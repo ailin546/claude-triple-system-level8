@@ -57,10 +57,13 @@ def call_claude(prompt: str, conversation_id: str | None = None) -> dict:
     cmd = ["claude", "-p", "--output-format", "json"]
 
     # 多轮对话: resume 已有会话
-    if conversation_id and conversation_id in sessions:
-        session_id = sessions[conversation_id].get("session_id")
-        if session_id:
-            cmd += ["--resume", session_id]
+    if conversation_id:
+        with sessions_lock:
+            existing = sessions.get(conversation_id)
+            if existing:
+                sid = existing.get("session_id")
+                if sid:
+                    cmd += ["--resume", sid]
 
     try:
         result = subprocess.run(
@@ -183,7 +186,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _read_body(self) -> dict:
+    def _read_body(self) -> dict | None:
         length = int(self.headers.get("Content-Length", 0))
         if length == 0:
             return {}
@@ -191,7 +194,11 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._respond(413, {"error": f"Request body too large (max {MAX_BODY_SIZE} bytes)"})
             return None
         raw = self.rfile.read(length)
-        return json.loads(raw)
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self._respond(400, {"error": "Invalid JSON in request body"})
+            return None
 
     def do_GET(self):
         if not self._check_auth():
@@ -270,6 +277,8 @@ def main():
     print(f"   Device: {DEVICE_NAME}")
     if AUTH_TOKEN:
         print(f"   Auth: token required")
+    else:
+        print(f"   Auth: WARNING - no token set, server is unauthenticated")
     print(f"   Endpoints:")
     print(f"     POST /chat           - 对话 (支持多轮)")
     print(f"     GET  /capabilities   - 查询能力")

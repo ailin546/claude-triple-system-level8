@@ -27,10 +27,10 @@ echo "Step 1: Fetching from OSSInsight (past 24h trending)..."
 curl -sL "https://api.ossinsight.io/v1/trends/repos?period=past_24_hours&limit=100" \
   -o "${TEMP_DIR}/ossinsight_raw.json" 2>/dev/null
 
-python3 -c "
+python3 - "${TEMP_DIR}/ossinsight_raw.json" > "${TEMP_DIR}/all_repos.jsonl" 2>/dev/null << 'PARSE_OSSINSIGHT'
 import json, sys
 
-data = json.load(open('${TEMP_DIR}/ossinsight_raw.json'))
+data = json.load(open(sys.argv[1]))
 rows = data.get('data', {}).get('rows', [])
 
 for r in rows:
@@ -38,13 +38,13 @@ for r in rows:
         'full_name': r.get('repo_name', ''),
         'description': r.get('description', '') or '',
         'stars': int(r.get('stars', 0)),
-        'stars_today': int(r.get('stars', 0)),  # OSSInsight 'stars' = stars in period
+        'stars_today': int(r.get('stars', 0)),
         'language': r.get('primary_language', '') or '',
         'score': float(r.get('total_score', 0)),
         'source': 'ossinsight'
     }
     print(json.dumps(repo))
-" > "${TEMP_DIR}/all_repos.jsonl" 2>/dev/null
+PARSE_OSSINSIGHT
 
 OSSINSIGHT_COUNT=$(wc -l < "${TEMP_DIR}/all_repos.jsonl" | tr -d ' ')
 echo "  Got ${OSSINSIGHT_COUNT} repos from OSSInsight"
@@ -141,7 +141,7 @@ with open(input_file) as f:
             continue
         try:
             r = json.loads(line)
-        except:
+        except Exception:
             continue
 
         name = r.get('full_name', '')
