@@ -1,0 +1,14 @@
+{
+  "peers": {
+    "mac": {
+      "url": "http://localhost:5111",
+      "description": "Local Mac"
+    },
+    "vps": {
+      "url": "http://100.64.0.2:5111",
+      "description": "VPS server"
+    }
+  },
+  "port": 5111,
+  "auth_token": ""
+}

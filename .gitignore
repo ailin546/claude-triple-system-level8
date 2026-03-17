@@ -1,0 +1,35 @@
+# ═══════════════════════════════════════════
+# Runtime Data (local only, never commit)
+# ═══════════════════════════════════════════
+.claude/memory/
+.claude/shared-state/board.json
+.claude/shared-state/decisions.log
+.claude/shared-state/artifacts/
+.claude/settings.local.json
+
+# ═══════════════════════════════════════════
+# OS & Editor
+# ═══════════════════════════════════════════
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# ═══════════════════════════════════════════
+# Dependencies
+# ═══════════════════════════════════════════
+node_modules/
+__pycache__/
+*.pyc
+.env
+.env.local
+
+# ═══════════════════════════════════════════
+# Runtime Output (project-specific)
+# ═══════════════════════════════════════════
+github-hunter/output/
+github-hunter/logs/
+github-hunter/workdir/
