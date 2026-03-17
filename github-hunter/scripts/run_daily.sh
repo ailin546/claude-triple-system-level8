@@ -80,8 +80,8 @@ while IFS= read -r repo_json; do
   REPO_CATEGORY=$(echo "$repo_json" | jq -r '.category')
 
   # Skip if already processed recently (within 7 days)
-  if grep -q "\"${REPO_NAME}\"" "$PROCESSED_FILE" 2>/dev/null; then
-    LAST_DATE=$(grep "\"${REPO_NAME}\"" "$PROCESSED_FILE" | tail -1 | jq -r '.date')
+  if grep -qF "\"${REPO_NAME}\"" "$PROCESSED_FILE" 2>/dev/null; then
+    LAST_DATE=$(grep -F "\"${REPO_NAME}\"" "$PROCESSED_FILE" | tail -1 | jq -r '.date')
     if date -jf "%Y-%m-%d" "$LAST_DATE" +%s >/dev/null 2>&1; then
       LAST_TS=$(date -jf "%Y-%m-%d" "$LAST_DATE" +%s)
     else

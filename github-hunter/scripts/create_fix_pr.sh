@@ -110,14 +110,12 @@ if git diff --cached --quiet; then
   log "WARNING: No specified files found, staging tracked changes only"
   git add -u
 fi
-git commit -m "$(cat <<EOF
-${ISSUE_TITLE}
+COMMIT_MSG="${ISSUE_TITLE}
 
 ${ISSUE_BODY}
 
-Fix type: ${FIX_TYPE}
-EOF
-)"
+Fix type: ${FIX_TYPE}"
+git commit -m "$COMMIT_MSG"
 
 # Step 6: Push to fork
 log "Pushing to fork..."

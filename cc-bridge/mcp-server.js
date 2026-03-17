@@ -60,7 +60,12 @@ async function fetchPeer(peerUrl, path, method = "GET", body = null) {
   try {
     const resp = await fetch(`${peerUrl}${path}`, opts);
     clearTimeout(timeout);
-    return await resp.json();
+    const text = await resp.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`Peer returned invalid JSON (HTTP ${resp.status}): ${text.slice(0, 200)}`);
+    }
   } catch (e) {
     clearTimeout(timeout);
     throw new Error(`Peer unreachable: ${e.message}`);

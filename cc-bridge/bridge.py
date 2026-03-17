@@ -8,7 +8,7 @@ CC Bridge - 让多台设备上的 Claude Code 互相对话
   GET  /health        - 健康检查
   GET  /sessions      - 列出活跃会话
 
-启动: python3 bridge.py [--port 5111] [--token YOUR_SECRET]
+启动: python3 bridge.py [--host 127.0.0.1] [--port 5111] [--token YOUR_SECRET]
 """
 
 import argparse
@@ -21,7 +21,7 @@ import time
 import uuid
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
 
 MAX_BODY_SIZE = 1 * 1024 * 1024  # 1 MB
 
@@ -187,7 +187,11 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _read_body(self) -> dict | None:
-        length = int(self.headers.get("Content-Length", 0))
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except (ValueError, TypeError):
+            self._respond(400, {"error": "Invalid Content-Length header"})
+            return None
         if length == 0:
             return {}
         if length > MAX_BODY_SIZE:
