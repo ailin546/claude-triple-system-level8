@@ -73,7 +73,7 @@ REPOS_WITH_ISSUES=0
 PROCESSED_FILE="${OUTPUT_DIR}/processed_repos.jsonl"
 touch "$PROCESSED_FILE"
 
-jq -c ".[:${MAX_REPOS}][]" "$TRENDING_FILE" | while IFS= read -r repo_json; do
+while IFS= read -r repo_json; do
   REPO_NAME=$(echo "$repo_json" | jq -r '.full_name')
   REPO_STARS=$(echo "$repo_json" | jq -r '.stars')
   REPO_LANG=$(echo "$repo_json" | jq -r '.language // "Unknown"')
@@ -82,7 +82,12 @@ jq -c ".[:${MAX_REPOS}][]" "$TRENDING_FILE" | while IFS= read -r repo_json; do
   # Skip if already processed recently (within 7 days)
   if grep -q "\"${REPO_NAME}\"" "$PROCESSED_FILE" 2>/dev/null; then
     LAST_DATE=$(grep "\"${REPO_NAME}\"" "$PROCESSED_FILE" | tail -1 | jq -r '.date')
-    DAYS_AGO=$(( ($(date +%s) - $(date -jf "%Y-%m-%d" "$LAST_DATE" +%s 2>/dev/null || echo 0)) / 86400 ))
+    if date -jf "%Y-%m-%d" "$LAST_DATE" +%s >/dev/null 2>&1; then
+      LAST_TS=$(date -jf "%Y-%m-%d" "$LAST_DATE" +%s)
+    else
+      LAST_TS=$(date -d "$LAST_DATE" +%s 2>/dev/null || echo 0)
+    fi
+    DAYS_AGO=$(( ($(date +%s) - LAST_TS) / 86400 ))
     if [ "$DAYS_AGO" -lt 7 ]; then
       log "  SKIP: ${REPO_NAME} (processed ${DAYS_AGO} days ago)"
       continue
@@ -146,7 +151,7 @@ jq -c ".[:${MAX_REPOS}][]" "$TRENDING_FILE" | while IFS= read -r repo_json; do
 
   REPOS_ANALYZED=$((REPOS_ANALYZED + 1))
   sleep 3  # Rate limit between repos
-done
+done < <(jq -c ".[:${MAX_REPOS}][]" "$TRENDING_FILE")
 
 # Summary
 log ""

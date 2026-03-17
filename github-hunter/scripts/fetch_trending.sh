@@ -53,7 +53,11 @@ echo "  Got ${OSSINSIGHT_COUNT} repos from OSSInsight"
 echo ""
 echo "Step 2: Fetching from GitHub Search API (topic-based)..."
 
-YESTERDAY=$(date -v-1d +%Y-%m-%d)
+if date -v-1d +%Y-%m-%d >/dev/null 2>&1; then
+  YESTERDAY=$(date -v-1d +%Y-%m-%d)
+else
+  YESTERDAY=$(date -d "yesterday" +%Y-%m-%d)
+fi
 
 TOPICS_AI=("llm" "machine-learning" "deep-learning" "generative-ai" "langchain" "transformers" "computer-vision" "nlp" "ai-agent")
 TOPICS_CRYPTO=("blockchain" "defi" "smart-contract" "web3" "solidity" "ethereum" "bitcoin" "cryptocurrency")

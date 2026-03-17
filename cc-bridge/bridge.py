@@ -12,6 +12,7 @@ CC Bridge - 让多台设备上的 Claude Code 互相对话
 """
 
 import argparse
+import hmac
 import json
 import subprocess
 import sys
@@ -21,6 +22,8 @@ import uuid
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
+
+MAX_BODY_SIZE = 1 * 1024 * 1024  # 1 MB
 
 # ── 会话管理 ─────────────────────────────────────────────
 
@@ -94,10 +97,11 @@ def call_claude(prompt: str, conversation_id: str | None = None) -> dict:
 
     # 更新会话
     with sessions_lock:
+        turns = sessions.get(conversation_id, {}).get("turns", 0) + 1
         sessions[conversation_id] = {
             "session_id": session_id,
             "last_active": time.time(),
-            "turns": sessions.get(conversation_id, {}).get("turns", 0) + 1
+            "turns": turns
         }
 
     return {
@@ -105,7 +109,7 @@ def call_claude(prompt: str, conversation_id: str | None = None) -> dict:
         "response": response_text,
         "session_id": session_id,
         "device": DEVICE_NAME,
-        "turns": sessions[conversation_id]["turns"]
+        "turns": turns
     }
 
 
@@ -166,7 +170,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if not AUTH_TOKEN:
             return True
         token = self.headers.get("Authorization", "").replace("Bearer ", "")
-        if token != AUTH_TOKEN:
+        if not hmac.compare_digest(token, AUTH_TOKEN):
             self._respond(401, {"error": "Unauthorized"})
             return False
         return True
@@ -183,6 +187,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         if length == 0:
             return {}
+        if length > MAX_BODY_SIZE:
+            self._respond(413, {"error": f"Request body too large (max {MAX_BODY_SIZE} bytes)"})
+            return None
         raw = self.rfile.read(length)
         return json.loads(raw)
 
@@ -218,6 +225,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         if path == "/chat":
             body = self._read_body()
+            if body is None:
+                return
             prompt = body.get("prompt", "")
             if not prompt:
                 self._respond(400, {"error": "Missing 'prompt' field"})
@@ -239,6 +248,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="CC Bridge Server")
     parser.add_argument("--port", type=int, default=5111)
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
     parser.add_argument("--token", type=str, default="", help="Auth token (optional)")
     args = parser.parse_args()
 
@@ -248,13 +258,15 @@ def main():
         conf = json.loads(peers_file.read_text())
         if not args.port or args.port == 5111:
             args.port = conf.get("port", 5111)
+        if args.host == "127.0.0.1":
+            args.host = conf.get("host", "127.0.0.1")
         if not args.token:
             args.token = conf.get("auth_token", "")
 
     AUTH_TOKEN = args.token
 
-    server = HTTPServer(("0.0.0.0", args.port), BridgeHandler)
-    print(f"🌉 CC Bridge running on :{args.port}")
+    server = HTTPServer((args.host, args.port), BridgeHandler)
+    print(f"🌉 CC Bridge running on {args.host}:{args.port}")
     print(f"   Device: {DEVICE_NAME}")
     if AUTH_TOKEN:
         print(f"   Auth: token required")

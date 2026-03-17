@@ -97,8 +97,19 @@ if git diff --quiet && git diff --cached --quiet; then
   exit 0
 fi
 
-# Step 5: Commit changes
-git add -A
+# Step 5: Commit changes (only stage files that were meant to be changed)
+IFS=',' read -ra CHANGE_FILES <<< "$FILES"
+for f in "${CHANGE_FILES[@]}"; do
+  f=$(echo "$f" | xargs)  # trim whitespace
+  if [ -f "$f" ]; then
+    git add "$f"
+  fi
+done
+# Fallback: if nothing was staged, add tracked changes only
+if git diff --cached --quiet; then
+  log "WARNING: No specified files found, staging tracked changes only"
+  git add -u
+fi
 git commit -m "$(cat <<EOF
 ${ISSUE_TITLE}
 

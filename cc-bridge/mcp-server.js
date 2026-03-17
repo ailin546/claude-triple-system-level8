@@ -18,29 +18,29 @@ import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// ── 加载 peers 配置 ────────────────────────────────────
+// ── 加载 peers 配置（启动时加载一次）─────────────────────
 
-function loadPeers() {
+let cachedConfig = null;
+
+function loadConfig() {
+  if (cachedConfig) return cachedConfig;
   const configPath = join(__dirname, "peers.json");
   try {
     const raw = readFileSync(configPath, "utf-8");
-    const config = JSON.parse(raw);
-    return config.peers || {};
+    cachedConfig = JSON.parse(raw);
   } catch (e) {
     console.error(`Failed to load peers.json: ${e.message}`);
-    return {};
+    cachedConfig = {};
   }
+  return cachedConfig;
+}
+
+function loadPeers() {
+  return loadConfig().peers || {};
 }
 
 function loadToken() {
-  const configPath = join(__dirname, "peers.json");
-  try {
-    const raw = readFileSync(configPath, "utf-8");
-    const config = JSON.parse(raw);
-    return config.auth_token || "";
-  } catch {
-    return "";
-  }
+  return loadConfig().auth_token || "";
 }
 
 // ── HTTP helpers ────────────────────────────────────────
