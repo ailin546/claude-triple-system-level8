@@ -1,5 +1,7 @@
 # Triple-System Development Framework
 
+> **所有内容用中文回复。**
+
 Three complementary systems integrated for Claude Code:
 
 | Layer | System | Source | What It Provides |
