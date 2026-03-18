@@ -64,14 +64,22 @@ echo "   ✅ memory/ (sprint files auto-created by hook)"
 echo "🔗 [3/4] Checking hook scripts..."
 
 # Verify hook scripts exist
+MISSING_HOOKS=0
 for script in shared-state-sync.js sprint-memory.js; do
   if [ ! -f "$CLAUDE_DIR/scripts/hooks/$script" ]; then
-    echo "   ⚠️  Missing: scripts/hooks/$script"
-    echo "   Copy from the ECC Level 8 template or run this from the repo root."
+    echo "   ❌ Missing: scripts/hooks/$script"
+    MISSING_HOOKS=1
   else
     echo "   ✅ scripts/hooks/$script"
   fi
 done
+
+if [ "$MISSING_HOOKS" -eq 1 ]; then
+  echo ""
+  echo "   FATAL: Required hook scripts are missing."
+  echo "   Copy them from the ECC Level 8 template or run this from the repo root."
+  exit 1
+fi
 
 # Check if hooks are registered in settings.json
 if grep -q "shared-state-sync.js" "$CLAUDE_DIR/settings.json" 2>/dev/null; then
@@ -93,8 +101,12 @@ if [ ! -f "$CLAUDE_DIR/settings.local.json" ]; then
     "allow": [
       "Bash(npm test*)",
       "Bash(npm run *)",
-      "Bash(npx *)",
-      "Bash(node *)",
+      "Bash(npx jest*)",
+      "Bash(npx vitest*)",
+      "Bash(npx tsc*)",
+      "Bash(npx eslint*)",
+      "Bash(npx prettier*)",
+      "Bash(node .claude/*)",
       "Bash(git status*)",
       "Bash(git diff*)",
       "Bash(git log*)",
@@ -106,14 +118,8 @@ if [ ! -f "$CLAUDE_DIR/settings.local.json" ]; then
       "Bash(gh pr *)",
       "Bash(gh issue *)",
       "Bash(gh run *)",
-      "Bash(mkdir *)",
-      "Bash(ls *)",
-      "Bash(cat *)",
-      "Bash(python *)",
-      "Bash(python3 *)",
-      "Bash(pip install *)",
-      "Bash(go *)",
-      "Bash(cargo *)"
+      "Bash(mkdir -p *)",
+      "Bash(ls *)"
     ]
   }
 }

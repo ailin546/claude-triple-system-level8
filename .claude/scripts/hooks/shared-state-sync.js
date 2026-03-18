@@ -4,15 +4,17 @@
  *
  * On every Stop event:
  * 1. Reads current board.json
- * 2. Cleans up stale agent entries (no update in 30min)
+ * 2. Cleans up stale agent entries (no heartbeat in 30min)
  * 3. Archives completed workflows
- * 4. Writes back
+ * 4. Writes back atomically (write-to-tmp + rename)
  *
  * Cross-platform (Windows, macOS, Linux)
  */
 
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+const crypto = require('crypto');
 
 const SHARED_STATE_DIR = path.join(process.cwd(), '.claude', 'shared-state');
 const BOARD_PATH = path.join(SHARED_STATE_DIR, 'board.json');
@@ -29,8 +31,17 @@ function readJSON(filePath) {
   }
 }
 
-function writeJSON(filePath, data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n', 'utf8');
+/**
+ * Atomic write: write to a temp file in the same directory, then rename.
+ * rename() is atomic on POSIX; on Windows it's close enough for our use.
+ */
+function writeJSONAtomic(filePath, data) {
+  const dir = path.dirname(filePath);
+  const tmpName = `.board-${crypto.randomBytes(4).toString('hex')}.tmp`;
+  const tmpPath = path.join(dir, tmpName);
+  const content = JSON.stringify(data, null, 2) + '\n';
+  fs.writeFileSync(tmpPath, content, 'utf8');
+  fs.renameSync(tmpPath, filePath);
 }
 
 function appendDecision(agentId, action, description) {
@@ -48,10 +59,15 @@ function main() {
   const now = Date.now();
   let changed = false;
 
-  // Clean up stale agents (running but no update in 30min)
+  // Clean up stale agents.
+  // Prefer lastHeartbeat (updated by the agent during activity),
+  // fall back to startedAt for backwards compatibility.
   for (const agent of board.agents) {
     if (agent.status === 'running') {
-      const lastUpdate = new Date(agent.startedAt).getTime();
+      const heartbeat = agent.lastHeartbeat || agent.startedAt;
+      if (!heartbeat) continue; // No timestamp — skip, don't break
+      const lastUpdate = new Date(heartbeat).getTime();
+      if (isNaN(lastUpdate)) continue; // Invalid date — skip
       if (now - lastUpdate > STALE_THRESHOLD_MS) {
         agent.status = 'stale';
         appendDecision('system', 'CLEANUP', `Agent ${agent.id} marked stale (no activity for 30min)`);
@@ -60,7 +76,7 @@ function main() {
     }
   }
 
-  // Remove completed agents older than 1 hour
+  // Remove completed agents older than 1 hour, and stale agents
   const ONE_HOUR = 60 * 60 * 1000;
   const beforeCount = board.agents.length;
   board.agents = board.agents.filter(a => {
@@ -73,7 +89,7 @@ function main() {
   if (board.agents.length !== beforeCount) changed = true;
 
   // Check if all tasks completed → archive workflow
-  if (board.tasks.length > 0 && board.tasks.every(t => t.status === 'completed')) {
+  if (board.tasks && board.tasks.length > 0 && board.tasks.every(t => t.status === 'completed')) {
     const workflowId = board.activeWorkflow || `workflow-${Date.now()}`;
     const archiveDir = path.join(ARTIFACTS_DIR, workflowId);
 
@@ -81,11 +97,9 @@ function main() {
       fs.mkdirSync(archiveDir, { recursive: true });
     }
 
-    // Archive current board state
-    writeJSON(path.join(archiveDir, 'board-final.json'), board);
+    writeJSONAtomic(path.join(archiveDir, 'board-final.json'), board);
     appendDecision('system', 'ARCHIVE', `Workflow ${workflowId} completed — all ${board.tasks.length} tasks done`);
 
-    // Reset board
     board.tasks = [];
     board.agents = [];
     board.conflicts = [];
@@ -95,7 +109,7 @@ function main() {
 
   if (changed) {
     board.lastUpdated = new Date().toISOString();
-    writeJSON(BOARD_PATH, board);
+    writeJSONAtomic(BOARD_PATH, board);
   }
 }
 

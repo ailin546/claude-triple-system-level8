@@ -26,10 +26,20 @@ function getISOWeek(date) {
   return Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7) + 1;
 }
 
+function getISOWeekYear(date) {
+  // The ISO week-year can differ from calendar year at year boundaries.
+  // Use the Thursday of the same ISO week to determine the correct year.
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  return d.getFullYear();
+}
+
 function getSprintId() {
   const now = new Date();
   const week = getISOWeek(now);
-  return `${now.getFullYear()}-W${String(week).padStart(2, '0')}`;
+  const year = getISOWeekYear(now);
+  return `${year}-W${String(week).padStart(2, '0')}`;
 }
 
 function getDateString() {
@@ -133,19 +143,19 @@ function main() {
         t.status === 'pending' || t.status === 'in_progress' || t.status === 'blocked'
       );
 
-      if (pendingTasks.length > 0) {
-        // Clear and rebuild unfinished work section
-        const sectionStart = content.indexOf('## Unfinished Work');
-        const sectionEnd = content.indexOf('\n---', sectionStart);
+      // Clear and rebuild unfinished work section
+      const sectionStart = content.indexOf('## Unfinished Work');
+      const sectionEnd = content.indexOf('\n---', sectionStart);
 
-        if (sectionStart !== -1 && sectionEnd !== -1) {
-          const header = '## Unfinished Work\n\n<!-- Auto-updated from board.json. Format: - [date] task description (status) -->\n';
-          const taskLines = pendingTasks.map(t =>
-            `- [${today}] ${t.description} (${t.status})`
-          ).join('\n');
+      if (sectionStart !== -1 && sectionEnd !== -1) {
+        const header = '## Unfinished Work\n\n<!-- Auto-updated from board.json. Format: - [date] task description (status) -->\n';
+        const taskLines = pendingTasks.length > 0
+          ? pendingTasks.map(t =>
+              `- [${today}] ${t.description} (${t.status})`
+            ).join('\n') + '\n'
+          : '';
 
-          content = content.slice(0, sectionStart) + header + taskLines + '\n' + content.slice(sectionEnd);
-        }
+        content = content.slice(0, sectionStart) + header + taskLines + content.slice(sectionEnd);
       }
     }
   }
