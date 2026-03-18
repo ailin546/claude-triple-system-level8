@@ -7,22 +7,76 @@
  * Runs on Stop events (after each response). Extracts a meaningful summary
  * from the session transcript (via stdin JSON transcript_path) and updates a
  * session file for cross-session continuity.
+ *
+ * All dependencies are inlined — no external lib/ required.
  */
 
 const path = require('path');
 const fs = require('fs');
-const {
-  getSessionsDir,
-  getDateString,
-  getTimeString,
-  getSessionIdShort,
-  getProjectName,
-  ensureDir,
-  readFile,
-  writeFile,
-  runCommand,
-  log
-} = require('../lib/utils');
+const { execSync } = require('child_process');
+
+// ── Inlined utilities (previously from ../lib/utils) ─────────
+
+const SESSIONS_DIR = path.join(
+  process.env.HOME || process.env.USERPROFILE || '/tmp',
+  '.claude', 'sessions'
+);
+
+function ensureDir(dir) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+function log(msg) {
+  console.error(msg);
+}
+
+function readFile(filePath) {
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+function writeFile(filePath, content) {
+  fs.writeFileSync(filePath, content, 'utf8');
+}
+
+function getDateString() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function getTimeString() {
+  return new Date().toISOString().split('T')[1].replace('Z', '').slice(0, 8);
+}
+
+function getSessionIdShort() {
+  // Use CLAUDE_SESSION_ID env var if available, otherwise generate from timestamp
+  const sessionId = process.env.CLAUDE_SESSION_ID || '';
+  if (sessionId) return sessionId.slice(0, 8);
+  return Date.now().toString(36).slice(-6);
+}
+
+function getProjectName() {
+  return path.basename(process.cwd());
+}
+
+function runCommand(cmd) {
+  try {
+    const output = execSync(cmd, {
+      encoding: 'utf8',
+      timeout: 5000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+    return { success: true, output };
+  } catch {
+    return { success: false, output: '' };
+  }
+}
+
+// ── End inlined utilities ────────────────────────────────────
 
 const SUMMARY_START_MARKER = '<!-- ECC:SUMMARY:START -->';
 const SUMMARY_END_MARKER = '<!-- ECC:SUMMARY:END -->';
@@ -51,7 +105,6 @@ function extractSessionSummary(transcriptPath) {
 
       // Collect user messages (first 200 chars each)
       if (entry.type === 'user' || entry.role === 'user' || entry.message?.role === 'user') {
-        // Support both direct content and nested message.content (Claude Code JSONL format)
         const rawContent = entry.message?.content ?? entry.content;
         const text = typeof rawContent === 'string'
           ? rawContent
@@ -74,7 +127,7 @@ function extractSessionSummary(transcriptPath) {
         }
       }
 
-      // Extract tool uses from assistant message content blocks (Claude Code JSONL format)
+      // Extract tool uses from assistant message content blocks
       if (entry.type === 'assistant' && Array.isArray(entry.message?.content)) {
         for (const block of entry.message.content) {
           if (block.type === 'tool_use') {
@@ -100,14 +153,14 @@ function extractSessionSummary(transcriptPath) {
   if (userMessages.length === 0) return null;
 
   return {
-    userMessages: userMessages.slice(-10), // Last 10 user messages
+    userMessages: userMessages.slice(-10),
     toolsUsed: Array.from(toolsUsed).slice(0, 20),
     filesModified: Array.from(filesModified).slice(0, 30),
     totalMessages: userMessages.length
   };
 }
 
-// Read hook input from stdin (Claude Code provides transcript_path via stdin JSON)
+// Read hook input from stdin
 const MAX_STDIN = 1024 * 1024;
 let stdinData = '';
 process.stdin.setEncoding('utf8');
@@ -138,6 +191,10 @@ function getSessionMetadata() {
     branch: branchResult.success ? branchResult.output : 'unknown',
     worktree: process.cwd()
   };
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function extractHeaderField(header, label) {
@@ -182,11 +239,10 @@ async function main() {
     const input = JSON.parse(stdinData);
     transcriptPath = input.transcript_path;
   } catch {
-    // Fallback: try env var for backwards compatibility
     transcriptPath = process.env.CLAUDE_TRANSCRIPT_PATH;
   }
 
-  const sessionsDir = getSessionsDir();
+  const sessionsDir = SESSIONS_DIR;
   const today = getDateString();
   const shortId = getSessionIdShort();
   const sessionFile = path.join(sessionsDir, `${today}-${shortId}-session.tmp`);
@@ -220,9 +276,6 @@ async function main() {
       }
     }
 
-    // If we have a new summary, update only the generated summary block.
-    // This keeps repeated Stop invocations idempotent and preserves
-    // user-authored sections in the same session file.
     if (summary && updatedContent) {
       const summaryBlock = buildSummaryBlock(summary);
 
@@ -232,7 +285,6 @@ async function main() {
           summaryBlock
         );
       } else {
-        // Migration path for files created before summary markers existed.
         updatedContent = updatedContent.replace(
           /## (?:Session Summary|Current State)[\s\S]*?$/,
           `${summaryBlock}\n\n### Notes for Next Session\n-\n\n### Context to Load\n\`\`\`\n[relevant files]\n\`\`\`\n`
@@ -246,7 +298,6 @@ async function main() {
 
     log(`[SessionEnd] Updated session file: ${sessionFile}`);
   } else {
-    // Create new session file
     const summarySection = summary
       ? `${buildSummaryBlock(summary)}\n\n### Notes for Next Session\n-\n\n### Context to Load\n\`\`\`\n[relevant files]\n\`\`\``
       : `## Current State\n\n[Session context goes here]\n\n### Completed\n- [ ]\n\n### In Progress\n- [ ]\n\n### Notes for Next Session\n-\n\n### Context to Load\n\`\`\`\n[relevant files]\n\`\`\``;
@@ -264,14 +315,12 @@ async function main() {
 function buildSummarySection(summary) {
   let section = '## Session Summary\n\n';
 
-  // Tasks (from user messages — collapse newlines and escape backticks to prevent markdown breaks)
   section += '### Tasks\n';
   for (const msg of summary.userMessages) {
     section += `- ${msg.replace(/\n/g, ' ').replace(/`/g, '\\`')}\n`;
   }
   section += '\n';
 
-  // Files modified
   if (summary.filesModified.length > 0) {
     section += '### Files Modified\n';
     for (const f of summary.filesModified) {
@@ -280,7 +329,6 @@ function buildSummarySection(summary) {
     section += '\n';
   }
 
-  // Tools used
   if (summary.toolsUsed.length > 0) {
     section += `### Tools Used\n${summary.toolsUsed.join(', ')}\n\n`;
   }
@@ -292,8 +340,4 @@ function buildSummarySection(summary) {
 
 function buildSummaryBlock(summary) {
   return `${SUMMARY_START_MARKER}\n${buildSummarySection(summary).trim()}\n${SUMMARY_END_MARKER}`;
-}
-
-function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
