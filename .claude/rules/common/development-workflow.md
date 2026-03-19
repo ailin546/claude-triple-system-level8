@@ -20,6 +20,14 @@ The Feature Implementation Workflow describes the development pipeline: research
    - Identify dependencies and risks
    - Break down into phases
 
+1.5. **Design Consultation** _(auto-trigger for UI/UX tasks)_
+   - If the task involves UI components, pages, layouts, or visual changes:
+     - Auto-invoke `design-consultation` skill
+     - Parallel agents: UI Designer + UX Architect + UX Researcher
+     - Accessibility gate (WCAG AA)
+     - Wait for user confirmation on design brief before coding
+   - Skip for backend-only, CLI, or non-visual tasks
+
 2. **TDD Approach**
    - Use **tdd-guide** agent
    - Write tests first (RED)
@@ -27,12 +35,18 @@ The Feature Implementation Workflow describes the development pipeline: research
    - Refactor (IMPROVE)
    - Verify 80%+ coverage
 
-3. **Code Review**
+3. **Design Review** _(auto-trigger for UI/UX changes)_
+   - If implementation touched CSS/styling/component files:
+     - Auto-invoke `design-review` skill before code review
+     - Check: design token compliance, accessibility, responsive, visual consistency
+     - Fix CRITICAL/HIGH issues before proceeding
+
+4. **Code Review**
    - Use **code-reviewer** agent immediately after writing code
    - Address CRITICAL and HIGH issues
    - Fix MEDIUM issues when possible
 
-4. **Commit & Push**
+5. **Commit & Push**
    - Detailed commit messages
    - Follow conventional commits format
    - See [git-workflow.md](./git-workflow.md) for commit message format and PR process

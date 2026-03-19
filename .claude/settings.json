@@ -28,6 +28,26 @@
         "description": "Auto-start dev servers in tmux"
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/careful-guard.js\""
+          }
+        ],
+        "description": "Block destructive commands (rm -rf, DROP TABLE, git push --force)"
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/freeze-guard.js\""
+          }
+        ],
+        "description": "Block edits outside frozen directory (when /freeze is active)"
+      },
+      {
         "matcher": "Edit|Write",
         "hooks": [
           {
@@ -39,6 +59,18 @@
       }
     ],
     "PostToolUse": [
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/drift-detector.js\"",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "description": "Track agent drift score (reverts, scattered edits, test failures)"
+      },
       {
         "matcher": "Edit|Write",
         "hooks": [
