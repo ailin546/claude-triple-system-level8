@@ -59,7 +59,9 @@ function main() {
   const absFreezeDir = path.resolve(freezeDir);
 
   // Check if the target file is within the frozen directory
-  if (!absPath.startsWith(absFreezeDir)) {
+  // Ensure trailing separator to prevent /src matching /src-other/file.js
+  const freezePrefix = absFreezeDir.endsWith(path.sep) ? absFreezeDir : absFreezeDir + path.sep;
+  if (!absPath.startsWith(freezePrefix) && absPath !== absFreezeDir) {
     const result = {
       decision: 'block',
       reason: `[freeze-guard] Edit blocked: ${path.relative(PROJECT_ROOT, absPath)}\nEdits restricted to: ${path.relative(PROJECT_ROOT, absFreezeDir)}/\nRun /unfreeze to remove the restriction.`

@@ -92,9 +92,9 @@ function main() {
   if (toolName === 'Edit' || toolName === 'Write') {
     const filePath = toolInput.file_path || '';
     if (filePath) {
-      // Track edit count per file
+      // Track edit count per file — only add score at threshold crossings (3, 6, 9...)
       state.editedFiles[filePath] = (state.editedFiles[filePath] || 0) + 1;
-      if (state.editedFiles[filePath] >= 3) {
+      if (state.editedFiles[filePath] >= 3 && state.editedFiles[filePath] % 3 === 0) {
         state.score += 5;
         scoreChanged = true;
       }
@@ -145,17 +145,16 @@ function main() {
   saveState(state);
 
   // Emit warnings based on score
+  // NOTE: PostToolUse hooks cannot block (tool already executed).
+  // All output goes to stderr as warnings visible to the user.
   if (state.score >= 40) {
-    const result = {
-      decision: 'block',
-      reason: `[drift-detector] Drift score critically high: ${state.score}%\n` +
-        `Reverts: ${state.revertCount}, Dirs touched: ${state.editedDirs.size}, ` +
-        `Consecutive test fails: ${state.consecutiveTestFails}\n` +
-        `Recommendation: Run /verify to check current state before continuing.`
-    };
-    process.stdout.write(JSON.stringify(result));
+    process.stderr.write(
+      `[drift-detector] CRITICAL: drift score ${state.score}%!\n` +
+      `Reverts: ${state.revertCount}, Dirs touched: ${state.editedDirs.size}, ` +
+      `Consecutive test fails: ${state.consecutiveTestFails}\n` +
+      `STOP and run /verify before continuing.\n`
+    );
   } else if (state.score >= 20 && scoreChanged) {
-    // Warning only — output to stderr so it appears in conversation
     process.stderr.write(
       `[drift-detector] Warning: drift score ${state.score}%. ` +
       `Consider pausing to verify direction is correct.\n`

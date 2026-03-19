@@ -73,7 +73,7 @@ Intent: Add OAuth login to user authentication system
 - src/utils/string-helpers.ts — unrelated utility change, consider separate PR
 
 ### 📋 Possibly Missing (1 file)
-- src/auth/oauth.test.ts — no test file found for new OAuth module
+- src/config/oauth-providers.ts — OAuth provider config not yet created
 
 **Drift Score: 1/11 files (9%) — Low drift**
 ```
