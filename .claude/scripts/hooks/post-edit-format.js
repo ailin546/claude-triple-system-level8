@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
- * PostToolUse Hook: Auto-format JS/TS files after edits
+ * PostToolUse Hook: Auto-format JS/TS/Rust files after edits
  *
  * Cross-platform (Windows, macOS, Linux)
  *
  * Runs after Edit tool use. If the edited file is a JS/TS file,
  * auto-detects the project formatter (Biome or Prettier) by looking
- * for config files, then formats accordingly.
+ * for config files, then formats accordingly. For Rust (.rs) files,
+ * runs rustfmt directly.
  *
  * For Biome, uses `check --write` (format + lint in one pass) to
  * avoid a redundant second invocation from quality-gate.js.
@@ -78,6 +79,19 @@ function run(rawInput) {
         }
       } catch {
         // Formatter not installed, file missing, or failed — non-blocking
+      }
+    }
+
+    // Rust files: run rustfmt directly
+    if (filePath && /\.rs$/.test(filePath)) {
+      try {
+        const resolvedFilePath = path.resolve(filePath);
+        execFileSync('rustfmt', ['--edition', '2021', resolvedFilePath], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 15000
+        });
+      } catch {
+        // rustfmt not installed or failed — non-blocking
       }
     }
   } catch {

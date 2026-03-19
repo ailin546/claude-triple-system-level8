@@ -13,7 +13,6 @@
 
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
 const crypto = require('crypto');
 
 const SHARED_STATE_DIR = path.join(process.cwd(), '.claude', 'shared-state');
@@ -41,7 +40,12 @@ function writeJSONAtomic(filePath, data) {
   const tmpPath = path.join(dir, tmpName);
   const content = JSON.stringify(data, null, 2) + '\n';
   fs.writeFileSync(tmpPath, content, 'utf8');
-  fs.renameSync(tmpPath, filePath);
+  try {
+    fs.renameSync(tmpPath, filePath);
+  } catch (err) {
+    try { fs.unlinkSync(tmpPath); } catch {}
+    throw err;
+  }
 }
 
 function appendDecision(agentId, action, description) {
@@ -114,9 +118,15 @@ function main() {
 }
 
 // Read stdin (Claude Code hook protocol) then run
+const MAX_STDIN = 1024 * 1024;
 let stdinData = '';
 process.stdin.setEncoding('utf8');
-process.stdin.on('data', chunk => { stdinData += chunk.substring(0, 1024 * 1024); });
+process.stdin.on('data', chunk => {
+  if (stdinData.length < MAX_STDIN) {
+    const remaining = MAX_STDIN - stdinData.length;
+    stdinData += chunk.substring(0, remaining);
+  }
+});
 process.stdin.on('end', () => {
   try { main(); } catch (err) {
     console.error('[SharedStateSync] Error:', err.message);

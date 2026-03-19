@@ -93,25 +93,6 @@ function createSprintTemplate(sprintId) {
 `;
 }
 
-function appendToSection(content, sectionHeader, newLine) {
-  const sectionRegex = new RegExp(`(## ${sectionHeader}\\n\\n(?:<!-- [^>]+ -->\\n)?)(\\n---)`);
-  const match = content.match(sectionRegex);
-
-  if (match) {
-    // Insert before the next ---
-    const insertPoint = content.indexOf(match[2], content.indexOf(match[1]));
-    return content.slice(0, insertPoint) + newLine + '\n' + content.slice(insertPoint);
-  }
-
-  // Fallback: append before last ---
-  const lastSeparator = content.lastIndexOf('\n---');
-  if (lastSeparator !== -1) {
-    return content.slice(0, lastSeparator) + '\n' + newLine + content.slice(lastSeparator);
-  }
-
-  return content + '\n' + newLine;
-}
-
 function main() {
   if (!fs.existsSync(MEMORY_DIR)) {
     fs.mkdirSync(MEMORY_DIR, { recursive: true });
@@ -138,24 +119,25 @@ function main() {
   // Sync unfinished work from board.json
   if (fs.existsSync(BOARD_PATH)) {
     const board = readJSON(BOARD_PATH);
-    if (board && board.tasks && board.tasks.length > 0) {
+    if (board && Array.isArray(board.tasks)) {
       const pendingTasks = board.tasks.filter(t =>
         t.status === 'pending' || t.status === 'in_progress' || t.status === 'blocked'
       );
 
       // Clear and rebuild unfinished work section
       const sectionStart = content.indexOf('## Unfinished Work');
-      const sectionEnd = content.indexOf('\n---', sectionStart);
+      if (sectionStart !== -1) {
+        const sectionEnd = content.indexOf('\n---', sectionStart);
+        if (sectionEnd !== -1) {
+          const header = '## Unfinished Work\n\n<!-- Auto-updated from board.json. Format: - [date] task description (status) -->\n';
+          const taskLines = pendingTasks.length > 0
+            ? pendingTasks.map(t =>
+                `- [${today}] ${t.description} (${t.status})`
+              ).join('\n') + '\n'
+            : '';
 
-      if (sectionStart !== -1 && sectionEnd !== -1) {
-        const header = '## Unfinished Work\n\n<!-- Auto-updated from board.json. Format: - [date] task description (status) -->\n';
-        const taskLines = pendingTasks.length > 0
-          ? pendingTasks.map(t =>
-              `- [${today}] ${t.description} (${t.status})`
-            ).join('\n') + '\n'
-          : '';
-
-        content = content.slice(0, sectionStart) + header + taskLines + content.slice(sectionEnd);
+          content = content.slice(0, sectionStart) + header + taskLines + content.slice(sectionEnd);
+        }
       }
     }
   }
@@ -164,9 +146,15 @@ function main() {
 }
 
 // Read stdin (Claude Code hook protocol) then run
+const MAX_STDIN = 1024 * 1024;
 let stdinData = '';
 process.stdin.setEncoding('utf8');
-process.stdin.on('data', chunk => { stdinData += chunk.substring(0, 1024 * 1024); });
+process.stdin.on('data', chunk => {
+  if (stdinData.length < MAX_STDIN) {
+    const remaining = MAX_STDIN - stdinData.length;
+    stdinData += chunk.substring(0, remaining);
+  }
+});
 process.stdin.on('end', () => {
   try { main(); } catch (err) {
     console.error('[SprintMemory] Error:', err.message);
