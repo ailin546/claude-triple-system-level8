@@ -129,6 +129,16 @@ After completing each chunk of the plan:
 - If loop exceeds 5 iterations, surface to human for guidance
 - Reviewers are advisory - explain disagreements if you believe feedback is incorrect
 
+## Staff-Level Strategic Review
+
+After ALL chunks are approved by plan-document-reviewer, dispatch a staff-reviewer subagent (see staff-reviewer-prompt.md) for the complete plan:
+
+1. Provide: full plan document path, project context, original requirements
+2. If ⚠️ Concerns: evaluate and address valid concerns, explain disagreements
+3. If ✅ Approved: proceed to execution handoff
+
+This review is advisory — it surfaces strategic risks but does not block execution. Only dispatch once for the full plan, not per-chunk.
+
 ## Execution Handoff
 
 After saving the plan:
