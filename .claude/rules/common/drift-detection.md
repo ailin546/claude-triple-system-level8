@@ -15,7 +15,7 @@ A PostToolUse hook (`drift-detector.js`) maintains a suspicion score per session
 ## Thresholds
 
 - **20%**: Warning message — "Consider pausing to verify direction"
-- **40%**: Block — "Run /verify before continuing"
+- **40%**: Critical warning — "STOP and run /verify before continuing"
 
 ## When It Triggers
 
