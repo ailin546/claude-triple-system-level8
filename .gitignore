@@ -6,6 +6,11 @@
 .claude/shared-state/decisions.log
 .claude/shared-state/artifacts/
 .claude/settings.local.json
+.claude/.careful-enabled
+.claude/.freeze-dir
+.claude/.drift-state/
+.claude/qa-scores/
+.context/
 
 # ═══════════════════════════════════════════
 # OS & Editor
