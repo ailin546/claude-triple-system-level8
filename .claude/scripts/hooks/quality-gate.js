@@ -9,7 +9,7 @@
  * For JS/TS files with Biome, this hook is skipped because
  * post-edit-format.js already runs `biome check --write`.
  * This hook still handles .json/.md files for Biome, and all
- * Prettier / Go / Python checks.
+ * Prettier / Go / Python / Rust checks.
  */
 
 'use strict';
@@ -115,6 +115,23 @@ function maybeRunQualityGate(filePath) {
         log(`[QualityGate] gofmt failed for ${filePath}`);
       } else if (r.stdout && r.stdout.trim()) {
         log(`[QualityGate] gofmt check failed for ${filePath}`);
+      }
+    }
+    return;
+  }
+
+  if (ext === '.rs') {
+    // Rust: rustfmt for formatting (already handled by post-edit-format
+    // when fix mode is on, so quality-gate only runs --check here)
+    if (fix) {
+      const r = exec('rustfmt', ['--edition', '2021', filePath]);
+      if (r.status !== 0 && strict) {
+        log(`[QualityGate] rustfmt failed for ${filePath}`);
+      }
+    } else if (strict) {
+      const r = exec('rustfmt', ['--edition', '2021', '--check', filePath]);
+      if (r.status !== 0) {
+        log(`[QualityGate] rustfmt check failed for ${filePath}`);
       }
     }
     return;
