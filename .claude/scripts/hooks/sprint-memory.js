@@ -126,17 +126,18 @@ function main() {
 
       // Clear and rebuild unfinished work section
       const sectionStart = content.indexOf('## Unfinished Work');
-      const sectionEnd = content.indexOf('\n---', sectionStart);
+      if (sectionStart !== -1) {
+        const sectionEnd = content.indexOf('\n---', sectionStart);
+        if (sectionEnd !== -1) {
+          const header = '## Unfinished Work\n\n<!-- Auto-updated from board.json. Format: - [date] task description (status) -->\n';
+          const taskLines = pendingTasks.length > 0
+            ? pendingTasks.map(t =>
+                `- [${today}] ${t.description} (${t.status})`
+              ).join('\n') + '\n'
+            : '';
 
-      if (sectionStart !== -1 && sectionEnd !== -1) {
-        const header = '## Unfinished Work\n\n<!-- Auto-updated from board.json. Format: - [date] task description (status) -->\n';
-        const taskLines = pendingTasks.length > 0
-          ? pendingTasks.map(t =>
-              `- [${today}] ${t.description} (${t.status})`
-            ).join('\n') + '\n'
-          : '';
-
-        content = content.slice(0, sectionStart) + header + taskLines + content.slice(sectionEnd);
+          content = content.slice(0, sectionStart) + header + taskLines + content.slice(sectionEnd);
+        }
       }
     }
   }

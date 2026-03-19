@@ -40,7 +40,12 @@ function writeJSONAtomic(filePath, data) {
   const tmpPath = path.join(dir, tmpName);
   const content = JSON.stringify(data, null, 2) + '\n';
   fs.writeFileSync(tmpPath, content, 'utf8');
-  fs.renameSync(tmpPath, filePath);
+  try {
+    fs.renameSync(tmpPath, filePath);
+  } catch (err) {
+    try { fs.unlinkSync(tmpPath); } catch {}
+    throw err;
+  }
 }
 
 function appendDecision(agentId, action, description) {

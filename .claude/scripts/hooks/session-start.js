@@ -204,7 +204,11 @@ function buildStructuredSummary(rawContent) {
 
   let result = parts.join('\n');
   if (Buffer.byteLength(result, 'utf8') > MAX_SUMMARY_BYTES) {
-    result = result.slice(0, MAX_SUMMARY_BYTES - 3) + '...';
+    const buf = Buffer.from(result, 'utf8');
+    let end = MAX_SUMMARY_BYTES - 3;
+    // Walk back to avoid splitting a multi-byte UTF-8 sequence
+    while (end > 0 && (buf[end] & 0xC0) === 0x80) end--;
+    result = buf.subarray(0, end).toString('utf8') + '...';
   }
   return result;
 }

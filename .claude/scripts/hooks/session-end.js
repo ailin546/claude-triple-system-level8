@@ -13,7 +13,7 @@
 
 const path = require('path');
 const fs = require('fs');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
 // ── Inlined utilities (previously from ../lib/utils) ─────────
 
@@ -63,16 +63,15 @@ function getProjectName() {
   return path.basename(process.cwd());
 }
 
-function runCommand(cmd) {
+function getGitBranch() {
   try {
-    const output = execSync(cmd, {
+    return execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
       encoding: 'utf8',
       timeout: 5000,
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
-    return { success: true, output };
   } catch {
-    return { success: false, output: '' };
+    return 'unknown';
   }
 }
 
@@ -184,11 +183,9 @@ function runMain() {
 }
 
 function getSessionMetadata() {
-  const branchResult = runCommand('git rev-parse --abbrev-ref HEAD');
-
   return {
     project: getProjectName() || 'unknown',
-    branch: branchResult.success ? branchResult.output : 'unknown',
+    branch: getGitBranch(),
     worktree: process.cwd()
   };
 }
