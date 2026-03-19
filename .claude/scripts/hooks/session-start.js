@@ -12,7 +12,6 @@
 
 const path = require('path');
 const fs = require('fs');
-const { execSync } = require('child_process');
 
 // ── Inlined utilities (previously from ../lib/) ──────────────
 
@@ -141,6 +140,12 @@ function buildStructuredSummary(rawContent) {
     resumeHint: null,
   };
 
+  // Extract goal from headings before iterating (headings are consumed by section detection)
+  const sessionHeadingMatch = rawContent.match(/^#\s+Session:\s+(.+)$/m);
+  if (sessionHeadingMatch) {
+    summary.goal = sessionHeadingMatch[1].trim();
+  }
+
   let currentSection = null;
 
   for (const line of lines) {
@@ -155,12 +160,6 @@ function buildStructuredSummary(rawContent) {
     if (/^#{1,3}\s+/i.test(trimmed)) { currentSection = 'other'; continue; }
 
     if (!trimmed || trimmed.startsWith('<!--')) continue;
-
-    // Extract first heading as goal
-    if (!summary.goal && /^#\s+Session:\s+/.test(trimmed)) {
-      summary.goal = trimmed.replace(/^#\s+Session:\s+/, '').trim();
-      continue;
-    }
 
     // Extract bullet items per section
     const bulletMatch = trimmed.match(/^[-*]\s+(.+)/);

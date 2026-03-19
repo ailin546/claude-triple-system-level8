@@ -93,25 +93,6 @@ function createSprintTemplate(sprintId) {
 `;
 }
 
-function appendToSection(content, sectionHeader, newLine) {
-  const sectionRegex = new RegExp(`(## ${sectionHeader}\\n\\n(?:<!-- [^>]+ -->\\n)?)(\\n---)`);
-  const match = content.match(sectionRegex);
-
-  if (match) {
-    // Insert before the next ---
-    const insertPoint = content.indexOf(match[2], content.indexOf(match[1]));
-    return content.slice(0, insertPoint) + newLine + '\n' + content.slice(insertPoint);
-  }
-
-  // Fallback: append before last ---
-  const lastSeparator = content.lastIndexOf('\n---');
-  if (lastSeparator !== -1) {
-    return content.slice(0, lastSeparator) + '\n' + newLine + content.slice(lastSeparator);
-  }
-
-  return content + '\n' + newLine;
-}
-
 function main() {
   if (!fs.existsSync(MEMORY_DIR)) {
     fs.mkdirSync(MEMORY_DIR, { recursive: true });
@@ -138,7 +119,7 @@ function main() {
   // Sync unfinished work from board.json
   if (fs.existsSync(BOARD_PATH)) {
     const board = readJSON(BOARD_PATH);
-    if (board && board.tasks && board.tasks.length > 0) {
+    if (board && Array.isArray(board.tasks)) {
       const pendingTasks = board.tasks.filter(t =>
         t.status === 'pending' || t.status === 'in_progress' || t.status === 'blocked'
       );
