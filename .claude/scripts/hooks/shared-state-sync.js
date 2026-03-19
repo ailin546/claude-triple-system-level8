@@ -13,7 +13,6 @@
 
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
 const crypto = require('crypto');
 
 const SHARED_STATE_DIR = path.join(process.cwd(), '.claude', 'shared-state');

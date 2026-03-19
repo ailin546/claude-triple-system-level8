@@ -145,9 +145,15 @@ function main() {
 }
 
 // Read stdin (Claude Code hook protocol) then run
+const MAX_STDIN = 1024 * 1024;
 let stdinData = '';
 process.stdin.setEncoding('utf8');
-process.stdin.on('data', chunk => { stdinData += chunk.substring(0, 1024 * 1024); });
+process.stdin.on('data', chunk => {
+  if (stdinData.length < MAX_STDIN) {
+    const remaining = MAX_STDIN - stdinData.length;
+    stdinData += chunk.substring(0, remaining);
+  }
+});
 process.stdin.on('end', () => {
   try { main(); } catch (err) {
     console.error('[SprintMemory] Error:', err.message);
