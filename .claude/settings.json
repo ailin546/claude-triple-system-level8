@@ -157,6 +157,30 @@
           }
         ],
         "description": "Update sprint mid-term memory with decisions and unfinished work"
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/memory-consolidate.js\"",
+            "async": true,
+            "timeout": 10
+          }
+        ],
+        "description": "Consolidate expired sprint memories into long-term project memory"
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/memory-promote.js\"",
+            "async": true,
+            "timeout": 15
+          }
+        ],
+        "description": "Auto-promote universal instincts from project to system memory"
       }
     ],
     "PreCompact": [

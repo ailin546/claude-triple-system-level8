@@ -1,0 +1,226 @@
+#!/usr/bin/env node
+/**
+ * Memory Consolidate Hook (Stop)
+ *
+ * Scans expired sprint files (>2 weeks old) and consolidates
+ * their decisions, lessons, and architecture notes into
+ * .claude/memory/long-term.md for permanent project memory.
+ *
+ * Frequency: once per day (lock file based).
+ * Cross-platform (Windows, macOS, Linux).
+ */
+
+const path = require('path');
+const fs = require('fs');
+
+const MEMORY_DIR = path.join(process.cwd(), '.claude', 'memory');
+const LONG_TERM_FILE = path.join(MEMORY_DIR, 'long-term.md');
+const LOCK_FILE = path.join(MEMORY_DIR, '.consolidate-lock');
+
+const SECTIONS_TO_EXTRACT = [
+  'Decisions Made',
+  'Lessons Learned',
+  'Architecture Notes'
+];
+
+const SECTION_MAP = {
+  'Decisions Made': 'Architecture Decisions',
+  'Lessons Learned': 'Lessons Learned',
+  'Architecture Notes': 'Architecture Decisions'
+};
+
+const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+function getDateString() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function shouldRun() {
+  try {
+    if (fs.existsSync(LOCK_FILE)) {
+      const stat = fs.statSync(LOCK_FILE);
+      if (Date.now() - stat.mtimeMs < ONE_DAY_MS) {
+        return false;
+      }
+    }
+  } catch {
+    // If we can't read the lock, proceed
+  }
+  return true;
+}
+
+function touchLock() {
+  fs.mkdirSync(path.dirname(LOCK_FILE), { recursive: true });
+  fs.writeFileSync(LOCK_FILE, getDateString(), 'utf8');
+}
+
+function createLongTermTemplate() {
+  const projectName = path.basename(process.cwd());
+  return `# Project Long-Term Memory
+
+**Project:** ${projectName}
+**Last Updated:** ${getDateString()}
+
+---
+
+## Architecture Decisions
+<!-- 从 sprint 沉淀的架构决策 -->
+
+## Coding Conventions
+<!-- 项目编码约定 -->
+
+## Known Gotchas
+<!-- 已知陷阱和注意事项 -->
+
+## Lessons Learned
+<!-- 从 sprint 沉淀的经验教训 -->
+`;
+}
+
+function parseSprintWeekDate(filename) {
+  // sprint-YYYY-WNN.md -> approximate date of that ISO week
+  const match = filename.match(/sprint-(\d{4})-W(\d{2})\.md$/);
+  if (!match) return null;
+
+  const year = parseInt(match[1], 10);
+  const week = parseInt(match[2], 10);
+
+  // Approximate: Jan 4 is always in week 1
+  const jan4 = new Date(year, 0, 4);
+  const dayOfWeek = jan4.getDay() || 7; // Monday=1
+  const weekStart = new Date(jan4);
+  weekStart.setDate(jan4.getDate() - dayOfWeek + 1 + (week - 1) * 7);
+  return weekStart;
+}
+
+function isExpired(filename) {
+  const weekDate = parseSprintWeekDate(filename);
+  if (!weekDate) return false;
+  return (Date.now() - weekDate.getTime()) > TWO_WEEKS_MS;
+}
+
+function isAlreadyConsolidated(content) {
+  return content.includes('<!-- consolidated:');
+}
+
+function extractSection(content, sectionName) {
+  const regex = new RegExp(
+    `## ${sectionName}\\n(?:<!--[^>]*-->\\n)?\\n?([\\s\\S]*?)(?=\\n---|\n## |$)`
+  );
+  const match = content.match(regex);
+  if (!match) return [];
+
+  const body = match[1].trim();
+  if (!body) return [];
+
+  // Extract lines that start with "- "
+  return body
+    .split('\n')
+    .filter(line => line.trim().startsWith('- '))
+    .map(line => line.trim());
+}
+
+function appendToSection(longTermContent, targetSection, entries) {
+  if (entries.length === 0) return longTermContent;
+
+  const sectionHeader = `## ${targetSection}`;
+  const idx = longTermContent.indexOf(sectionHeader);
+  if (idx === -1) return longTermContent;
+
+  // Find the end of the comment line after the header
+  const afterHeader = longTermContent.indexOf('\n', idx);
+  if (afterHeader === -1) return longTermContent;
+
+  // Find position after comment (if any) to insert
+  let insertPos = afterHeader + 1;
+  const nextLine = longTermContent.indexOf('\n', insertPos);
+  if (nextLine !== -1) {
+    const line = longTermContent.substring(insertPos, nextLine).trim();
+    if (line.startsWith('<!--')) {
+      insertPos = nextLine + 1;
+    }
+  }
+
+  const newEntries = entries.join('\n') + '\n';
+  return longTermContent.slice(0, insertPos) + newEntries + longTermContent.slice(insertPos);
+}
+
+function main() {
+  if (!fs.existsSync(MEMORY_DIR)) return;
+  if (!shouldRun()) return;
+
+  // Find expired sprint files
+  const files = fs.readdirSync(MEMORY_DIR)
+    .filter(f => f.startsWith('sprint-') && f.endsWith('.md'));
+
+  const expiredFiles = files.filter(f => isExpired(f));
+  if (expiredFiles.length === 0) {
+    touchLock();
+    return;
+  }
+
+  // Load or create long-term memory
+  let longTerm;
+  if (fs.existsSync(LONG_TERM_FILE)) {
+    longTerm = fs.readFileSync(LONG_TERM_FILE, 'utf8');
+  } else {
+    longTerm = createLongTermTemplate();
+  }
+
+  let consolidated = 0;
+
+  for (const file of expiredFiles) {
+    const filePath = path.join(MEMORY_DIR, file);
+    const content = fs.readFileSync(filePath, 'utf8');
+
+    if (isAlreadyConsolidated(content)) continue;
+
+    let hasEntries = false;
+
+    for (const section of SECTIONS_TO_EXTRACT) {
+      const entries = extractSection(content, section);
+      if (entries.length > 0) {
+        const targetSection = SECTION_MAP[section];
+        const tagged = entries.map(e => `${e} *(from ${file})*`);
+        longTerm = appendToSection(longTerm, targetSection, tagged);
+        hasEntries = true;
+      }
+    }
+
+    if (hasEntries) {
+      // Mark as consolidated
+      const marker = `\n<!-- consolidated: ${getDateString()} -->\n`;
+      fs.writeFileSync(filePath, content + marker, 'utf8');
+      consolidated++;
+    }
+  }
+
+  if (consolidated > 0) {
+    // Update timestamp
+    longTerm = longTerm.replace(
+      /\*\*Last Updated:\*\* .+/,
+      `**Last Updated:** ${getDateString()}`
+    );
+    fs.writeFileSync(LONG_TERM_FILE, longTerm, 'utf8');
+  }
+
+  touchLock();
+}
+
+// Read stdin (Claude Code hook protocol) then run
+const MAX_STDIN = 1024 * 1024;
+let stdinData = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', chunk => {
+  if (stdinData.length < MAX_STDIN) {
+    const remaining = MAX_STDIN - stdinData.length;
+    stdinData += chunk.substring(0, remaining);
+  }
+});
+process.stdin.on('end', () => {
+  try { main(); } catch (err) {
+    console.error('[MemoryConsolidate] Error:', err.message);
+  }
+  process.exit(0);
+});
