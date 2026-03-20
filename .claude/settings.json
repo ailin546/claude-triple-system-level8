@@ -21,9 +21,29 @@
           }
         ],
         "description": "Suggest manual compaction at logical intervals"
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_ROOT}/.claude/skills/ecc-continuous-learning-v2/hooks/observe.sh\" pre"
+          }
+        ],
+        "description": "Continuous learning v2 - capture tool use observations (pre)"
       }
     ],
     "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_ROOT}/.claude/skills/ecc-continuous-learning-v2/hooks/observe.sh\" post"
+          }
+        ],
+        "description": "Continuous learning v2 - capture tool use observations (post)"
+      },
       {
         "matcher": "Edit|Write",
         "hooks": [
