@@ -2,6 +2,7 @@
 # Runtime Data (local only, never commit)
 # ═══════════════════════════════════════════
 .claude/memory/
+.claude/sessions/
 .claude/shared-state/board.json
 .claude/shared-state/decisions.log
 .claude/shared-state/artifacts/
