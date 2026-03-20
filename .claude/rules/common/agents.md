@@ -23,6 +23,26 @@ No user prompt needed:
 2. Code just written/modified - Use **code-reviewer** agent
 3. Bug fix or new feature - Use **tdd-guide** agent
 4. Architectural decision - Use **architect** agent
+5. UI/UX work starting - Use **design-consultation** skill (auto-trigger, see below)
+6. UI code just written - Use **design-review** skill (auto-trigger, see below)
+
+## Design System Auto-Trigger
+
+When the task involves UI/visual changes, the design system activates automatically:
+
+**Before implementation** — auto-invoke `design-consultation` skill when the request involves:
+- New pages, screens, or layouts
+- New UI components (buttons, forms, cards, modals, navigation)
+- Color, typography, or spacing changes
+- Responsive design or dark mode work
+- UX flow changes or information architecture
+
+**After implementation** — auto-invoke `design-review` skill when:
+- CSS/SCSS/styling files have been created or modified
+- Component files (.tsx/.jsx/.vue/.svelte) with visual elements were changed
+- Design tokens or theme variables were added/modified
+
+Detection: if changed files match `*.css|*.scss|*.less|*.tsx|*.jsx|*.vue|*.svelte` AND contain visual keywords (color, margin, padding, font, display, grid, flex, background, border, shadow, theme), auto-trigger design-review before code-review.
 
 ## Parallel Task Execution
 

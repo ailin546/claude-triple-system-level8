@@ -49,6 +49,9 @@ User Request: "给用户系统加上OAuth登录"
 | `/code-review` | 代码审查 | `/save-session` | 保存会话 |
 | `/e2e` | E2E测试 | `/resume-session` | 恢复会话 |
 | `/build-fix` | 修复构建 | `/harness-audit` | 审计配置 |
+| `/design-consultation` | 设计咨询 | `/design-review` | 设计审查 |
+| `/careful` | 危险命令守卫 | `/freeze` / `/unfreeze` | 编辑范围锁 |
+| `/codex` | 跨AI审查 | | |
 
 ## Agent Routing (Agency Agents - auto)
 
@@ -60,6 +63,8 @@ User Request: "给用户系统加上OAuth登录"
 | AI/ML | `engineering-ai-engineer` | Architecture | `engineering-software-architect` |
 | MCP tool | `specialized-mcp-builder` | Full project | `agents-orchestrator` |
 | Prototype | `engineering-rapid-prototyper` | Tests | `testing-api-tester` |
+| UI design | `design-ui-designer` | UX structure | `design-ux-architect` |
+| UX research | `design-ux-researcher` | Brand | `design-brand-guardian` |
 
 ## File Structure
 
@@ -67,8 +72,8 @@ User Request: "给用户系统加上OAuth登录"
 .claude/
 ├── settings.json      ← Hooks config (ECC)
 ├── agents/            ← 96 agents (Agency + ECC + Superpowers)
-├── skills/            ← 106 skills (Superpowers + ECC)
-├── commands/          ← 48 slash commands (ECC)
+├── skills/            ← 110 skills (Superpowers + ECC + gstack)
+├── commands/          ← 53 slash commands (ECC + gstack)
 ├── rules/             ← 44 rule files (common + per-language)
 ├── scripts/hooks/     ← 24 hook scripts (ECC)
 ├── strategies/        ← Playbooks & runbooks
