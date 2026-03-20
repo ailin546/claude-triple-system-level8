@@ -87,6 +87,9 @@ function parseSprintWeekDate(filename) {
   const year = parseInt(match[1], 10);
   const week = parseInt(match[2], 10);
 
+  // Validate ISO week range (1-53)
+  if (week < 1 || week > 53) return null;
+
   // ISO 8601: Jan 4 is always in week 1. Find Monday of week 1, then offset.
   const jan4 = new Date(year, 0, 4);
   jan4.setHours(0, 0, 0, 0);
@@ -184,7 +187,8 @@ function main() {
   // 1. Write long-term.md first (target)
   // 2. Mark sprint files after (source)
   // This way, a crash between steps causes at most duplicate entries, never data loss.
-  const toMark = [];
+  const toMarkWithEntries = [];
+  const toMarkEmpty = [];
 
   for (const file of expiredFiles) {
     const filePath = path.join(MEMORY_DIR, file);
@@ -198,18 +202,23 @@ function main() {
       const entries = extractSection(content, section);
       if (entries.length > 0) {
         const targetSection = SECTION_MAP[section];
-        const tagged = entries.map(e => `${e} *(from ${file})*`);
+        // Include source section name when it differs from target to preserve context
+        const sourceTag = section !== targetSection ? `[${section}] ` : '';
+        const tagged = entries.map(e => `${e} *(${sourceTag}from ${file})*`);
         longTerm = appendToSection(longTerm, targetSection, tagged);
         hasEntries = true;
       }
     }
 
     if (hasEntries) {
-      toMark.push({ filePath, content });
+      toMarkWithEntries.push({ filePath, content });
+    } else {
+      // Empty sprints also get marked to avoid re-parsing every day
+      toMarkEmpty.push({ filePath, content });
     }
   }
 
-  if (toMark.length > 0) {
+  if (toMarkWithEntries.length > 0) {
     // Step 1: Write long-term.md first (safe: duplicate on crash, no data loss)
     longTerm = longTerm.replace(
       /\*\*Last Updated:\*\* .+/,
@@ -219,7 +228,15 @@ function main() {
 
     // Step 2: Mark sprint files as consolidated
     const marker = `\n<!-- consolidated: ${getDateString()} -->\n`;
-    for (const { filePath, content } of toMark) {
+    for (const { filePath, content } of toMarkWithEntries) {
+      fs.writeFileSync(filePath, content + marker, 'utf8');
+    }
+  }
+
+  // Mark empty expired sprints too, to avoid re-parsing them every day
+  if (toMarkEmpty.length > 0) {
+    const marker = `\n<!-- consolidated: ${getDateString()} (empty) -->\n`;
+    for (const { filePath, content } of toMarkEmpty) {
       fs.writeFileSync(filePath, content + marker, 'utf8');
     }
   }

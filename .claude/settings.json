@@ -165,7 +165,7 @@
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/memory-consolidate.js\"",
             "async": true,
-            "timeout": 10
+            "timeout": 15
           }
         ],
         "description": "Consolidate expired sprint memories into long-term project memory"
