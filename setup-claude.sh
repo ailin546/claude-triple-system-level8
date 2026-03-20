@@ -2,12 +2,12 @@
 # setup-claude.sh — 将 claude-triple-system submodule 链接到项目 .claude/ 目录
 #
 # 用法（在新项目根目录执行）：
-#   git submodule add <repo-url> .claude-framework
-#   bash .claude-framework/setup-claude.sh
+#   git submodule add <repo-url> .claude-system
+#   bash .claude-system/setup-claude.sh
 #
 # 更新：
-#   git submodule update --remote .claude-framework
-#   bash .claude-framework/setup-claude.sh   # 重新链接（幂等）
+#   git submodule update --remote .claude-system
+#   bash .claude-system/setup-claude.sh   # 重新链接（幂等）
 
 set -euo pipefail
 
@@ -17,8 +17,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # 如果脚本就在项目根目录（非 submodule 场景），调整路径
 if [ "$SCRIPT_DIR" = "$PROJECT_ROOT" ]; then
   echo "⚠ 请将本仓库作为 submodule 添加到目标项目，而非直接在本仓库运行。"
-  echo "  用法: git submodule add <repo-url> .claude-framework"
-  echo "        bash .claude-framework/setup-claude.sh"
+  echo "  用法: git submodule add <repo-url> .claude-system"
+  echo "        bash .claude-system/setup-claude.sh"
   exit 1
 fi
 
@@ -128,4 +128,4 @@ echo "     .claude/sessions/"
 echo "     .claude/shared-state/"
 echo "     .claude/.drift-state/"
 echo "  2. 提交 .claude/settings.json 和 CLAUDE.md"
-echo "  3. 更新框架: git submodule update --remote .claude-framework && bash .claude-framework/setup-claude.sh"
+echo "  3. 更新框架: git submodule update --remote .claude-system && bash .claude-system/setup-claude.sh"
