@@ -25,6 +25,32 @@ fi
 FRAMEWORK_CLAUDE="$SCRIPT_DIR/.claude"
 TARGET_CLAUDE="$PROJECT_ROOT/.claude"
 
+# 检测 .claude 是否已经直接 symlink 到框架的 .claude 目录
+# 这种情况下不需要创建子目录的 symlink，否则会产生自引用循环
+if [ -L "$TARGET_CLAUDE" ]; then
+  TARGET_REAL="$(readlink -f "$TARGET_CLAUDE")"
+  FRAMEWORK_REAL="$(readlink -f "$FRAMEWORK_CLAUDE")"
+  if [ "$TARGET_REAL" = "$FRAMEWORK_REAL" ]; then
+    echo "=== Claude Triple-System Setup ==="
+    echo "检测到 $TARGET_CLAUDE 已直接链接到 $FRAMEWORK_CLAUDE"
+    echo "无需额外操作，所有内容已通过顶层 symlink 自动可用。"
+    echo ""
+    echo "如需本地状态目录，请确保以下目录存在："
+    for dir in memory sessions shared-state; do
+      dest="$FRAMEWORK_CLAUDE/$dir"
+      if [ ! -d "$dest" ]; then
+        mkdir -p "$dest"
+        echo "  + $dir (已创建)"
+      else
+        echo "  ✓ $dir (已存在)"
+      fi
+    done
+    echo ""
+    echo "=== 完成（顶层 symlink 模式）==="
+    exit 0
+  fi
+fi
+
 # ── 需要符号链接的目录（框架提供的静态内容）──
 LINK_DIRS=(
   agents
