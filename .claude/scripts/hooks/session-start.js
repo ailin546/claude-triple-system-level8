@@ -240,6 +240,14 @@ async function main() {
     log(`[SessionStart] ${learnedSkills.length} learned skill(s) available in ${LEARNED_DIR}`);
   }
 
+  // Dynamic rules loading — only load rules for detected languages
+  try {
+    require('./rules-loader.js');
+    log('[SessionStart] Dynamic rules loading completed');
+  } catch (err) {
+    log(`[SessionStart] Rules loader error: ${err.message}`);
+  }
+
   // Detect and report package manager
   const pm = getPackageManager();
   log(`[SessionStart] Package manager: ${pm.name} (${pm.source})`);

@@ -56,9 +56,29 @@
           }
         ],
         "description": "Suggest manual compaction at logical intervals"
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_ROOT}/.claude/skills/ecc-continuous-learning-v2/hooks/observe.sh\" pre"
+          }
+        ],
+        "description": "Continuous learning v2 - capture tool use observations (pre)"
       }
     ],
     "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_ROOT}/.claude/skills/ecc-continuous-learning-v2/hooks/observe.sh\" post"
+          }
+        ],
+        "description": "Continuous learning v2 - capture tool use observations (post)"
+      },
       {
         "matcher": "Edit|Write|Bash",
         "hooks": [
@@ -184,6 +204,30 @@
           }
         ],
         "description": "Update sprint mid-term memory with decisions and unfinished work"
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/memory-consolidate.js\"",
+            "async": true,
+            "timeout": 15
+          }
+        ],
+        "description": "Consolidate expired sprint memories into long-term project memory"
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/memory-promote.js\"",
+            "async": true,
+            "timeout": 15
+          }
+        ],
+        "description": "Auto-promote universal instincts from project to system memory"
       }
     ],
     "PreCompact": [
