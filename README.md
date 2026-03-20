@@ -86,6 +86,25 @@ claude
 
 ## Apply to an Existing Project
 
+### 方式一：Git Submodule（推荐）
+
+独立管理、按需更新，适合团队协作。详见 [SUBMODULE-GUIDE.md](./SUBMODULE-GUIDE.md)。
+
+```bash
+cd your-project
+
+# 一键设置
+bash /path/to/claude-triple-system-level8/.claude/scripts/setup-submodule.sh
+
+# 提交
+git add -A
+git commit -m "chore: add claude system submodule"
+```
+
+### 方式二：直接复制
+
+简单直接，但无法追踪版本更新。
+
 ```bash
 # Copy .claude/ directory to your project
 cp -r .claude/ /path/to/your-project/.claude/
