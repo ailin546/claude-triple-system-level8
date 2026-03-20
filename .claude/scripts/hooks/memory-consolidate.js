@@ -79,19 +79,23 @@ function createLongTermTemplate() {
 }
 
 function parseSprintWeekDate(filename) {
-  // sprint-YYYY-WNN.md -> approximate date of that ISO week
+  // sprint-YYYY-WNN.md -> Monday of that ISO week
+  // Uses same algorithm as sprint-memory.js getISOWeek/getISOWeekYear
   const match = filename.match(/sprint-(\d{4})-W(\d{2})\.md$/);
   if (!match) return null;
 
   const year = parseInt(match[1], 10);
   const week = parseInt(match[2], 10);
 
-  // Approximate: Jan 4 is always in week 1
+  // ISO 8601: Jan 4 is always in week 1. Find Monday of week 1, then offset.
   const jan4 = new Date(year, 0, 4);
-  const dayOfWeek = jan4.getDay() || 7; // Monday=1
-  const weekStart = new Date(jan4);
-  weekStart.setDate(jan4.getDate() - dayOfWeek + 1 + (week - 1) * 7);
-  return weekStart;
+  jan4.setHours(0, 0, 0, 0);
+  const dow = jan4.getDay() || 7; // Convert Sunday=0 to 7
+  const mondayWeek1 = new Date(jan4);
+  mondayWeek1.setDate(jan4.getDate() - dow + 1);
+  const mondayTargetWeek = new Date(mondayWeek1);
+  mondayTargetWeek.setDate(mondayWeek1.getDate() + (week - 1) * 7);
+  return mondayTargetWeek;
 }
 
 function isExpired(filename) {
@@ -101,12 +105,20 @@ function isExpired(filename) {
 }
 
 function isAlreadyConsolidated(content) {
-  return content.includes('<!-- consolidated:');
+  // Check last 200 chars for the marker to avoid false positives from user content
+  const tail = content.slice(-200);
+  return /<!-- consolidated: \d{4}-\d{2}-\d{2} -->/.test(tail);
+}
+
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function extractSection(content, sectionName) {
+  const escaped = escapeRegex(sectionName);
+  // Match section until next "---" line or next "## " header
   const regex = new RegExp(
-    `## ${sectionName}\\n(?:<!--[^>]*-->\\n)?\\n?([\\s\\S]*?)(?=\\n---|\n## |$)`
+    `## ${escaped}\\n(?:<!--[^>]*-->\\n)?\\n?([\\s\\S]*?)(?=\\n---\\n|\\n## |$)`
   );
   const match = content.match(regex);
   if (!match) return [];
@@ -168,7 +180,11 @@ function main() {
     longTerm = createLongTermTemplate();
   }
 
-  let consolidated = 0;
+  // Collect entries from all expired sprints first, then write in safe order:
+  // 1. Write long-term.md first (target)
+  // 2. Mark sprint files after (source)
+  // This way, a crash between steps causes at most duplicate entries, never data loss.
+  const toMark = [];
 
   for (const file of expiredFiles) {
     const filePath = path.join(MEMORY_DIR, file);
@@ -189,20 +205,23 @@ function main() {
     }
 
     if (hasEntries) {
-      // Mark as consolidated
-      const marker = `\n<!-- consolidated: ${getDateString()} -->\n`;
-      fs.writeFileSync(filePath, content + marker, 'utf8');
-      consolidated++;
+      toMark.push({ filePath, content });
     }
   }
 
-  if (consolidated > 0) {
-    // Update timestamp
+  if (toMark.length > 0) {
+    // Step 1: Write long-term.md first (safe: duplicate on crash, no data loss)
     longTerm = longTerm.replace(
       /\*\*Last Updated:\*\* .+/,
       `**Last Updated:** ${getDateString()}`
     );
     fs.writeFileSync(LONG_TERM_FILE, longTerm, 'utf8');
+
+    // Step 2: Mark sprint files as consolidated
+    const marker = `\n<!-- consolidated: ${getDateString()} -->\n`;
+    for (const { filePath, content } of toMark) {
+      fs.writeFileSync(filePath, content + marker, 'utf8');
+    }
   }
 
   touchLock();

@@ -75,9 +75,21 @@ function findPython() {
   return null;
 }
 
+const MAX_LOG_LINES = 100;
+
 function appendLog(entry) {
   fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true });
   fs.appendFileSync(LOG_FILE, JSON.stringify(entry) + '\n', 'utf8');
+
+  // Rotate: keep only last MAX_LOG_LINES entries
+  try {
+    const lines = fs.readFileSync(LOG_FILE, 'utf8').split('\n').filter(Boolean);
+    if (lines.length > MAX_LOG_LINES) {
+      fs.writeFileSync(LOG_FILE, lines.slice(-MAX_LOG_LINES).join('\n') + '\n', 'utf8');
+    }
+  } catch {
+    // Non-critical, skip rotation on error
+  }
 }
 
 function main() {
@@ -109,9 +121,13 @@ function main() {
     return;
   }
 
-  // Check if there are candidates (look for "would promote" or instinct IDs)
-  const hasPromotions = dryOutput.includes('promote') || dryOutput.includes('→');
+  // Check if there are candidates. Be specific to avoid matching help text.
+  // Look for patterns like "would promote N" or "→" with instinct IDs
   const nothingToPromote = dryOutput.includes('No instincts') || dryOutput.includes('0 instincts');
+  const hasPromotions = !nothingToPromote && (
+    /would promote \d+/i.test(dryOutput) ||
+    /\b[a-z0-9_-]+\s*→\s*(?:system|global)/i.test(dryOutput)
+  );
 
   if (nothingToPromote || !hasPromotions) {
     appendLog({
