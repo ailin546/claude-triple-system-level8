@@ -5,9 +5,13 @@
 #   git submodule add <repo-url> .claude-system
 #   bash .claude-system/setup-claude.sh
 #
-# 更新：
-#   git submodule update --remote .claude-system
-#   bash .claude-system/setup-claude.sh   # 重新链接（幂等）
+# 重新链接（幂等）：
+#   bash .claude-system/setup-claude.sh
+#
+# 更新框架到最新版：
+#   git submodule update --remote .claude-system && bash .claude-system/setup-claude.sh
+#   # 或（如果有 install.sh）：
+#   bash .claude-system/install.sh --update
 
 set -euo pipefail
 
@@ -161,4 +165,4 @@ echo "     .claude/sessions/"
 echo "     .claude/shared-state/"
 echo "     .claude/.drift-state/"
 echo "  2. 提交 .claude/settings.json（框架 CLAUDE.md 通过 symlink 自动生效）"
-echo "  3. 更新框架: bash .claude-system/install.sh --update"
+echo "  3. 更新框架: git submodule update --remote .claude-system && bash .claude-system/setup-claude.sh"
