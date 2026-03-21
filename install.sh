@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh — 一键安装 Claude Triple-System 到任何项目
+# install.sh — 一键安装/更新 Claude Triple-System 到任何项目
 #
 # 首次安装（在目标项目根目录执行）：
 #   curl -sL <raw-url>/install.sh | bash -s -- <repo-url>
@@ -8,6 +8,9 @@
 #
 # 已有子模块时（克隆后初始化）：
 #   bash .claude-system/install.sh
+#
+# 更新框架到最新版：
+#   bash .claude-system/install.sh --update
 #
 # 做的事情：
 #   1. 如果子模块不存在 → git submodule add
@@ -18,7 +21,20 @@
 set -euo pipefail
 
 SUBMODULE_DIR=".claude-system"
-REPO_URL="${1:-}"
+MODE="install"
+REPO_URL=""
+
+# ── 解析参数 ──
+for arg in "$@"; do
+  case "$arg" in
+    --update|-u)
+      MODE="update"
+      ;;
+    *)
+      REPO_URL="$arg"
+      ;;
+  esac
+done
 
 # ── 检测运行位置 ──
 if [ -f "$(dirname "$0")/setup-claude.sh" ]; then
@@ -47,6 +63,50 @@ else
 fi
 
 cd "$PROJECT_ROOT"
+
+# ── 更新模式 ──
+if [ "$MODE" = "update" ]; then
+  echo "╔══════════════════════════════════════════════╗"
+  echo "║  Claude Triple-System 框架更新               ║"
+  echo "╚══════════════════════════════════════════════╝"
+  echo ""
+
+  if [ ! -d "$SUBMODULE_DIR/.claude" ]; then
+    echo "❌ 未找到子模块 $SUBMODULE_DIR，请先运行安装："
+    echo "   bash install.sh <repo-url>"
+    exit 1
+  fi
+
+  # 拉取子模块最新版本
+  echo "🔄 [1/3] 拉取框架最新版本..."
+  git submodule update --remote --merge "$SUBMODULE_DIR"
+
+  # 重新链接
+  echo "🔗 [2/3] 重新链接框架..."
+  echo ""
+  bash "$SUBMODULE_DIR/setup-claude.sh"
+
+  # 显示更新内容
+  echo ""
+  echo "📋 [3/3] 更新内容："
+  (cd "$SUBMODULE_DIR" && git log --oneline -5)
+
+  echo ""
+  echo "╔══════════════════════════════════════════════╗"
+  echo "║  ✅ 框架已更新到最新版本！                    ║"
+  echo "╠══════════════════════════════════════════════╣"
+  echo "║                                              ║"
+  echo "║  提交子模块指针变更：                          ║"
+  echo "║    git add .claude-system                    ║"
+  echo "║    git commit -m \"chore: update framework\"   ║"
+  echo "║                                              ║"
+  echo "╚══════════════════════════════════════════════╝"
+  exit 0
+fi
+
+# ══════════════════════════════════════════════
+# 安装模式
+# ══════════════════════════════════════════════
 
 echo "╔══════════════════════════════════════════════╗"
 echo "║  Claude Triple-System 一键安装               ║"
@@ -138,6 +198,6 @@ echo "║    git pull / git checkout → 自动重新链接     ║"
 echo "║    团队成员 clone → 只需运行一次 install.sh   ║"
 echo "║                                              ║"
 echo "║  更新框架：                                   ║"
-echo "║    git submodule update --remote .claude-system║"
+echo "║    bash .claude-system/install.sh --update    ║"
 echo "║                                              ║"
 echo "╚══════════════════════════════════════════════╝"
