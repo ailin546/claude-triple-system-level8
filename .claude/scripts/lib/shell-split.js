@@ -6,8 +6,6 @@
  * operators like &&, ||, ;, |, and newlines. Respects quoting so that
  * operators inside strings are not treated as separators.
  *
- * Used by pre-bash-dev-server-block.js to inspect each command in a
- * compound shell expression independently.
  */
 
 'use strict';
