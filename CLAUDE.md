@@ -137,7 +137,7 @@ User Request: "给用户系统加上OAuth登录"
 ├── skills/            ← 38 个活跃 skills
 ├── commands/          ← 28 个活跃 commands
 ├── rules/common/      ← 10 个规则文件（仅 common 目录）
-├── scripts/hooks/     ← 32 个脚本文件（20 个被引用，12 个未引用）
+├── scripts/hooks/     ← 21 个脚本文件（全部被引用或间接依赖）
 ├── strategies/        ← Playbooks & runbooks
 ├── mcp-configs/       ← MCP server templates
 └── examples/          ← Workflow examples
@@ -152,13 +152,6 @@ User Request: "给用户系统加上OAuth登录"
 | Stop | 8 | console.log 检查、会话持久化、评估、成本追踪、状态同步、冲刺记忆、记忆整合、记忆提升 |
 | PreCompact | 1 | 上下文压缩前保存状态 |
 | SessionStart | 1 | 加载上次上下文、检测包管理器 |
-
-### 未引用脚本（12 个死代码）
-
-`check-hook-enabled.js` `doc-file-warning.js` `insaits-security-wrapper.js`
-`post-bash-build-complete.js` `post-bash-pr-created.js` `pre-bash-dev-server-block.js`
-`pre-bash-git-push-reminder.js` `pre-bash-tmux-reminder.js` `pre-write-doc-warn.js`
-`rules-loader.js` `run-with-flags-shell.sh` `run-with-flags.js`
 
 > 注：`observe.sh` 位于 `skills/ecc-continuous-learning-v2/hooks/` 而非 `scripts/hooks/`
 
