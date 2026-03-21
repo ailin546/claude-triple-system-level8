@@ -132,15 +132,22 @@ if [ -f "$SETTINGS_SRC" ]; then
   fi
 fi
 
-# 复制 CLAUDE.md 到项目根目录（不覆盖）
-CLAUDEMD_SRC="$SCRIPT_DIR/CLAUDE.md"
-CLAUDEMD_DEST="$PROJECT_ROOT/CLAUDE.md"
-if [ -f "$CLAUDEMD_SRC" ]; then
-  if [ -f "$CLAUDEMD_DEST" ]; then
-    echo "  ✓ CLAUDE.md (已存在，保留项目配置)"
+# 链接框架 CLAUDE.md 到 .claude/CLAUDE.md（分层生效，不与项目根目录的 CLAUDE.md 冲突）
+# Claude Code 会自动加载项目根目录和 .claude/ 子目录下的所有 CLAUDE.md
+CLAUDEMD_SRC="$FRAMEWORK_CLAUDE/CLAUDE.md"
+CLAUDEMD_DEST="$TARGET_CLAUDE/CLAUDE.md"
+if [ -f "$CLAUDEMD_SRC" ] || [ -L "$CLAUDEMD_SRC" ]; then
+  if [ -L "$CLAUDEMD_DEST" ] && [ "$(readlink -f "$CLAUDEMD_DEST")" = "$(readlink -f "$CLAUDEMD_SRC")" ]; then
+    echo "  ✓ .claude/CLAUDE.md (已链接)"
+  elif [ -f "$CLAUDEMD_DEST" ]; then
+    backup="$CLAUDEMD_DEST.backup.$(date +%s)"
+    echo "  ⚠ .claude/CLAUDE.md 已存在，备份到 ${backup##*/}"
+    mv "$CLAUDEMD_DEST" "$backup"
+    ln -s "$CLAUDEMD_SRC" "$CLAUDEMD_DEST"
+    echo "  → .claude/CLAUDE.md (已链接)"
   else
-    cp "$CLAUDEMD_SRC" "$CLAUDEMD_DEST"
-    echo "  + CLAUDE.md (已复制到项目根目录)"
+    ln -s "$CLAUDEMD_SRC" "$CLAUDEMD_DEST"
+    echo "  → .claude/CLAUDE.md (已链接)"
   fi
 fi
 
@@ -153,5 +160,5 @@ echo "     .claude/memory/"
 echo "     .claude/sessions/"
 echo "     .claude/shared-state/"
 echo "     .claude/.drift-state/"
-echo "  2. 提交 .claude/settings.json 和 CLAUDE.md"
-echo "  3. 更新框架: git submodule update --remote .claude-system && bash .claude-system/setup-claude.sh"
+echo "  2. 提交 .claude/settings.json（框架 CLAUDE.md 通过 symlink 自动生效）"
+echo "  3. 更新框架: bash .claude-system/install.sh --update"

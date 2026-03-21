@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/auto-tmux-dev.js\""
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/auto-tmux-dev.js\""
           }
         ],
         "description": "Auto-start dev servers in tmux"
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/careful-guard.js\""
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/careful-guard.js\""
           }
         ],
         "description": "Block destructive commands (rm -rf, DROP TABLE, git push --force)"
@@ -42,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/freeze-guard.js\""
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/freeze-guard.js\""
           }
         ],
         "description": "Block edits outside frozen directory (when /freeze is active)"
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/suggest-compact.js\""
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/suggest-compact.js\""
           }
         ],
         "description": "Suggest manual compaction at logical intervals"
@@ -62,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_ROOT}/.claude/skills/ecc-continuous-learning-v2/hooks/observe.sh\" pre"
+            "command": "bash \"${CLAUDE_PROJECT_ROOT:-.}/.claude/skills/ecc-continuous-learning-v2/hooks/observe.sh\" pre"
           }
         ],
         "description": "Continuous learning v2 - capture tool use observations (pre)"
@@ -74,7 +74,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_ROOT}/.claude/skills/ecc-continuous-learning-v2/hooks/observe.sh\" post"
+            "command": "bash \"${CLAUDE_PROJECT_ROOT:-.}/.claude/skills/ecc-continuous-learning-v2/hooks/observe.sh\" post"
           }
         ],
         "description": "Continuous learning v2 - capture tool use observations (post)"
@@ -84,7 +84,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/drift-detector.js\"",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/drift-detector.js\"",
             "async": true,
             "timeout": 5
           }
@@ -96,7 +96,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/quality-gate.js\"",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/quality-gate.js\"",
             "async": true,
             "timeout": 30
           }
@@ -108,7 +108,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/post-edit-format.js\""
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/post-edit-format.js\""
           }
         ],
         "description": "Auto-format JS/TS files after edits"
@@ -118,7 +118,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/post-edit-typecheck.js\""
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/post-edit-typecheck.js\""
           }
         ],
         "description": "TypeScript check after editing .ts/.tsx files"
@@ -128,7 +128,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/post-edit-console-warn.js\""
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/post-edit-console-warn.js\""
           }
         ],
         "description": "Warn about console.log statements after edits"
@@ -140,7 +140,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/check-console-log.js\""
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/check-console-log.js\""
           }
         ],
         "description": "Check for console.log in modified files"
@@ -150,7 +150,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/session-end.js\"",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/session-end.js\"",
             "async": true,
             "timeout": 10
           }
@@ -162,7 +162,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/evaluate-session.js\"",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/evaluate-session.js\"",
             "async": true,
             "timeout": 10
           }
@@ -174,7 +174,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/cost-tracker.js\"",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/cost-tracker.js\"",
             "async": true,
             "timeout": 10
           }
@@ -186,7 +186,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/shared-state-sync.js\"",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/shared-state-sync.js\"",
             "async": true,
             "timeout": 10
           }
@@ -198,7 +198,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/sprint-memory.js\"",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/sprint-memory.js\"",
             "async": true,
             "timeout": 10
           }
@@ -210,7 +210,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/memory-consolidate.js\"",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/memory-consolidate.js\"",
             "async": true,
             "timeout": 15
           }
@@ -222,7 +222,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/memory-promote.js\"",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/memory-promote.js\"",
             "async": true,
             "timeout": 15
           }
@@ -236,7 +236,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/pre-compact.js\""
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/pre-compact.js\""
           }
         ],
         "description": "Save state before context compaction"
@@ -248,7 +248,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/session-start.js\""
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/session-start.js\""
           }
         ],
         "description": "Load previous context and detect package manager"
