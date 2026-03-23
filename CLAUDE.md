@@ -113,7 +113,10 @@ User Request: "给用户系统加上OAuth登录"
 | `/build-fix` | 修复构建 | `/harness-audit` | 审计配置 |
 | `/design-consultation` | 设计咨询 | `/design-review` | 设计审查 |
 | `/careful` | 危险命令守卫 | `/freeze` / `/unfreeze` | 编辑范围锁 |
-| `/codex` | 跨AI审查 | | |
+| `/codex` | 跨AI审查 | `/autoloop` | 自主迭代循环 |
+| `/autoloop:debug` | 自主 bug 猎杀 | `/autoloop:fix` | 自主错误修复 |
+| `/autoloop:security` | 自主安全审计 | `/autoloop:predict` | 多人格预测 |
+| `/autoloop:scenario` | 场景探索 | | |
 
 ## Agent Routing (Agency Agents - auto)
 
@@ -132,14 +135,15 @@ User Request: "给用户系统加上OAuth登录"
 
 ```
 .claude/
-├── settings.json      ← 21 个 Hook 配置（5 种类型）
+├── settings.json      ← 22 个 Hook 配置（5 种类型）
 ├── agents/            ← 26 个活跃 agents
-├── skills/            ← 38 个活跃 skills
-├── commands/          ← 28 个活跃 commands
+├── skills/            ← 39 个活跃 skills
+├── commands/          ← 35 个活跃 commands
 ├── rules/common/      ← 10 个规则文件（仅 common 目录）
 ├── scripts/hooks/     ← 21 个脚本文件（全部被引用或间接依赖）
 ├── strategies/        ← Playbooks & runbooks
 ├── mcp-configs/       ← MCP server templates
+├── experiments/       ← 实验配置、结果、方向文件
 └── examples/          ← Workflow examples
 ```
 
@@ -148,7 +152,7 @@ User Request: "给用户系统加上OAuth登录"
 | 类型 | 配置数 | 用途 |
 |------|--------|------|
 | PreToolUse | 5 | tmux 自动启动、危险命令守卫、冻结守卫、压缩建议、学习观察 |
-| PostToolUse | 6 | 学习观察、漂移检测、质量门、自动格式化、类型检查、console.log 警告 |
+| PostToolUse | 7 | 学习观察、漂移检测、质量门、自动格式化、类型检查、console.log 警告、故障提示 |
 | Stop | 8 | console.log 检查、会话持久化、评估、成本追踪、状态同步、冲刺记忆、记忆整合、记忆提升 |
 | PreCompact | 1 | 上下文压缩前保存状态 |
 | SessionStart | 1 | 加载上次上下文、检测包管理器 |

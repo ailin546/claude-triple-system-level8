@@ -113,3 +113,18 @@ Save score to `.claude/qa-scores/YYYY-MM-DD.json` for trend tracking.
 - Called by `verification-before-completion` skill as final quality check
 - Called by `/verify` command for on-demand scoring
 - History enables trend analysis: "Quality improved 12 points this sprint"
+- Called by `autoloop` skill on loop completion for trend tracking
+
+### Step 6: Trend Tracking (autoloop integration)
+
+After saving the daily score (Step 5), append to `.claude/qa-scores/trend.jsonl` (JSONL format, consistent with `~/.claude/metrics/costs.jsonl`):
+
+```json
+{"date":"2026-03-23","total":78,"build":100,"coverage":82,"tests":100,"lint":90,"types":70,"security":85,"deadcode":60,"project":"my-project"}
+```
+
+Trend alerts:
+- 3 consecutive score decreases → output warning: "QA health declining: X → Y → Z"
+- Score drops below 60 → output critical: "QA health critical: score below 60"
+
+When called by autoloop, cross-reference with `.claude/experiments/results.jsonl` to correlate quality trends with experiment iterations.
