@@ -6,7 +6,7 @@ Three complementary systems integrated for Claude Code:
 
 | Layer | System | Source | What It Provides |
 |-------|--------|--------|-----------------|
-| **Infrastructure** | [ECC](https://github.com/affaan-m/everything-claude-code) | affaan-m | Hooks, memory, learning, 28 commands, common rules |
+| **Infrastructure** | [ECC](https://github.com/affaan-m/everything-claude-code) | affaan-m | Hooks, memory, learning, commands, common rules |
 | **Process** | [Superpowers](https://github.com/obra/superpowers) | obra | TDD iron law, systematic debugging, brainstorming, quality gates |
 | **Expertise** | [Agency Agents](https://github.com/msitarzewski/agency-agents) | msitarzewski | 26 active agents with domain knowledge |
 
@@ -118,32 +118,29 @@ User Request: "给用户系统加上OAuth登录"
 | `/autoloop:security` | 自主安全审计 | `/autoloop:predict` | 多人格预测 |
 | `/autoloop:scenario` | 场景探索 | | |
 
-## Agent Routing (Agency Agents - auto)
+## Agent Routing (仅活跃 agents)
 
 | Task | Agent | Task | Agent |
 |------|-------|------|-------|
 | React/Vue/CSS | `engineering-frontend-developer` | Security audit | `engineering-security-engineer` |
 | API/Database | `engineering-backend-architect` | CI/CD/Docker | `engineering-devops-automator` |
-| Mobile | `engineering-mobile-app-builder` | Code review | `engineering-code-reviewer` |
-| AI/ML | `engineering-ai-engineer` | Architecture | `engineering-software-architect` |
-| MCP tool | `specialized-mcp-builder` | Full project | `agents-orchestrator` |
+| Code review | `engineering-code-reviewer` | Architecture | `engineering-software-architect` |
+| AI/ML | `engineering-ai-engineer` | Full project | `agents-orchestrator` |
 | Prototype | `engineering-rapid-prototyper` | Tests | `testing-api-tester` |
-| UI design | `design-ui-designer` | UX structure | `design-ux-architect` |
-| UX research | `design-ux-researcher` | Brand | `design-brand-guardian` |
 
-## File Structure (已审计 2026-03-21)
+## File Structure (已审计 2026-03-23)
 
 ```
 .claude/
-├── settings.json      ← 22 个 Hook 配置（5 种类型）
+├── settings.json      ← 21 个 Hook 配置（5 种类型）
 ├── agents/            ← 26 个活跃 agents
 ├── skills/            ← 39 个活跃 skills
-├── commands/          ← 35 个活跃 commands
-├── rules/common/      ← 10 个规则文件（仅 common 目录）
-├── scripts/hooks/     ← 21 个脚本文件（全部被引用或间接依赖）
+├── commands/          ← 34 个活跃 commands (29 + 5 autoloop 子命令)
+├── rules/common/      ← 10 个规则文件
+├── rules-all/         ← 8 种语言的扩展规则（无 common 重复）
+├── scripts/hooks/     ← 23 个脚本文件
 ├── strategies/        ← Playbooks & runbooks
 ├── mcp-configs/       ← MCP server templates
-├── experiments/       ← 实验配置、结果、方向文件
 └── examples/          ← Workflow examples
 ```
 
@@ -153,7 +150,7 @@ User Request: "给用户系统加上OAuth登录"
 |------|--------|------|
 | PreToolUse | 5 | tmux 自动启动、危险命令守卫、冻结守卫、压缩建议、学习观察 |
 | PostToolUse | 7 | 学习观察、漂移检测、质量门、自动格式化、类型检查、console.log 警告、故障提示 |
-| Stop | 8 | console.log 检查、会话持久化、评估、成本追踪、状态同步、冲刺记忆、记忆整合、记忆提升 |
+| Stop | 7 | 会话持久化、评估、成本追踪、状态同步、冲刺记忆、记忆整合、记忆提升 |
 | PreCompact | 1 | 上下文压缩前保存状态 |
 | SessionStart | 1 | 加载上次上下文、检测包管理器 |
 

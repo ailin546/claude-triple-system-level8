@@ -16,13 +16,13 @@ Three complementary open-source systems integrated into one framework, extended 
 │  Triple System      │                         │              │
 │                     ▼                         ▼              │
 │  ┌─ ECC (Infrastructure) ──────────────────────────────────┐ │
-│  │  Hooks · Memory · Learning · 48 Commands · Multi-lang   │ │
+│  │  Hooks · Memory · Learning · 34 Commands · Multi-lang   │ │
 │  └─────────────────────────────────────────────────────────┘ │
 │  ┌─ Superpowers (Process) ─────────────────────────────────┐ │
 │  │  TDD · Systematic Debugging · Brainstorming · Quality   │ │
 │  └─────────────────────────────────────────────────────────┘ │
 │  ┌─ Agency Agents (Expertise) ─────────────────────────────┐ │
-│  │  78+ Specialized Personas · Domain Knowledge · Routing  │ │
+│  │  26 Active Agents · Domain Knowledge · Routing          │ │
 │  └─────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -106,12 +106,12 @@ bash .claude/scripts/install-level8.sh
 ├── .gitignore                         ← Excludes runtime data
 └── .claude/
     ├── settings.json                  ← Hooks configuration
-    ├── agents/                        ← 96 specialized agents
-    ├── skills/                        ← 107 skills (including shared-state-sync)
-    ├── commands/                      ← 48 slash commands
-    ├── rules/                         ← 44 coding rules (common + per-language)
+    ├── agents/                        ← 26 active agents (71 archived)
+    ├── skills/                        ← 39 active skills (74 archived)
+    ├── commands/                      ← 34 slash commands (29 archived)
+    ├── rules/                         ← 10 common + 8 language-specific rule sets
     ├── scripts/
-    │   ├── hooks/                     ← 26 hook scripts (including Level 8 hooks)
+    │   ├── hooks/                     ← 23 hook scripts (including Level 8 hooks)
     │   └── install-level8.sh          ← One-click Level 8 setup
     ├── strategies/                    ← Playbooks (including autonomous-permissions)
     ├── shared-state/
@@ -128,7 +128,7 @@ bash .claude/scripts/install-level8.sh
 | `/plan` | Plan implementation |
 | `/tdd` | Test-driven development |
 | `/code-review` | Code review |
-| `/orchestrate` | Multi-agent workflow |
+| `/autoloop` | Autonomous iteration |
 | `/save-session` | Save session + sprint memory |
 | `/resume-session` | Resume with full context |
 | `/learn` | Extract reusable patterns |
@@ -140,7 +140,7 @@ bash .claude/scripts/install-level8.sh
 |--------|--------|-----------------|
 | ECC | [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code) | Infrastructure: hooks, memory, commands |
 | Superpowers | [obra/superpowers](https://github.com/obra/superpowers) | Process: TDD, debugging, quality gates |
-| Agency Agents | [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) | Expertise: 78 specialized personas |
+| Agency Agents | [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) | Expertise: 26 active agent personas |
 | **Level 8** | **This repo** | **Autonomous agent coordination layer** |
 
 ## License

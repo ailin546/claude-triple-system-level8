@@ -152,16 +152,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/check-console-log.js\""
-          }
-        ],
-        "description": "Check for console.log in modified files"
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
             "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/session-end.js\"",
             "async": true,
             "timeout": 10
