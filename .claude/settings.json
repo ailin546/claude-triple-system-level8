@@ -132,6 +132,18 @@
           }
         ],
         "description": "Warn about console.log statements after edits"
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/fault-hint.js\"",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "description": "Hint to run /verify fault when error handling or resilience code is edited"
       }
     ],
     "Stop": [

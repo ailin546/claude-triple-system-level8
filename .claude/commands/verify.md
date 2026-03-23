@@ -57,3 +57,34 @@ $ARGUMENTS can be:
 - `full` - All checks (default)
 - `pre-commit` - Checks relevant for commits
 - `pre-pr` - Full checks plus security scan
+- `fault` - Fault scenario analysis (see below)
+
+## Fault Mode (`/verify fault`)
+
+When `$ARGUMENTS` is `fault`, skip the standard pipeline and run fault scenario analysis instead:
+
+1. **Run fault-scenarios scanner**
+   ```bash
+   node "${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/fault-scenarios.js"
+   ```
+   - By default scans only git-modified files
+   - Pass `--all` to scan the entire project
+
+2. **Interpret results**
+   - CRITICAL: empty catch blocks, swallowed errors → must fix before commit
+   - HIGH: fetch/HTTP without timeout, DB calls without error handling → should fix
+   - MEDIUM: missing input validation, unhandled promises → recommended fix
+
+3. **Output format**
+   ```
+   FAULT VERIFICATION: [PASS/FAIL]
+
+   Files scanned: N
+   Issues:       N (CRITICAL: X, HIGH: Y, MEDIUM: Z)
+
+   [Issue details with file:line and fix suggestions]
+
+   Ready for PR: [YES/NO]
+   ```
+
+4. **Blocking rule**: Any CRITICAL issue blocks the PR. HIGH issues produce a warning.
