@@ -2,13 +2,13 @@
 /**
  * SessionStart Hook: Task Mode Router
  *
- * Resets mode to Fast at session start, then outputs routing instructions
- * so Claude evaluates the correct mode for the first task.
+ * Resets mode to Fast at session start, clears escalation state,
+ * truncates mode-trace log, and outputs routing instructions.
  *
  * Mode escalation happens through three mechanisms:
  * 1. Claude evaluates routing signals and calls set-mode.js (CLAUDE.md rule)
- * 2. pre-tool-escalate.js detects high-risk Bash/Edit/Write (automatic)
- * 3. post-edit-light.js detects high-risk file paths (automatic fallback)
+ * 2. pre-tool-escalate.js detects risk signals + cross-file accumulation (automatic)
+ * 3. pre-tool-escalate.js detects task boundaries via idle gap (automatic reset)
  *
  * Cross-platform (Windows, macOS, Linux)
  * Non-blocking: errors fall back to Fast mode.
@@ -47,6 +47,23 @@ function main() {
   // Always reset to Fast at session start
   writeMode(DEFAULT_MODE);
 
+  // Clear escalation state and truncate trace log
+  try {
+    const { appendModeTrace, truncateModeTrace, clearEscalationState } = require('../lib/mode-check');
+    clearEscalationState();
+    truncateModeTrace();
+    appendModeTrace({
+      trigger: 'task-router',
+      prev_mode: '',
+      next_mode: 'fast',
+      reason: 'session-init',
+      matched_signal: null,
+      overridden_by_user: false
+    });
+  } catch {
+    // mode-check not available — continue without trace
+  }
+
   // Output routing instructions into Claude's context
   output([
     '[TaskRouter] Mode: Fast (default)',
@@ -58,9 +75,10 @@ function main() {
     '',
     'If Standard or Heavy, run: node .claude/scripts/hooks/set-mode.js <mode>',
     'Auto-escalation via pre-tool-escalate.js is also active as a safety net.',
+    'Task boundary auto-reset: 5min idle gap resets mode to fast.',
   ].join('\n'));
 
-  log('[TaskRouter] Initialized mode: fast, routing reminder injected');
+  log('[TaskRouter] Initialized mode: fast, escalation state cleared, trace truncated');
 }
 
 // ── stdin entry point (hook protocol) ────────────────────────

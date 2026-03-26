@@ -128,6 +128,9 @@ function main() {
               if (task.status === 'in_progress') {
                 task.status = 'pending';
               }
+              // Mark for explicit reassignment so orchestrators can filter
+              task.needs_reassignment = true;
+              task.stale_reclaimed_at = new Date().toISOString();
               // Preserve handoff context
               const handoffNote = `[auto-reclaimed] Was owned by ${prevOwner} (${prevStatus}), worker went stale`;
               task.handoff_note = task.handoff_note
@@ -207,6 +210,18 @@ function main() {
     } catch (err) {
       console.error(`[SharedStateSync] DEGRADED: board write failed — ${err.message}`);
       appendDecision('system', 'DEGRADE', `Board write failed: ${err.message}`);
+    }
+  }
+
+  // ── Report tasks needing reassignment ──
+  const orphanTasks = (board.tasks || []).filter(t => t.needs_reassignment);
+  if (orphanTasks.length > 0) {
+    console.error(`[SharedStateSync] ${orphanTasks.length} task(s) need reassignment:`);
+    for (const t of orphanTasks) {
+      const taskId = t.task_id || t.id || '?';
+      const desc = (t.description || '').slice(0, 80);
+      const prevOwner = (t.handoff_note || '').match(/owned by (\S+)/)?.[1] || 'unknown';
+      console.error(`  - ${taskId}: ${desc} (was: ${prevOwner})`);
     }
   }
 }

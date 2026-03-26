@@ -12,12 +12,14 @@
  * Reset (--reset): resets to fast first, then optionally sets a new mode.
  *   Used at task boundaries when a new, unrelated task starts in the same session.
  *
+ * All mode changes are logged to .claude/logs/mode-trace.jsonl.
+ *
  * Cross-platform (Windows, macOS, Linux)
  */
 
 'use strict';
 
-const { getCurrentMode, setMode, MODE_LEVELS } = require('../lib/mode-check');
+const { getCurrentMode, setMode, MODE_LEVELS, appendModeTrace, clearEscalationState } = require('../lib/mode-check');
 
 const VALID_MODES = Object.keys(MODE_LEVELS);
 const args = process.argv.slice(2).map(a => a.toLowerCase());
@@ -29,7 +31,16 @@ const modeArg = args.find(a => a !== '--reset');
 if (isReset) {
   const prevMode = getCurrentMode();
   setMode('fast');
-  console.error(`[SetMode] Reset: ${prevMode} → fast (new task boundary)`);
+  clearEscalationState();
+  appendModeTrace({
+    trigger: 'set-mode',
+    prev_mode: prevMode,
+    next_mode: 'fast',
+    reason: 'manual reset (--reset)',
+    matched_signal: null,
+    overridden_by_user: true
+  });
+  console.error(`[SetMode] Reset: ${prevMode} → fast (new task boundary, escalation state cleared)`);
 
   if (!modeArg) {
     process.exit(0);
@@ -64,5 +75,13 @@ if (requestedLevel === currentLevel) {
 }
 
 setMode(modeArg);
+appendModeTrace({
+  trigger: 'set-mode',
+  prev_mode: currentMode,
+  next_mode: modeArg,
+  reason: 'manual escalation',
+  matched_signal: modeArg,
+  overridden_by_user: true
+});
 console.error(`[SetMode] Mode escalated: ${currentMode} → ${modeArg}`);
 process.exit(0);

@@ -55,13 +55,17 @@ User Request: "给用户系统加上OAuth登录"
 | **Standard** | 普通功能开发、一般 bugfix、跨 2-5 文件 | Fast + 风险提醒、局部质量门、决策记忆 | shared-state、多 agent |
 | **Heavy** | 认证/支付/权限/迁移/部署/架构重构 | Standard + shared-state、sprint memory、冲突检测 | — |
 
-**路由信号**：风险关键词（auth, payment, deploy, migration 等）→ 自动升档；用户说"直接做"→ 降档。
+**自动升档机制**（`pre-tool-escalate.js`，Always-on）：
+- 风险信号检测：auth/payment/deploy 等关键词 → 自动升档
+- 跨文件累积：3 文件 → Standard，6 文件 → Heavy
+- 任务边界检测：5 分钟空闲间隔 → 自动 reset 到 fast
 
-**每个任务开始**必须执行两步：
-1. 输出摘要：`[Mode: Fast/Standard/Heavy] 原因 | 自动启用项 | 建议命令`
-2. 写入模式：`node .claude/scripts/hooks/set-mode.js <mode>`（仅当判定为 Standard 或 Heavy 时执行）
+**手动设定**：`node .claude/scripts/hooks/set-mode.js <mode>`
+**手动 reset**：`node .claude/scripts/hooks/set-mode.js --reset`
 
-> 注：编辑高风险目录时 `post-edit-light.js` 也会自动升档，作为兜底。
+**可观测性**：所有模式变化记录到 `.claude/logs/mode-trace.jsonl`
+
+**每个任务开始**输出摘要：`[Mode: Fast/Standard/Heavy] 原因 | 自动启用项 | 建议命令`
 
 **推荐命令链**：
 - Fast：直接做 → `/verify`
@@ -181,18 +185,27 @@ User Request: "给用户系统加上OAuth登录"
 
 | 层级 | 类型 | Hooks | 说明 |
 |------|------|-------|------|
-| **Always-on** | SessionStart | session-start, task-router | 上下文恢复 + 模式判定 |
-| **Always-on** | PreToolUse | careful-guard, freeze-guard | 安全守卫 |
-| **Always-on** | PostToolUse | post-edit-light | 轻量格式化 + 风险扫描 |
-| **Always-on** | Stop | stop-summary | 最小摘要 + console.log 检查 |
+| **Always-on** | SessionStart | session-start, task-router | 上下文恢复 + 模式 reset + trace 截断 |
+| **Always-on** | PreToolUse | careful-guard, freeze-guard, pre-tool-escalate | 安全守卫 + 自动升档 + 跨文件追踪 + 任务边界检测 |
+| **Always-on** | PostToolUse | post-edit-light | 轻量格式化 + console.log 警告 |
+| **Always-on** | Stop | stop-summary | 高价值记忆抽取（Decisions/Constraints/Open Loops） |
 | **Always-on** | PreCompact | pre-compact | 压缩前保存 |
-| **Standard+** | PreToolUse | auto-tmux-dev, suggest-compact, observe.sh | 模式门控 |
-| **Standard+** | PostToolUse | drift-detector, quality-gate, fault-hint, observe.sh | 模式门控 |
+| **Standard+** | PreToolUse | auto-tmux-dev, suggest-compact | 模式门控 |
+| **Standard+** | PostToolUse | drift-detector, quality-gate, fault-hint, post-edit-typecheck | 模式门控 |
 | **Standard+** | Stop | session-end, cost-tracker | 模式门控 |
-| **Heavy** | PostToolUse | post-edit-typecheck | 完整类型检查 |
 | **Heavy** | Stop | evaluate-session, shared-state-sync, sprint-memory, shared-memory-sync, memory-consolidate, memory-promote | 重型记忆与协作 |
 
 > 所有 Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式下自动跳过。
+
+### shared-state 任务接管语义
+
+当 Heavy 模式 `shared-state-sync.js` 检测到 stale worker（30 分钟无心跳）时：
+1. Worker status → `stale`，随后从 board 移除
+2. 其 in_progress 任务：owner 清空、status → `pending`、`needs_reassignment: true`、`stale_reclaimed_at` 记录时间
+3. `handoff_note` 保留上下文，供新 agent 参考
+4. stderr 输出待重新分配任务清单
+
+新 agent 认领任务时，写入方应清除 `needs_reassignment` 字段。
 
 ### 风险控制
 

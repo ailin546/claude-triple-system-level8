@@ -2,18 +2,12 @@
 /**
  * PreToolUse Hook: Auto-escalate mode before tool execution (Always-on)
  *
- * Checks the tool input (Bash command or file path) for risk signals
- * and escalates the task mode BEFORE the tool runs, ensuring that
- * Standard+/Heavy hooks are active when they're first needed.
+ * Three escalation mechanisms in one hook:
+ * 1. Risk signal detection — Bash commands and file paths matching known patterns
+ * 2. Cross-file accumulation — 3+ unique files → Standard, 6+ → Heavy
+ * 3. Task boundary detection — 5min idle gap → reset to fast, then re-evaluate
  *
- * This closes the gap where:
- * - post-edit-light.js only triggers after Edit (too late for Bash)
- * - task-router.js only runs at SessionStart (no task context yet)
- * - set-mode.js requires Claude to remember to call it (unreliable)
- *
- * Signals checked:
- * - Bash commands involving high-risk tools/directories
- * - Edit/Write targets in high-risk directories
+ * All mode changes are logged to .claude/logs/mode-trace.jsonl for observability.
  *
  * Non-blocking: pass-through on error, never blocks tool execution.
  * Cross-platform (Windows, macOS, Linux).
@@ -22,6 +16,12 @@
 'use strict';
 
 const MAX_STDIN = 1024 * 1024;
+
+// ── Thresholds ───────────────────────────────────────────────
+
+const CROSS_FILE_STANDARD = 3;
+const CROSS_FILE_HEAVY = 6;
+const TASK_BOUNDARY_MS = (parseInt(process.env.TASK_BOUNDARY_MINUTES, 10) || 5) * 60 * 1000;
 
 // ── Risk signal definitions ──────────────────────────────────
 
@@ -59,14 +59,17 @@ const HEAVY_DIR_NAMES = [
 
 /**
  * Check if a normalized path contains a directory segment.
- * Matches both '/dir/' (mid-path) and 'dir/' (start of relative path).
  */
 function pathContainsDir(normalizedPath, dirName) {
   return normalizedPath.includes(`/${dirName}/`) || normalizedPath.startsWith(`${dirName}/`);
 }
 
-// ── Main logic ───────────────────────────────────────────────
+// ── Signal detection ─────────────────────────────────────────
 
+/**
+ * Detect escalation target from a single tool input.
+ * Returns { mode, signal } or null.
+ */
 function detectEscalation(input) {
   const toolName = input.tool_name || '';
   const toolInput = input.tool_input || {};
@@ -77,30 +80,41 @@ function detectEscalation(input) {
     if (!cmd) return null;
 
     for (const pattern of HEAVY_BASH_PATTERNS) {
-      if (pattern.test(cmd)) return 'heavy';
+      if (pattern.test(cmd)) return { mode: 'heavy', signal: `bash: ${cmd.slice(0, 80)}` };
     }
     for (const pattern of STANDARD_BASH_PATTERNS) {
-      if (pattern.test(cmd)) return 'standard';
+      if (pattern.test(cmd)) return { mode: 'standard', signal: `bash: ${cmd.slice(0, 80)}` };
     }
   }
 
   // Check Edit/Write file paths
-  if (toolName === 'Edit' || toolName === 'Write' || toolName === 'edit' || toolName === 'write') {
+  if (/^(Edit|Write)$/i.test(toolName)) {
     const filePath = (toolInput.file_path || '').replace(/\\/g, '/');
     if (!filePath) return null;
 
     for (const dir of HEAVY_DIR_NAMES) {
-      if (pathContainsDir(filePath, dir)) return 'heavy';
+      if (pathContainsDir(filePath, dir)) return { mode: 'heavy', signal: `path: ${filePath}` };
     }
     for (const dir of STANDARD_DIR_NAMES) {
-      if (pathContainsDir(filePath, dir)) return 'standard';
+      if (pathContainsDir(filePath, dir)) return { mode: 'standard', signal: `path: ${filePath}` };
     }
   }
 
   return null;
 }
 
-// ── stdin entry point ────────────────────────────────────────
+/**
+ * Extract file path from tool input (Edit/Write targets).
+ */
+function extractFilePath(input) {
+  const toolName = input.tool_name || '';
+  if (/^(Edit|Write)$/i.test(toolName)) {
+    return (input.tool_input?.file_path || '').replace(/\\/g, '/') || null;
+  }
+  return null;
+}
+
+// ── Main logic ───────────────────────────────────────────────
 
 let data = '';
 process.stdin.setEncoding('utf8');
@@ -115,19 +129,95 @@ process.stdin.on('data', chunk => {
 process.stdin.on('end', () => {
   try {
     const input = JSON.parse(data);
-    const targetMode = detectEscalation(input);
+    const {
+      getCurrentMode, setMode, MODE_LEVELS,
+      appendModeTrace,
+      getEscalationState, setEscalationState
+    } = require('../lib/mode-check');
 
+    const escState = getEscalationState();
+    const now = Date.now();
+    let currentMode = getCurrentMode();
+
+    // ── Task boundary detection ──
+    // If idle for > TASK_BOUNDARY_MS, reset to fast and clear file tracking
+    if (escState.lastToolUseAt && (now - escState.lastToolUseAt) > TASK_BOUNDARY_MS) {
+      const prevMode = currentMode;
+      if (prevMode !== 'fast') {
+        setMode('fast');
+        appendModeTrace({
+          trigger: 'pre-tool-escalate',
+          prev_mode: prevMode,
+          next_mode: 'fast',
+          reason: `task-boundary: idle ${Math.round((now - escState.lastToolUseAt) / 60000)}min`,
+          matched_signal: null,
+          overridden_by_user: false
+        });
+        console.error(`[PreToolEscalate] Task boundary detected (idle ${Math.round((now - escState.lastToolUseAt) / 60000)}min). Mode reset: ${prevMode} → fast`);
+        currentMode = 'fast';
+      }
+      // Clear file tracking for new task
+      escState.filesTracked = [];
+    }
+
+    // ── Track unique files ──
+    const filePath = extractFilePath(input);
+    if (filePath && !escState.filesTracked.includes(filePath)) {
+      escState.filesTracked.push(filePath);
+    }
+
+    // ── Determine target mode from all signals ──
+    let targetMode = null;
+    let targetSignal = null;
+    let targetReason = null;
+
+    // 1. Risk signal detection (highest priority)
+    const riskResult = detectEscalation(input);
+    if (riskResult) {
+      targetMode = riskResult.mode;
+      targetSignal = riskResult.signal;
+      targetReason = `risk-signal: ${riskResult.signal}`;
+    }
+
+    // 2. Cross-file accumulation (only upgrade if risk didn't already set higher)
+    const fileCount = escState.filesTracked.length;
+    if (fileCount >= CROSS_FILE_HEAVY) {
+      if (!targetMode || MODE_LEVELS[targetMode] < MODE_LEVELS.heavy) {
+        targetMode = 'heavy';
+        targetSignal = `${fileCount} unique files`;
+        targetReason = `cross-file: ${fileCount} files touched (threshold: ${CROSS_FILE_HEAVY})`;
+      }
+    } else if (fileCount >= CROSS_FILE_STANDARD) {
+      if (!targetMode || MODE_LEVELS[targetMode] < MODE_LEVELS.standard) {
+        targetMode = 'standard';
+        targetSignal = `${fileCount} unique files`;
+        targetReason = `cross-file: ${fileCount} files touched (threshold: ${CROSS_FILE_STANDARD})`;
+      }
+    }
+
+    // ── Apply escalation (only upgrade, never downgrade) ──
     if (targetMode) {
-      const { getCurrentMode, setMode, MODE_LEVELS } = require('../lib/mode-check');
-      const currentMode = getCurrentMode();
       const currentLevel = MODE_LEVELS[currentMode] ?? 0;
       const targetLevel = MODE_LEVELS[targetMode] ?? 0;
 
       if (targetLevel > currentLevel) {
         setMode(targetMode);
-        console.error(`[PreToolEscalate] Mode auto-escalated: ${currentMode} → ${targetMode}`);
+        appendModeTrace({
+          trigger: 'pre-tool-escalate',
+          prev_mode: currentMode,
+          next_mode: targetMode,
+          reason: targetReason,
+          matched_signal: targetSignal,
+          overridden_by_user: false
+        });
+        console.error(`[PreToolEscalate] Mode escalated: ${currentMode} → ${targetMode} (${targetReason})`);
       }
     }
+
+    // ── Update escalation state ──
+    escState.lastToolUseAt = now;
+    setEscalationState(escState);
+
   } catch {
     // Parse error or mode-check unavailable — pass through
   }

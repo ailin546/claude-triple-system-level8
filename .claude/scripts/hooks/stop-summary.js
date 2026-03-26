@@ -134,42 +134,80 @@ function checkConsoleLogs() {
 }
 
 /**
- * Extract high-value signals from stdin (hook input).
+ * Extract high-value signals from the current session.
  * Returns { decisions, constraints, openLoops } arrays.
+ *
  * Conservative: only extracts what's clearly identifiable, skips if unsure.
+ * Deliberately does NOT record:
+ * - "N file(s) modified" — git status can show this anytime
+ * - "Task ran in X mode" — mode itself is not a decision/constraint
  */
 function extractHighValueContent(stdinContent) {
   const result = { decisions: [], constraints: [], openLoops: [] };
 
   try {
-    const input = JSON.parse(stdinContent);
-
-    // Check for git modified files as a proxy for "work was done"
-    if (isGitRepo()) {
-      const modifiedFiles = getGitModifiedFiles();
-      if (modifiedFiles.length > 0) {
-        result.openLoops.push(`${modifiedFiles.length} file(s) modified but uncommitted`);
+    // Check mode-trace for mode escalations (= decisions worth recording)
+    try {
+      const { MODE_TRACE_PATH } = require('../lib/mode-check');
+      if (fs.existsSync(MODE_TRACE_PATH)) {
+        const lines = fs.readFileSync(MODE_TRACE_PATH, 'utf8').trim().split('\n');
+        const cutoff = Date.now() - 60 * 60 * 1000; // last hour
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+            if (new Date(entry.timestamp).getTime() < cutoff) continue;
+            if (entry.prev_mode === entry.next_mode) continue;
+            if (entry.trigger === 'task-router' && entry.next_mode === 'fast') continue; // session init, not interesting
+            const desc = entry.overridden_by_user
+              ? `用户覆盖模式: ${entry.prev_mode} → ${entry.next_mode}`
+              : `自动升档: ${entry.prev_mode} → ${entry.next_mode} (${entry.reason})`;
+            result.decisions.push(desc);
+          } catch { /* skip malformed line */ }
+        }
       }
-    }
+    } catch { /* mode-check not available */ }
 
-    // Check .task-mode for non-default mode (signals meaningful work)
-    const mode = getCurrentMode();
-    if (mode !== 'fast') {
-      result.constraints.push(`Task ran in ${mode} mode`);
-    }
-
-    // Check for TODO items in recently modified files
+    // Check for NEW TODO/FIXME/HACK in git diff (only newly added lines)
     if (isGitRepo()) {
-      const jsFiles = getGitModifiedFiles(['\\.tsx?$', '\\.jsx?$', '\\.md$']);
-      for (const file of jsFiles.slice(0, 5)) {
-        const content = readFile(file);
-        if (!content) continue;
-        const todoMatches = content.match(/(?:TODO|FIXME|HACK|XXX)[\s:]+(.+)/gi);
-        if (todoMatches) {
-          for (const m of todoMatches.slice(0, 2)) {
-            result.openLoops.push(`${path.basename(file)}: ${m.trim().slice(0, 100)}`);
+      try {
+        const { execFileSync } = require('child_process');
+        const diff = execFileSync('git', ['diff', '--cached', '--diff-filter=AM', '-U0'], {
+          encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000
+        });
+        // Also check unstaged
+        const diffUnstaged = execFileSync('git', ['diff', '-U0'], {
+          encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000
+        });
+        const allDiff = diff + diffUnstaged;
+        let currentFile = '';
+        for (const line of allDiff.split('\n')) {
+          if (line.startsWith('diff --git')) {
+            const match = line.match(/b\/(.+)$/);
+            currentFile = match ? match[1] : '';
+          }
+          // Only look at added lines in user code (skip hooks/scripts/tests/config)
+          if (line.startsWith('+') && !line.startsWith('+++')) {
+            // Skip hook/script/config files — their comments are not user TODOs
+            if (/\.(config|spec|test)\.[jt]sx?$/.test(currentFile)) continue;
+            if (/scripts\/|hooks\/|__tests__\/|__mocks__\//.test(currentFile)) continue;
+            // Must be a real annotation, not just the word in a comment about annotations
+            const todoMatch = line.match(/^\+\s*(?:\/\/|\/?\*|#)?\s*\b(TODO|FIXME|HACK|XXX)[\s:]+(.{3,})/i);
+            if (todoMatch) {
+              const tag = todoMatch[1].toUpperCase();
+              const msg = todoMatch[2].trim().slice(0, 100);
+              // Skip lines that are merely describing/documenting these tags
+              if (/\b(known|tech debt|constraint|open loop)\b/i.test(msg)) continue;
+              const basename = path.basename(currentFile);
+              if (tag === 'TODO') {
+                result.openLoops.push(`${basename}: ${tag}: ${msg}`);
+              } else {
+                result.constraints.push(`${basename}: ${tag}: ${msg}`);
+              }
+            }
           }
         }
+      } catch {
+        // git diff failed — skip
       }
     }
   } catch {
