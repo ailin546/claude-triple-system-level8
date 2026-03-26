@@ -2,9 +2,27 @@
 
 > 详细设计见 `docs/claude-triple-system-level8-redesign/permissions.md`
 
-## 三层权限模型
+## 当前默认配置
 
-### Layer 1：默认允许（只读、低风险）
+当前使用**全权限 + hook 风险守卫**模式：
+- `settings.json`：`Bash(*)`、`Write(*)`、`Edit(*)`、`Read(*)` 等全开放
+- 风险控制由运行时 hook 守卫承担，不依赖配置层最小权限
+- 产品决策：避免逐条人工授权打断工作流
+
+## 风险守卫机制
+
+| Hook | 类型 | 作用 |
+|------|------|------|
+| `careful-guard` | PreToolUse | 阻断破坏性命令（rm -rf、DROP TABLE、git push --force） |
+| `freeze-guard` | PreToolUse | 阻断锁定范围外的编辑 |
+| `pre-tool-escalate` | PreToolUse | 检测高风险操作，自动升档模式 |
+| 模式门控 hooks | Standard+/Heavy | 按模式启用验证、质量门、shared-state |
+
+## 三层权限分类（治理参考）
+
+三层模型作为**治理框架**，用于风险分类和高安全场景下的可选收紧。
+
+### Layer 1：低风险（只读、验证）
 
 | 类别 | 具体命令 |
 |------|---------|
@@ -14,9 +32,7 @@
 | 搜索类 | `grep`, `rg`, `ag`, `fd` |
 | 信息类 | `node --version`, `npm --version`, `which`, `type`, `env` |
 
-**要求**：不写远程、不破坏文件、不改变部署或数据状态。
-
-### Layer 2：条件允许（可回滚、无远程副作用）
+### Layer 2：本地写入（可回滚、无远程副作用）
 
 | 类别 | 具体命令 | 条件 |
 |------|---------|------|
@@ -25,9 +41,7 @@
 | 依赖安装 | `npm install`, `pip install` | package.json/requirements.txt 已变更 |
 | 本地生成 | 创建/编辑项目文件 | 不涉及远程 |
 
-**条件**：任务明确需要、结果可回滚、不涉及远程副作用。
-
-### Layer 3：必须人工确认（永不默认自治）
+### Layer 3：高风险（远程写、不可逆）
 
 | 类别 | 具体命令 | 原因 |
 |------|---------|------|
@@ -38,51 +52,6 @@
 | 大规模删除 | `rm -rf`, `DROP TABLE`, `TRUNCATE` | 不可恢复 |
 | Secrets | 读取/写入/轮转 secrets | 安全敏感 |
 
-## 禁止的大前缀白名单
+## 可选收紧配置
 
-以下宽泛授权方式**禁止使用**：
-
-```
-❌ Bash(node *)
-❌ Bash(npx *)
-❌ Bash(git *)
-❌ Bash(python *)
-❌ Bash(sh *)
-```
-
-**原因**：范围过大、难以审计、容易把局部问题升级为系统性风险。
-
-## 权限与模式联动
-
-| 模式 | 允许层级 | 说明 |
-|------|---------|------|
-| **Fast** | 仅 Layer 1 | 只读操作，不写文件以外的东西 |
-| **Standard** | Layer 1 + 需要时 Layer 2 | 可 commit、可本地构建 |
-| **Heavy** | Layer 1 + Layer 2 | Layer 3 永远需要人工确认 |
-
-## 推荐配置
-
-按动作分类批准，不按解释器分类：
-
-```jsonc
-// settings.json 或 settings.local.json
-{
-  "permissions": {
-    "allow": [
-      // Layer 1: 只读
-      "Read(*)", "Glob(*)", "Grep(*)", "WebSearch(*)", "WebFetch(*)",
-      "TodoWrite(*)", "Agent(*)",
-      // Layer 1: 验证
-      "Bash(npm test *)", "Bash(npm run lint *)", "Bash(npm run typecheck *)",
-      "Bash(npx tsc *)",
-      // Layer 1: Git 只读
-      "Bash(git status *)", "Bash(git diff *)", "Bash(git log *)",
-      "Bash(git branch *)", "Bash(git show *)"
-    ]
-  }
-}
-```
-
-> 当前 settings.json 默认全开放（`Bash(*)`）以避免人工授权中断。
-> 三层模型作为**参考指南**，由 careful-guard hook 和 pre-tool-escalate hook 提供运行时风险提醒。
-> 需要收紧时，可按上述模式手动配置 settings.json 或 settings.local.json。
+需要收紧时，可在 `settings.json` 或 `settings.local.json` 中按动作分类配置 allowlist/denylist。参见 `docs/claude-triple-system-level8-redesign/permissions.md` 的"可选：收紧配置"章节。

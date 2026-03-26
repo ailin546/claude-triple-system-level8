@@ -194,6 +194,13 @@ User Request: "给用户系统加上OAuth登录"
 
 > 所有 Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式下自动跳过。
 
+### 风险控制
+
+当前系统采用**全权限 + hook 守卫**模式（非配置层最小权限）：
+- `settings.json` 保持 `Bash(*)`、`Write(*)` 等全开放，避免人工授权打断
+- 风险由运行时 hook 守卫承担：`careful-guard`（阻断破坏性命令）、`freeze-guard`（编辑范围锁）、`pre-tool-escalate`（自动升档）
+- 三层权限模型（见 `.claude/strategies/autonomous-permissions.md`）是治理框架和可选收紧方案，非默认强制配置
+
 ### 降级状态
 
 | 状态 | 含义 |

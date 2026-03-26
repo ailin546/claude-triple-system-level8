@@ -177,7 +177,31 @@ flowchart TD
 2. 能在 `Fast` 完成的任务，绝不强制升级。
 3. `Standard` 只增加必要验证，不引入协作控制面。
 4. `Heavy` 才启用 shared-state、sprint memory、多 agent 编排。
-5. 用户明确说“直接做”“不要 TDD”“不要多 agent”时，Control Plane 允许降级。
+5. 用户明确说”直接做””不要 TDD””不要多 agent”时，Control Plane 允许降级。
+
+### “默认轻量”的含义
+
+“默认轻量”指**流程轻量**，不等于权限最小化：
+
+- **流程轻量**：默认不启用 TDD 强制、shared-state、多 agent、重型 memory 链路、全量验证。小任务只跑 Always-on hooks。
+- **权限宽松**：默认保持 `Bash(*)` 等全开放授权，避免人工授权打断。风险控制由 hook 守卫（careful-guard、freeze-guard、pre-tool-escalate）承担。
+
+### 风险控制架构
+
+当前系统的风险控制不依赖配置层最小权限，而是依赖三层运行时机制：
+
+1. **PreToolUse 守卫**（始终活跃）：
+   - `careful-guard`：阻断破坏性命令
+   - `freeze-guard`：阻断锁定范围外编辑
+   - `pre-tool-escalate`：检测高风险操作，自动升档模式
+
+2. **模式门控**（按需启用）：
+   - Standard+ hooks 在高风险操作时自动激活（漂移检测、质量门、风险提示）
+   - Heavy hooks 在认证/支付/部署等场景激活（shared-state、严格验证）
+
+3. **可选配置层收紧**：
+   - 三层权限模型作为**治理框架**，可在高安全场景下配置 allowlist/denylist
+   - 不作为当前默认运行配置
 
 ## 建议目录结构
 
