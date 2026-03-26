@@ -72,8 +72,14 @@ node .claude/scripts/hooks/set-mode.js standard
 node .claude/scripts/hooks/set-mode.js heavy
 ```
 
+**新任务边界**：同一 session 中切换到不同任务时，先重置再设置：
+```bash
+node .claude/scripts/hooks/set-mode.js --reset           # 回到 fast
+node .claude/scripts/hooks/set-mode.js --reset standard   # 回到 fast 再升到 standard
+```
+
 > Fast 模式是默认值（SessionStart 已写入），无需额外执行。
-> `post-edit-light.js` 也会在编辑高风险目录时自动升档，作为兜底。
+> `pre-tool-escalate.js` 和 `post-edit-light.js` 也会在高风险操作时自动升档，作为兜底。
 
 示例：
 ```text

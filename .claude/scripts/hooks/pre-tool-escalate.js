@@ -47,14 +47,14 @@ const HEAVY_BASH_PATTERNS = [
 
 // File path patterns → Standard
 const STANDARD_PATH_SEGMENTS = [
-  '/api/', '/server/', '/database/', '/migrations/', '/auth/',
+  '/api/', '/server/', '/database/', '/migrations/',
   '/config/', '/infra/', '/middleware/',
 ];
 
 // File path patterns → Heavy
 const HEAVY_PATH_SEGMENTS = [
-  '/payment/', '/billing/', '/deploy/', '/permission/',
-  '/shared-state/',
+  '/auth/', '/payment/', '/billing/', '/deploy/', '/permission/',
+  '/shared-state/', '/identity/', '/oauth/',
 ];
 
 // ── Main logic ───────────────────────────────────────────────

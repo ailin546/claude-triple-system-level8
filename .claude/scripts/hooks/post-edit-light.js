@@ -27,14 +27,14 @@ const RISK_KEYWORDS = [
 
 // Directories that signal at least Standard mode
 const STANDARD_DIRS = [
-  '/api/', '/server/', '/database/', '/migrations/', '/auth/',
+  '/api/', '/server/', '/database/', '/migrations/',
   '/config/', '/infra/', '/middleware/',
 ];
 
 // Directories/patterns that signal Heavy mode
 const HEAVY_DIRS = [
-  '/payment/', '/billing/', '/deploy/', '/permission/',
-  '/shared-state/',
+  '/auth/', '/payment/', '/billing/', '/deploy/', '/permission/',
+  '/shared-state/', '/identity/', '/oauth/',
 ];
 
 // File-level risk keywords that signal Standard+
