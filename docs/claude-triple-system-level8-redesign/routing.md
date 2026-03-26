@@ -79,7 +79,6 @@
 
 手动触发：
 
-- `/orchestrate`
 - `/save-session`
 - `/resume-session`
 

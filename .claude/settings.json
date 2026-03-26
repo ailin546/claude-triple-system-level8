@@ -12,7 +12,8 @@
       "WebSearch(*)",
       "TodoWrite(*)",
       "NotebookEdit(*)",
-      "Agent(*)"
+      "Agent(*)",
+      "mcp__github__*"
     ]
   },
   "hooks": {

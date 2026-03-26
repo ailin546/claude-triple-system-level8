@@ -64,7 +64,6 @@
 - `/tdd`
 - `/verify`
 - `/code-review`
-- `/orchestrate`
 - `/save-session`
 - `/resume-session`
 
@@ -220,7 +219,6 @@ CLAUDE.md
     tdd.md
     verify.md
     code-review.md
-    orchestrate.md
     save-session.md
     resume-session.md
   scripts/

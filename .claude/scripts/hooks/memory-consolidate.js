@@ -176,7 +176,10 @@ function appendToSection(longTermContent, targetSection, entries) {
 }
 
 function main() {
-  if (!fs.existsSync(MEMORY_DIR)) return;
+  if (!fs.existsSync(MEMORY_DIR)) {
+    console.error('[MemoryConsolidate] warn: .memory/ directory not found, consolidation skipped');
+    return;
+  }
   if (!shouldRun()) return;
 
   // Find expired sprint files

@@ -106,12 +106,12 @@ bash .claude/scripts/install-level8.sh
 ├── .gitignore                         ← Excludes runtime data
 └── .claude/
     ├── settings.json                  ← Hooks configuration
-    ├── agents/                        ← 96 specialized agents
-    ├── skills/                        ← 107 skills (including shared-state-sync)
-    ├── commands/                      ← 48 slash commands
-    ├── rules/                         ← 44 coding rules (common + per-language)
+    ├── agents/                        ← 26 specialized agents
+    ├── skills/                        ← 38 skills (including shared-state-sync)
+    ├── commands/                      ← 28 slash commands
+    ├── rules/                         ← 11 coding rules (common/ + routing.md)
     ├── scripts/
-    │   ├── hooks/                     ← 26 hook scripts (including Level 8 hooks)
+    │   ├── hooks/                     ← 29 hook scripts (including Level 8 hooks)
     │   └── install-level8.sh          ← One-click Level 8 setup
     ├── strategies/                    ← Playbooks (including autonomous-permissions)
     ├── shared-state/
@@ -128,7 +128,6 @@ bash .claude/scripts/install-level8.sh
 | `/plan` | Plan implementation |
 | `/tdd` | Test-driven development |
 | `/code-review` | Code review |
-| `/orchestrate` | Multi-agent workflow |
 | `/save-session` | Save session + sprint memory |
 | `/resume-session` | Resume with full context |
 | `/learn` | Extract reusable patterns |

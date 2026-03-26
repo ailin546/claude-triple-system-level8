@@ -138,7 +138,6 @@ Artifacts are the **handoff mechanism** between agents. Each agent reads its dep
 
 | System | Integration |
 |--------|-------------|
-| `/orchestrate` | Uses board.json instead of inline handoff docs |
 | `/save-session` | Includes board.json snapshot in session file |
 | `/resume-session` | Restores board.json state from session |
 | `session-end.js` hook | Auto-archives board state on session end |

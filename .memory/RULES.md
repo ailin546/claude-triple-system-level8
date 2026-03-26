@@ -4,8 +4,10 @@
 
 ## 目录结构
 
+共享记忆位于**项目根目录**下的 `.memory/`：
+
 ```
-~/cc/.memory/
+{project}/.memory/
 ├── RULES.md       ← 本文件：使用规则（只读）
 ├── today.md       ← 短期：当日工作日志
 ├── weekly.md      ← 中期：本周摘要（保留 2 周）
@@ -81,25 +83,20 @@
 
 ## 子项目记忆
 
-子项目可以维护自己的详细记忆（如 `aimm_qun/AIGMM_Memory.md`），但**关键决策和跨项目信息**必须同步到 `~/cc/.memory/` 的对应层级。
+子项目可以维护自己的详细记忆，但**关键决策和跨项目信息**必须同步到项目根目录 `.memory/` 的对应层级。
 
 ## 配置指引
 
 ### Claude Code
-在 CLAUDE.md 中添加读取指令，Stop Hook 自动写入 today.md。
+- `session-start.js` 启动时自动读取 `.memory/` 下的记忆文件
+- `stop-summary.js`（Always-on）在 Fast/Standard 模式写入高价值记忆到 `today.md`
+- `shared-memory-sync.js`（Heavy-only）执行完整的会话同步和每日归档
 
-### Codex
-在 `codex.md` 或 `AGENTS.md` 中添加：
+### Codex / 其他工具
+在工具配置中添加：
 ```
-每次会话开始先读取 ~/cc/.memory/ 下的 RULES.md、long-term.md、weekly.md、today.md。
+每次会话开始先读取 {project}/.memory/ 下的 long-term.md、weekly.md、today.md。
 会话结束前更新 today.md。
-```
-
-### OpenClaw
-在各 workspace 的 SOUL.md 或 IDENTITY.md 中添加：
-```
-共享记忆路径：~/cc/.memory/
-遵守 RULES.md 协议读写。
 ```
 
 ## 降级策略

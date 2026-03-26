@@ -213,11 +213,71 @@ function buildStructuredSummary(rawContent) {
   return result;
 }
 
+// ── Shared Memory ────────────────────────────────────────────
+
+const MEMORY_DIR = path.join(process.cwd(), '.memory');
+const MAX_MEMORY_BYTES = 1024; // Cap each memory file excerpt
+
+/**
+ * Read shared memory files and inject a compact summary.
+ * Reads: long-term.md → weekly.md → today.md (per RULES.md protocol).
+ * Non-blocking: missing files are silently skipped.
+ */
+function loadSharedMemory() {
+  if (!fs.existsSync(MEMORY_DIR)) {
+    log('[SessionStart] warn: .memory/ directory not found, skipping shared memory');
+    return;
+  }
+
+  const memoryFiles = [
+    { name: 'long-term.md', label: 'Long-term knowledge' },
+    { name: 'weekly.md', label: 'Weekly summary' },
+    { name: 'today.md', label: 'Today log' },
+  ];
+
+  const parts = [];
+  let loadedCount = 0;
+
+  for (const { name, label } of memoryFiles) {
+    const filePath = path.join(MEMORY_DIR, name);
+    const content = readFile(filePath);
+    if (!content || !content.trim()) continue;
+
+    // Strip the first heading line and any empty "template-only" content
+    const lines = content.split('\n');
+    const bodyLines = lines.filter(l => !l.startsWith('# ') && !l.startsWith('> '));
+    const body = bodyLines.join('\n').trim();
+    if (!body || body === '## Sessions') continue;
+
+    // Truncate to keep context injection small
+    let excerpt = body;
+    if (Buffer.byteLength(excerpt, 'utf8') > MAX_MEMORY_BYTES) {
+      const buf = Buffer.from(excerpt, 'utf8');
+      let end = MAX_MEMORY_BYTES - 3;
+      while (end > 0 && (buf[end] & 0xC0) === 0x80) end--;
+      excerpt = buf.subarray(0, end).toString('utf8') + '...';
+    }
+
+    parts.push(`**${label}:**\n${excerpt}`);
+    loadedCount++;
+  }
+
+  if (parts.length > 0) {
+    output(`## Shared Memory\n${parts.join('\n\n')}`);
+    log(`[SessionStart] Loaded ${loadedCount} shared memory file(s)`);
+  } else {
+    log('[SessionStart] Shared memory files exist but contain no actionable content');
+  }
+}
+
 // ── Main ─────────────────────────────────────────────────────
 
 async function main() {
   ensureDir(SESSIONS_DIR);
   ensureDir(LEARNED_DIR);
+
+  // Load shared memory (long-term → weekly → today)
+  loadSharedMemory();
 
   // Load most recent session — inject structured summary, not full text
   const recentSessions = findFiles(SESSIONS_DIR, '-session.tmp', { maxAge: 7 });
