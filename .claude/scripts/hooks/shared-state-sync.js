@@ -78,11 +78,21 @@ function main() {
     return;
   }
 
-  // ── Version check ──
-  if (board.version && board.version !== EXPECTED_SCHEMA_VERSION) {
-    console.error(`[SharedStateSync] DEGRADED: schema version mismatch (expected ${EXPECTED_SCHEMA_VERSION}, got ${board.version})`);
-    appendDecision('system', 'DEGRADE', `Schema version mismatch: expected ${EXPECTED_SCHEMA_VERSION}, got ${board.version}`);
-    return;
+  // ── Version check (accepts both old string "1.0"/"1.0.0" and new integer 1) ──
+  const boardVersion = board.version;
+  if (boardVersion != null) {
+    const numericVersion = typeof boardVersion === 'string'
+      ? parseInt(boardVersion.split('.')[0], 10)
+      : boardVersion;
+    if (isNaN(numericVersion) || numericVersion > EXPECTED_SCHEMA_VERSION) {
+      console.error(`[SharedStateSync] DEGRADED: schema version incompatible (expected <=${EXPECTED_SCHEMA_VERSION}, got ${boardVersion})`);
+      appendDecision('system', 'DEGRADE', `Schema version incompatible: expected <=${EXPECTED_SCHEMA_VERSION}, got ${boardVersion}`);
+      return;
+    }
+    // Normalize to integer for consistency
+    if (typeof board.version === 'string') {
+      board.version = numericVersion;
+    }
   }
 
   // Support both old (agents) and new (workers) schema

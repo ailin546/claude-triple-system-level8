@@ -15,18 +15,8 @@ const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
 
-// ── Mode gate: Standard+ only ───────────────────────────────
-try {
-  const { requireMode } = require('../lib/mode-check');
-  if (!requireMode('standard')) {
-    let d = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', c => { d += c; });
-    process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
-    return;
-  }
-} catch { /* mode-check not available — run anyway */ }
-// ─────────────────────────────────────────────────────────────
+// Session snapshots are always-on (session-start reads them for recovery).
+// No mode gate — this hook runs in all modes (Fast/Standard/Heavy).
 
 // ── Inlined utilities (previously from ../lib/utils) ─────────
 

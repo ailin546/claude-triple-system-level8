@@ -2,9 +2,13 @@
 /**
  * SessionStart Hook: Task Mode Router
  *
- * Determines Fast / Standard / Heavy mode based on routing signals.
- * Writes mode to .claude/.task-mode so other hooks can check it.
- * Outputs mode summary to stdout (injected into Claude context).
+ * Resets mode to Fast at session start, then outputs routing instructions
+ * so Claude evaluates the correct mode for the first task.
+ *
+ * Mode escalation happens through three mechanisms:
+ * 1. Claude evaluates routing signals and calls set-mode.js (CLAUDE.md rule)
+ * 2. pre-tool-escalate.js detects high-risk Bash/Edit/Write (automatic)
+ * 3. post-edit-light.js detects high-risk file paths (automatic fallback)
  *
  * Cross-platform (Windows, macOS, Linux)
  * Non-blocking: errors fall back to Fast mode.
@@ -17,25 +21,8 @@ const path = require('path');
 
 const PROJECT_ROOT = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
 const MODE_FILE = path.join(PROJECT_ROOT, '.claude', '.task-mode');
-
-// Default to Fast
 const DEFAULT_MODE = 'fast';
 
-/**
- * Read the current mode from the mode file.
- * Returns null if no mode file exists.
- */
-function readCurrentMode() {
-  try {
-    return fs.readFileSync(MODE_FILE, 'utf8').trim().toLowerCase();
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Write mode to file so other hooks can check it.
- */
 function writeMode(mode) {
   try {
     const dir = path.dirname(MODE_FILE);
@@ -48,9 +35,6 @@ function writeMode(mode) {
   }
 }
 
-/**
- * Output to Claude context (stdout).
- */
 function output(msg) {
   process.stdout.write(msg + '\n');
 }
@@ -59,25 +43,24 @@ function log(msg) {
   console.error(msg);
 }
 
-// ── Main ─────────────────────────────────────────────────────
-
 function main() {
-  // On SessionStart, we don't have task context yet.
-  // Set default mode to Fast. The mode摘要 rule in CLAUDE.md
-  // will guide Claude to re-evaluate at task start.
-  const currentMode = readCurrentMode();
+  // Always reset to Fast at session start
+  writeMode(DEFAULT_MODE);
 
-  if (!currentMode) {
-    // First session or mode file missing — default to Fast
-    writeMode(DEFAULT_MODE);
-    output('[TaskRouter] Mode: Fast (default) — will re-evaluate when task begins');
-    log('[TaskRouter] Initialized mode: fast');
-  } else {
-    // Mode file exists from previous session — reset to Fast for new session
-    writeMode(DEFAULT_MODE);
-    output(`[TaskRouter] Mode: Fast (reset for new session, previous: ${currentMode})`);
-    log(`[TaskRouter] Reset mode to fast (was: ${currentMode})`);
-  }
+  // Output routing instructions into Claude's context
+  output([
+    '[TaskRouter] Mode: Fast (default)',
+    '',
+    'ROUTING REMINDER: Before starting work, evaluate the task against these signals:',
+    '→ Heavy: auth, oauth, payment, billing, permission, deploy, migration, secret, PII, multi-agent',
+    '→ Standard: multi-file change, bugfix, API/server/database/config work, user-visible behavior change',
+    '→ Fast: explain code, write docs, single-file small edit, config tweak',
+    '',
+    'If Standard or Heavy, run: node .claude/scripts/hooks/set-mode.js <mode>',
+    'Auto-escalation via pre-tool-escalate.js is also active as a safety net.',
+  ].join('\n'));
+
+  log('[TaskRouter] Initialized mode: fast, routing reminder injected');
 }
 
 // ── stdin entry point (hook protocol) ────────────────────────
@@ -95,7 +78,6 @@ process.stdin.on('end', () => {
     main();
   } catch (err) {
     log(`[TaskRouter] Error: ${err.message}`);
-    // Fallback: write Fast mode
     writeMode(DEFAULT_MODE);
   }
   process.exit(0);

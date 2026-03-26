@@ -189,7 +189,7 @@
             "timeout": 10
           }
         ],
-        "description": "[Standard+] Persist session state (mode-gated)"
+        "description": "[Always-on] Persist session state for cross-session recovery"
       },
       {
         "matcher": "",
