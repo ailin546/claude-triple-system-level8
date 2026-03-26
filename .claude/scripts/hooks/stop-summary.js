@@ -132,29 +132,103 @@ function checkConsoleLogs() {
 }
 
 /**
- * Append a minimal entry to .memory/today.md.
- * Only writes if the mode is Fast or Standard.
+ * Extract high-value signals from stdin (hook input).
+ * Returns { decisions, constraints, openLoops } arrays.
+ * Conservative: only extracts what's clearly identifiable, skips if unsure.
+ */
+function extractHighValueContent(stdinContent) {
+  const result = { decisions: [], constraints: [], openLoops: [] };
+
+  try {
+    const input = JSON.parse(stdinContent);
+
+    // Check for git modified files as a proxy for "work was done"
+    if (isGitRepo()) {
+      const modifiedFiles = getGitModifiedFiles();
+      if (modifiedFiles.length > 0) {
+        result.openLoops.push(`${modifiedFiles.length} file(s) modified but uncommitted`);
+      }
+    }
+
+    // Check .task-mode for non-default mode (signals meaningful work)
+    const mode = getCurrentMode();
+    if (mode !== 'fast') {
+      result.constraints.push(`Task ran in ${mode} mode`);
+    }
+
+    // Check for TODO items in recently modified files
+    if (isGitRepo()) {
+      const jsFiles = getGitModifiedFiles(['\\.tsx?$', '\\.jsx?$', '\\.md$']);
+      for (const file of jsFiles.slice(0, 5)) {
+        const content = readFile(file);
+        if (!content) continue;
+        const todoMatches = content.match(/(?:TODO|FIXME|HACK|XXX)[\s:]+(.+)/gi);
+        if (todoMatches) {
+          for (const m of todoMatches.slice(0, 2)) {
+            result.openLoops.push(`${path.basename(file)}: ${m.trim().slice(0, 100)}`);
+          }
+        }
+      }
+    }
+  } catch {
+    // Can't parse stdin — that's fine, just means less context
+  }
+
+  return result;
+}
+
+/**
+ * Write high-value memory to .memory/today.md.
+ * Only writes if there's actual content worth recording.
+ * If no decisions/constraints/open loops found, skips entirely — no noise.
+ *
+ * Only writes in Fast/Standard mode.
  * Heavy mode defers to the full Stop chain (sprint-memory, shared-memory-sync, etc.)
  */
-function writeMinimalMemory(mode) {
+function writeMinimalMemory(mode, stdinContent) {
   try {
     if (!fs.existsSync(MEMORY_DIR)) {
       fs.mkdirSync(MEMORY_DIR, { recursive: true });
     }
 
-    // Rotate first, then append
+    // Rotate first
     rotateTodayIfNeeded();
+
+    // Extract high-value content
+    const { decisions, constraints, openLoops } = extractHighValueContent(stdinContent);
+
+    // If nothing worth recording, skip entirely — no noise
+    const hasContent = decisions.length > 0 || constraints.length > 0 || openLoops.length > 0;
+    if (!hasContent) {
+      log('[StopSummary] No high-value content to record, skipping write');
+      return;
+    }
 
     // Ensure today.md exists with header
     if (!fs.existsSync(TODAY_FILE)) {
       fs.writeFileSync(TODAY_FILE, `# Today — ${getLocalDateString()}\n\n## Sessions\n\n`, 'utf8');
     }
 
+    // Build entry with only non-empty sections
     const timestamp = getTimestamp();
-    const entry = `### [Claude Code] ${timestamp}\n- Mode: ${mode}\n- Session ended normally\n\n`;
+    const parts = [`### [Claude Code] ${timestamp}`];
 
+    if (decisions.length > 0) {
+      parts.push('**Decisions:**');
+      decisions.forEach(d => parts.push(`- ${d}`));
+    }
+    if (constraints.length > 0) {
+      parts.push('**Constraints:**');
+      constraints.forEach(c => parts.push(`- ${c}`));
+    }
+    if (openLoops.length > 0) {
+      parts.push('**Open loops:**');
+      openLoops.forEach(o => parts.push(`- ${o}`));
+    }
+
+    const entry = parts.join('\n') + '\n\n';
     fs.appendFileSync(TODAY_FILE, entry, 'utf8');
-    log(`[StopSummary] Appended to ${TODAY_FILE}`);
+    log(`[StopSummary] Appended ${decisions.length}d/${constraints.length}c/${openLoops.length}o to ${TODAY_FILE}`);
   } catch (err) {
     log(`[StopSummary] Memory write failed (non-blocking): ${err.message}`);
   }
@@ -166,10 +240,10 @@ function main() {
   // Always: check console.log
   checkConsoleLogs();
 
-  // Fast/Standard: write minimal memory with rotation
+  // Fast/Standard: write high-value memory only (with rotation)
   // Heavy: skip — the full Stop chain handles memory
   if (mode !== 'heavy') {
-    writeMinimalMemory(mode);
+    writeMinimalMemory(mode, stdinData);
   }
 
   log(`[StopSummary] Done (mode: ${mode})`);

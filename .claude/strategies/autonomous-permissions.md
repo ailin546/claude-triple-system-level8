@@ -83,5 +83,5 @@
 }
 ```
 
-> 注：当前项目 settings.json 使用 `Bash(*)` 是为了开发便利。
-> 生产项目建议按上述模式收紧。
+> 当前 settings.json 已按此模式配置。Layer 3 操作（git push、deploy、publish、rm -rf）
+> 在 `deny` 列表中被显式阻止。

@@ -100,12 +100,30 @@ function main() {
       if (now - lastUpdate > STALE_THRESHOLD_MS) {
         const prevStatus = worker.status;
         worker.status = 'stale';
-        // Release file claims from stale workers
+        // Reclaim tasks and release file claims from stale workers
+        const workerId = worker.agent_id || worker.id;
         if (board.tasks) {
           for (const task of board.tasks) {
-            if (task.owner === (worker.agent_id || worker.id)) {
+            if (task.owner === workerId || task.assignedAgent === workerId) {
+              const prevStatus = task.status;
+              const prevOwner = task.owner || task.assignedAgent;
+              // Release file claims
               task.files_claimed = [];
-              appendDecision('system', 'RELEASE', `Released file claims from stale worker ${worker.agent_id || worker.id}`);
+              // Clear ownership so task can be reassigned
+              if (task.owner) task.owner = null;
+              if (task.assignedAgent) task.assignedAgent = null;
+              // Reset status: in_progress → pending (re-assignable);
+              // blocked stays blocked (may have external dependency);
+              // completed stays completed (work was done)
+              if (task.status === 'in_progress') {
+                task.status = 'pending';
+              }
+              // Preserve handoff context
+              const handoffNote = `[auto-reclaimed] Was owned by ${prevOwner} (${prevStatus}), worker went stale`;
+              task.handoff_note = task.handoff_note
+                ? `${task.handoff_note}\n${handoffNote}`
+                : handoffNote;
+              appendDecision('system', 'RECLAIM', `Task ${task.task_id || task.id}: owner cleared, status ${prevStatus} → ${task.status}, files released (stale worker: ${workerId})`);
             }
           }
         }
