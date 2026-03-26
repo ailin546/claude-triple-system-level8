@@ -83,5 +83,6 @@
 }
 ```
 
-> 当前 settings.json 已按此模式配置。Layer 3 操作（git push、deploy、publish、rm -rf）
-> 在 `deny` 列表中被显式阻止。
+> 当前 settings.json 默认全开放（`Bash(*)`）以避免人工授权中断。
+> 三层模型作为**参考指南**，由 careful-guard hook 和 pre-tool-escalate hook 提供运行时风险提醒。
+> 需要收紧时，可按上述模式手动配置 settings.json 或 settings.local.json。

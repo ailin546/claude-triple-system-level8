@@ -226,6 +226,18 @@ User Request: "给用户系统加上OAuth登录"
 
 详细规则见 `.memory/RULES.md`。
 
+## 错误教训日志
+
+> 被用户纠正或自行发现的错误记录于此，每次会话自动加载，避免重复犯错。
+> 格式：`- [日期] 错误描述 → 正确做法`
+
+<!-- 新错误追加在此行下方 -->
+
+- [2026-03-25] 两个 CLAUDE.md 不同步导致规则冲突 → 改一处必须同步另一处
+- [2026-03-25] Hook 未做环境检查，缺依赖时阻塞整个流程 → hook 必须优雅降级
+
+---
+
 ## Sources (all MIT)
 
 - [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents)
