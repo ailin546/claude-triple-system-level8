@@ -163,7 +163,7 @@ function extractSummaryFromStdin(stdinData) {
 
 function main(stdinData) {
   if (!fs.existsSync(MEMORY_DIR)) {
-    // .memory dir doesn't exist — skip silently
+    console.error('[SharedMemorySync] warn: .memory/ directory not found, shared memory write skipped');
     return;
   }
 

@@ -174,7 +174,7 @@ User Request: "给用户系统加上OAuth登录"
 ├── skills/            ← 38 个活跃 skills
 ├── commands/          ← 28 个活跃 commands
 ├── rules/             ← 11 个规则文件（common/ + routing.md）
-├── scripts/hooks/     ← 27 个脚本文件（含新增 3 个 + lib/mode-check.js）
+├── scripts/hooks/     ← 29 个 hook 脚本 + lib/ 下 5 个工具模块
 ├── strategies/        ← Playbooks & runbooks（含 autonomous-permissions.md）
 ├── shared-state/      ← 多 agent 控制面（仅 Heavy 模式）
 ├── mcp-configs/       ← MCP server templates
@@ -188,14 +188,14 @@ User Request: "给用户系统加上OAuth登录"
 | **Always-on** | SessionStart | session-start, task-router | 上下文恢复 + 模式 reset + trace 截断 |
 | **Always-on** | PreToolUse | careful-guard, freeze-guard, pre-tool-escalate | 安全守卫 + 自动升档 + 跨文件追踪 + 任务边界检测 |
 | **Always-on** | PostToolUse | post-edit-light | 轻量格式化 + console.log 警告 |
-| **Always-on** | Stop | stop-summary | 高价值记忆抽取（Decisions/Constraints/Open Loops） |
+| **Always-on** | Stop | stop-summary, session-end | 高价值记忆抽取 + 会话状态持久化 |
 | **Always-on** | PreCompact | pre-compact | 压缩前保存 |
-| **Standard+** | PreToolUse | auto-tmux-dev, suggest-compact | 模式门控 |
-| **Standard+** | PostToolUse | drift-detector, quality-gate, fault-hint, post-edit-typecheck | 模式门控 |
-| **Standard+** | Stop | session-end, cost-tracker | 模式门控 |
-| **Heavy** | Stop | evaluate-session, shared-state-sync, sprint-memory, shared-memory-sync, memory-consolidate, memory-promote | 重型记忆与协作 |
+| **Standard+** | PreToolUse | auto-tmux-dev, suggest-compact | 注册为 Always-on，脚本内 mode-gate |
+| **Standard+** | PostToolUse | drift-detector, quality-gate, fault-hint, post-edit-typecheck | 注册为 Always-on，脚本内 mode-gate |
+| **Standard+** | Stop | cost-tracker | 注册为 Always-on，脚本内 mode-gate |
+| **Heavy** | Stop | evaluate-session, shared-state-sync, sprint-memory, shared-memory-sync, memory-consolidate, memory-promote | 注册为 Always-on，脚本内 mode-gate |
 
-> 所有 Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式下自动跳过。
+> **注意**：所有 hooks 在 `settings.json` 中均为常驻注册。Standard+/Heavy hooks 通过脚本内 `requireMode()` 决定是否执行逻辑，Fast 模式下自动跳过（透传 stdin）。
 
 ### shared-state 任务接管语义
 
@@ -228,21 +228,27 @@ User Request: "给用户系统加上OAuth登录"
 ## 跨工具共享记忆
 
 所有 AI 工具（Claude Code、Codex、OpenClaw）共享的记忆系统。
+共享记忆位于**项目根目录**下的 `.memory/`。
 
 ```
 .memory/
 ├── RULES.md       ← 使用规则（所有工具必读）
-├── today.md       ← 短期：当日工作日志（Stop Hook 自动写入）
+├── today.md       ← 短期：当日工作日志
 ├── weekly.md      ← 中期：本周摘要（today 次日自动归档）
 └── long-term.md   ← 长期：永久知识库
 ```
 
-**规则**：
-- 会话开始 → 读取 long-term.md → weekly.md → today.md
-- 会话过程 → 追加到 today.md（`### [工具名] HH:MM`）
-- 会话结束 → Stop Hook 自动写入
-- 每日轮转 → 旧 today 归档到 weekly
-- 每周沉淀 → >2周的 weekly 归档到 long-term
+**读取**（SessionStart，Always-on）：
+- `session-start.js` 启动时按顺序读取 `long-term.md` → `weekly.md` → `today.md`
+- 文件缺失时非阻塞，仅记录 stderr 警告
+
+**写入**（分层）：
+- Fast/Standard：`stop-summary.js`（Always-on）写入高价值记忆（Decisions/Constraints/Open Loops）到 `today.md`
+- Heavy：`shared-memory-sync.js`（Heavy-only）执行完整会话同步和每日归档（today → weekly）
+
+**每日轮转**：
+- `stop-summary.js`（Always-on）和 `shared-memory-sync.js`（Heavy）都包含轮转逻辑
+- 检测到 today.md 日期非今日时，自动归档到 weekly.md 并重置
 
 详细规则见 `.memory/RULES.md`。
 

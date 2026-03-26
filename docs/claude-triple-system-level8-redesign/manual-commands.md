@@ -79,25 +79,6 @@
 - 输出按严重级别排序的发现
 - 附带残留风险说明
 
-### `/orchestrate`
-
-何时使用：
-
-- Heavy 任务
-- 多 agent 分工明显
-- 任务适合 planner -> implementer -> reviewer 之类链路
-
-不要在这些场景滥用：
-
-- 单 agent 即可完成的任务
-- 上下文极短的小改动
-
-预期结果：
-
-- 形成结构化 handoff
-- 产生清楚的 agent 链路
-- 有可回溯的最终报告
-
 ### `/save-session`
 
 何时使用：
@@ -138,7 +119,7 @@
 
 ### 多 agent / 长任务
 
-`/plan` -> `/orchestrate` -> 阶段性 `/save-session` -> `/resume-session` -> `/verify`
+`/plan` -> 阶段性 `/save-session` -> `/resume-session` -> `/verify`
 
 ## 命令说明模板
 

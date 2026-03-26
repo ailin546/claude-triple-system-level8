@@ -26,7 +26,7 @@
 
 启用：Standard 全部 + shared-state、sprint memory、冲突检测、严格验证。
 
-手动触发：`/orchestrate`、`/save-session`、`/resume-session`。
+手动触发：`/save-session`、`/resume-session`。
 
 ## 路由规则（优先级从高到低）
 
