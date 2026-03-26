@@ -118,6 +118,13 @@ esac
 # Layer 2: Respect ECC_HOOK_PROFILE=minimal — suppresses non-essential hooks
 [ "${ECC_HOOK_PROFILE:-standard}" = "minimal" ] && exit 0
 
+# Layer 2.5: Mode gate — only run in Standard+ mode (skip in Fast)
+_TASK_MODE_FILE="${CLAUDE_PROJECT_ROOT:-.}/.claude/.task-mode"
+if [ -f "$_TASK_MODE_FILE" ]; then
+  _CURRENT_MODE=$(cat "$_TASK_MODE_FILE" 2>/dev/null || echo "fast")
+  [ "$_CURRENT_MODE" = "fast" ] && exit 0
+fi
+
 # Layer 3: Cooperative skip env var — tools like claude-mem can set this
 # (export ECC_SKIP_OBSERVE=1) before spawning their automated sessions
 [ "${ECC_SKIP_OBSERVE:-0}" = "1" ] && exit 0

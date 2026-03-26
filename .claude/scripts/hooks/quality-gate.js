@@ -18,6 +18,17 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
+// ── Mode gate: Standard+ only ───────────────────────────────
+const { requireMode } = require('../lib/mode-check');
+if (!requireMode('standard')) {
+  let d = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', c => { d += c; });
+  process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+  return;
+}
+// ─────────────────────────────────────────────────────────────
+
 const { findProjectRoot, detectFormatter, resolveFormatterBin } = require('../lib/resolve-formatter');
 
 const MAX_STDIN = 1024 * 1024;

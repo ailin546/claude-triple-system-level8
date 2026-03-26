@@ -13,6 +13,19 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
+// ── Mode gate: Heavy only ────────────────────────────────────
+try {
+  const { requireMode } = require("../lib/mode-check");
+  if (!requireMode("heavy")) {
+    let d = "";
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", c => { d += c; });
+    process.stdin.on("end", () => { process.stdout.write(d); process.exit(0); });
+    return;
+  }
+} catch { /* mode-check not available — run anyway */ }
+// ─────────────────────────────────────────────────────────────
+
 const MAX_STDIN = 1024 * 1024; // 1MB limit
 let data = "";
 process.stdin.setEncoding("utf8");

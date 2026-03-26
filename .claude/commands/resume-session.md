@@ -1,5 +1,11 @@
 ---
 description: Load the most recent session file from ~/.claude/sessions/ and resume work with full context from where the last session ended.
+mode: Standard / Heavy
+when: 恢复跨会话工作、快速接上次上下文
+not_when: 全新任务、不需要之前上下文
+prev: /save-session（上次会话）
+next: 继续实施
+heavy_deps: sprint-memory（Heavy 模式下读取冲刺记忆）
 ---
 
 # Resume Session Command

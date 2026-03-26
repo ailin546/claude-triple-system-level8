@@ -28,6 +28,19 @@
 const path = require('path');
 const { spawnSync } = require('child_process');
 
+// ── Mode gate: Standard+ only ───────────────────────────────
+try {
+  const { requireMode } = require('../lib/mode-check');
+  if (!requireMode('standard')) {
+    let d = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', c => { d += c; });
+    process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+    return;
+  }
+} catch { /* mode-check not available — run anyway */ }
+// ─────────────────────────────────────────────────────────────
+
 const MAX_STDIN = 1024 * 1024; // 1MB limit
 let data = '';
 process.stdin.setEncoding('utf8');

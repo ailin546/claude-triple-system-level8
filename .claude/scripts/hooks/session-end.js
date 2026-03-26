@@ -15,6 +15,9 @@ const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
 
+// Session snapshots are always-on (session-start reads them for recovery).
+// No mode gate — this hook runs in all modes (Fast/Standard/Heavy).
+
 // ── Inlined utilities (previously from ../lib/utils) ─────────
 
 const SESSIONS_DIR = path.join(
@@ -44,12 +47,16 @@ function writeFile(filePath, content) {
   fs.writeFileSync(filePath, content, 'utf8');
 }
 
+/** Local date string (YYYY-MM-DD) */
 function getDateString() {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** Local time string (HH:MM:SS) */
 function getTimeString() {
-  return new Date().toISOString().split('T')[1].replace('Z', '').slice(0, 8);
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
 }
 
 function getSessionIdShort() {

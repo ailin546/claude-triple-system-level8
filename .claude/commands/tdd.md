@@ -1,5 +1,11 @@
 ---
 description: Enforce test-driven development workflow. Scaffold interfaces, generate tests FIRST, then implement minimal code to pass. Ensure 80%+ coverage.
+mode: Standard / Heavy
+when: bugfix 防回归、核心逻辑改动、新功能有可测行为
+not_when: 纯文档、样式微调、不可测脚本
+prev: /plan
+next: /code-review 或 /verify
+heavy_deps: 无
 ---
 
 # TDD Command

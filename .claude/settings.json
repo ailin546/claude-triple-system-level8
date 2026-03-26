@@ -16,17 +16,29 @@
     ]
   },
   "hooks": {
-    "PreToolUse": [
+    "SessionStart": [
       {
-        "matcher": "Bash",
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/auto-tmux-dev.js\""
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/session-start.js\""
           }
         ],
-        "description": "Auto-start dev servers in tmux"
+        "description": "Load previous context and detect package manager"
       },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/task-router.js\""
+          }
+        ],
+        "description": "Initialize task mode router (Fast/Standard/Heavy)"
+      }
+    ],
+    "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
@@ -35,7 +47,7 @@
             "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/careful-guard.js\""
           }
         ],
-        "description": "Block destructive commands (rm -rf, DROP TABLE, git push --force)"
+        "description": "[Always-on] Block destructive commands (rm -rf, DROP TABLE, git push --force)"
       },
       {
         "matcher": "Edit|Write",
@@ -45,7 +57,27 @@
             "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/freeze-guard.js\""
           }
         ],
-        "description": "Block edits outside frozen directory (when /freeze is active)"
+        "description": "[Always-on] Block edits outside frozen directory (when /freeze is active)"
+      },
+      {
+        "matcher": "Bash|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/pre-tool-escalate.js\""
+          }
+        ],
+        "description": "[Always-on] Auto-escalate mode based on tool input risk signals"
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/auto-tmux-dev.js\""
+          }
+        ],
+        "description": "[Standard+] Auto-start dev servers in tmux (mode-gated)"
       },
       {
         "matcher": "Edit|Write",
@@ -55,7 +87,7 @@
             "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/suggest-compact.js\""
           }
         ],
-        "description": "Suggest manual compaction at logical intervals"
+        "description": "[Standard+] Suggest manual compaction at logical intervals (mode-gated)"
       },
       {
         "matcher": "",
@@ -65,10 +97,20 @@
             "command": "bash \"${CLAUDE_PROJECT_ROOT:-.}/.claude/skills/ecc-continuous-learning-v2/hooks/observe.sh\" pre"
           }
         ],
-        "description": "Continuous learning v2 - capture tool use observations (pre)"
+        "description": "[Standard+] Continuous learning v2 - capture tool use observations (pre, mode-gated)"
       }
     ],
     "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/post-edit-light.js\""
+          }
+        ],
+        "description": "[Always-on] Lightweight post-edit: format + console.log warn + risk scan"
+      },
       {
         "matcher": "",
         "hooks": [
@@ -77,7 +119,7 @@
             "command": "bash \"${CLAUDE_PROJECT_ROOT:-.}/.claude/skills/ecc-continuous-learning-v2/hooks/observe.sh\" post"
           }
         ],
-        "description": "Continuous learning v2 - capture tool use observations (post)"
+        "description": "[Standard+] Continuous learning v2 - capture tool use observations (post, mode-gated)"
       },
       {
         "matcher": "Edit|Write|Bash",
@@ -89,7 +131,7 @@
             "timeout": 5
           }
         ],
-        "description": "Track agent drift score (reverts, scattered edits, test failures)"
+        "description": "[Standard+] Track agent drift score (mode-gated)"
       },
       {
         "matcher": "Edit|Write",
@@ -101,37 +143,7 @@
             "timeout": 30
           }
         ],
-        "description": "Run quality gate checks after file edits"
-      },
-      {
-        "matcher": "Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/post-edit-format.js\""
-          }
-        ],
-        "description": "Auto-format JS/TS files after edits"
-      },
-      {
-        "matcher": "Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/post-edit-typecheck.js\""
-          }
-        ],
-        "description": "TypeScript check after editing .ts/.tsx files"
-      },
-      {
-        "matcher": "Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/post-edit-console-warn.js\""
-          }
-        ],
-        "description": "Warn about console.log statements after edits"
+        "description": "[Standard+] Run quality gate checks after file edits (mode-gated)"
       },
       {
         "matcher": "Edit|Write",
@@ -143,7 +155,17 @@
             "timeout": 5
           }
         ],
-        "description": "Hint to run /verify fault when error handling or resilience code is edited"
+        "description": "[Standard+] Hint to run /verify fault (mode-gated)"
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/post-edit-typecheck.js\""
+          }
+        ],
+        "description": "[Heavy] TypeScript check after editing .ts/.tsx files (mode-gated)"
       }
     ],
     "Stop": [
@@ -152,10 +174,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/check-console-log.js\""
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/stop-summary.js\""
           }
         ],
-        "description": "Check for console.log in modified files"
+        "description": "[Always-on] Lightweight stop: console.log check + minimal memory"
       },
       {
         "matcher": "",
@@ -167,19 +189,7 @@
             "timeout": 10
           }
         ],
-        "description": "Persist session state after each response"
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/evaluate-session.js\"",
-            "async": true,
-            "timeout": 10
-          }
-        ],
-        "description": "Evaluate session for extractable patterns"
+        "description": "[Always-on] Persist session state for cross-session recovery"
       },
       {
         "matcher": "",
@@ -191,7 +201,19 @@
             "timeout": 10
           }
         ],
-        "description": "Track token and cost metrics per session"
+        "description": "[Standard+] Track token and cost metrics (mode-gated)"
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/evaluate-session.js\"",
+            "async": true,
+            "timeout": 10
+          }
+        ],
+        "description": "[Heavy] Evaluate session for extractable patterns (mode-gated)"
       },
       {
         "matcher": "",
@@ -203,7 +225,7 @@
             "timeout": 10
           }
         ],
-        "description": "Clean up stale agents and archive completed workflows in shared-state"
+        "description": "[Heavy] Clean up stale agents and archive workflows (mode-gated)"
       },
       {
         "matcher": "",
@@ -215,7 +237,19 @@
             "timeout": 10
           }
         ],
-        "description": "Update sprint mid-term memory with decisions and unfinished work"
+        "description": "[Heavy] Update sprint mid-term memory (mode-gated)"
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/shared-memory-sync.js\"",
+            "async": true,
+            "timeout": 10
+          }
+        ],
+        "description": "[Heavy] Sync to cross-tool shared memory (mode-gated)"
       },
       {
         "matcher": "",
@@ -227,7 +261,7 @@
             "timeout": 15
           }
         ],
-        "description": "Consolidate expired sprint memories into long-term project memory"
+        "description": "[Heavy] Consolidate sprint memories into long-term (mode-gated)"
       },
       {
         "matcher": "",
@@ -239,7 +273,7 @@
             "timeout": 15
           }
         ],
-        "description": "Auto-promote universal instincts from project to system memory"
+        "description": "[Heavy] Auto-promote universal instincts (mode-gated)"
       }
     ],
     "PreCompact": [
@@ -251,19 +285,7 @@
             "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/pre-compact.js\""
           }
         ],
-        "description": "Save state before context compaction"
-      }
-    ],
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/session-start.js\""
-          }
-        ],
-        "description": "Load previous context and detect package manager"
+        "description": "[Always-on] Save state before context compaction"
       }
     ]
   }

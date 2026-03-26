@@ -1,3 +1,13 @@
+---
+description: Run comprehensive verification on current codebase state.
+mode: Fast / Standard / Heavy (所有模式)
+when: 准备宣称完成、合并前检查、接口/配置/行为变更后
+not_when: 无（任何完成前都应验证）
+prev: /tdd 或 /code-review
+next: git commit
+heavy_deps: 无
+---
+
 # Verification Command
 
 Run comprehensive verification on current codebase state.

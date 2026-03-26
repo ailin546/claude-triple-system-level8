@@ -13,6 +13,19 @@
 const path = require('path');
 const fs = require('fs');
 
+// ── Mode gate: Heavy only ────────────────────────────────────
+try {
+  const { requireMode } = require('../lib/mode-check');
+  if (!requireMode('heavy')) {
+    let d = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', c => { d += c; });
+    process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+    return;
+  }
+} catch { /* mode-check not available — run anyway */ }
+// ─────────────────────────────────────────────────────────────
+
 const MEMORY_DIR = path.join(process.cwd(), '.claude', 'memory');
 const LONG_TERM_FILE = path.join(MEMORY_DIR, 'long-term.md');
 const LOCK_FILE = path.join(MEMORY_DIR, '.consolidate-lock');
@@ -33,7 +46,8 @@ const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 function getDateString() {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function shouldRun() {
