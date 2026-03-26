@@ -13,6 +13,19 @@
 const path = require('path');
 const fs = require('fs');
 
+// ── Mode gate: Heavy only ────────────────────────────────────
+try {
+  const { requireMode } = require('../lib/mode-check');
+  if (!requireMode('heavy')) {
+    let d = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', c => { d += c; });
+    process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+    return;
+  }
+} catch { /* mode-check not available — run anyway */ }
+// ─────────────────────────────────────────────────────────────
+
 const MEMORY_DIR = path.join(process.cwd(), '.claude', 'memory');
 const LONG_TERM_FILE = path.join(MEMORY_DIR, 'long-term.md');
 const LOCK_FILE = path.join(MEMORY_DIR, '.consolidate-lock');

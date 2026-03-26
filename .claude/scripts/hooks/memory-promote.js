@@ -15,6 +15,19 @@ const fs = require('fs');
 const { execFileSync } = require('child_process');
 const os = require('os');
 
+// ── Mode gate: Heavy only ────────────────────────────────────
+try {
+  const { requireMode } = require('../lib/mode-check');
+  if (!requireMode('heavy')) {
+    let d = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', c => { d += c; });
+    process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+    return;
+  }
+} catch { /* mode-check not available — run anyway */ }
+// ─────────────────────────────────────────────────────────────
+
 const HOMUNCULUS_DIR = path.join(os.homedir(), '.claude', 'homunculus');
 const LOCK_FILE = path.join(HOMUNCULUS_DIR, '.promote-lock');
 const LOG_FILE = path.join(HOMUNCULUS_DIR, 'promote-log.jsonl');

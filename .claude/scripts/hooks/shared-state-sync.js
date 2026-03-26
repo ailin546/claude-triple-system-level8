@@ -15,6 +15,19 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
+// ── Mode gate: Heavy only ────────────────────────────────────
+try {
+  const { requireMode } = require('../lib/mode-check');
+  if (!requireMode('heavy')) {
+    let d = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', c => { d += c; });
+    process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+    return;
+  }
+} catch { /* mode-check not available — run anyway */ }
+// ─────────────────────────────────────────────────────────────
+
 const SHARED_STATE_DIR = path.join(process.cwd(), '.claude', 'shared-state');
 const BOARD_PATH = path.join(SHARED_STATE_DIR, 'board.json');
 const DECISIONS_PATH = path.join(SHARED_STATE_DIR, 'decisions.log');
@@ -54,47 +67,89 @@ function appendDecision(agentId, action, description) {
   fs.appendFileSync(DECISIONS_PATH, line, 'utf8');
 }
 
+const EXPECTED_SCHEMA_VERSION = 1;
+
 function main() {
   if (!fs.existsSync(BOARD_PATH)) return;
 
   const board = readJSON(BOARD_PATH);
-  if (!board || !board.agents) return;
+  if (!board) {
+    console.error('[SharedStateSync] DEGRADED: board.json unreadable, skipping sync');
+    return;
+  }
 
+  // ── Version check ──
+  if (board.version && board.version !== EXPECTED_SCHEMA_VERSION) {
+    console.error(`[SharedStateSync] DEGRADED: schema version mismatch (expected ${EXPECTED_SCHEMA_VERSION}, got ${board.version})`);
+    appendDecision('system', 'DEGRADE', `Schema version mismatch: expected ${EXPECTED_SCHEMA_VERSION}, got ${board.version}`);
+    return;
+  }
+
+  // Support both old (agents) and new (workers) schema
+  const workers = board.workers || board.agents || [];
   const now = Date.now();
   let changed = false;
 
-  // Clean up stale agents.
-  // Prefer lastHeartbeat (updated by the agent during activity),
-  // fall back to startedAt for backwards compatibility.
-  for (const agent of board.agents) {
-    if (agent.status === 'running') {
-      const heartbeat = agent.lastHeartbeat || agent.startedAt;
-      if (!heartbeat) continue; // No timestamp — skip, don't break
+  // ── Clean up stale workers ──
+  for (const worker of workers) {
+    if (worker.status === 'active' || worker.status === 'running') {
+      const heartbeat = worker.last_heartbeat || worker.lastHeartbeat || worker.startedAt;
+      if (!heartbeat) continue;
       const lastUpdate = new Date(heartbeat).getTime();
-      if (isNaN(lastUpdate)) continue; // Invalid date — skip
+      if (isNaN(lastUpdate)) continue;
       if (now - lastUpdate > STALE_THRESHOLD_MS) {
-        agent.status = 'stale';
-        appendDecision('system', 'CLEANUP', `Agent ${agent.id} marked stale (no activity for 30min)`);
+        const prevStatus = worker.status;
+        worker.status = 'stale';
+        // Release file claims from stale workers
+        if (board.tasks) {
+          for (const task of board.tasks) {
+            if (task.owner === (worker.agent_id || worker.id)) {
+              task.files_claimed = [];
+              appendDecision('system', 'RELEASE', `Released file claims from stale worker ${worker.agent_id || worker.id}`);
+            }
+          }
+        }
+        appendDecision('system', 'CLEANUP', `Worker ${worker.agent_id || worker.id} marked stale (was: ${prevStatus}, no heartbeat for 30min)`);
         changed = true;
       }
     }
   }
 
-  // Remove completed agents older than 1 hour, and stale agents
+  // ── Remove stale and old completed workers ──
   const ONE_HOUR = 60 * 60 * 1000;
-  const beforeCount = board.agents.length;
-  board.agents = board.agents.filter(a => {
-    if (a.status === 'completed' && a.completedAt) {
-      return now - new Date(a.completedAt).getTime() < ONE_HOUR;
+  const beforeCount = workers.length;
+  const filteredWorkers = workers.filter(w => {
+    if (w.status === 'completed' && (w.completedAt || w.updated_at)) {
+      const ts = w.completedAt || w.updated_at;
+      return now - new Date(ts).getTime() < ONE_HOUR;
     }
-    if (a.status === 'stale') return false;
+    if (w.status === 'stale') return false;
     return true;
   });
-  if (board.agents.length !== beforeCount) changed = true;
+  if (filteredWorkers.length !== beforeCount) changed = true;
 
-  // Check if all tasks completed → archive workflow
+  // ── File claim conflict detection ──
+  if (board.tasks && board.tasks.length > 0) {
+    const fileClaims = new Map(); // file → [task_id]
+    for (const task of board.tasks) {
+      if (task.files_claimed && task.status !== 'completed') {
+        for (const file of task.files_claimed) {
+          if (!fileClaims.has(file)) fileClaims.set(file, []);
+          fileClaims.get(file).push(task.task_id || task.id);
+        }
+      }
+    }
+    for (const [file, tasks] of fileClaims) {
+      if (tasks.length > 1) {
+        console.error(`[SharedStateSync] CONFLICT: file ${file} claimed by tasks: ${tasks.join(', ')}`);
+        appendDecision('system', 'CONFLICT', `File claim conflict: ${file} claimed by ${tasks.join(', ')}`);
+      }
+    }
+  }
+
+  // ── Archive completed workflows ──
   if (board.tasks && board.tasks.length > 0 && board.tasks.every(t => t.status === 'completed')) {
-    const workflowId = board.activeWorkflow || `workflow-${Date.now()}`;
+    const workflowId = board.workflow_id || board.activeWorkflow || `workflow-${Date.now()}`;
     const archiveDir = path.join(ARTIFACTS_DIR, workflowId);
 
     if (!fs.existsSync(archiveDir)) {
@@ -105,15 +160,26 @@ function main() {
     appendDecision('system', 'ARCHIVE', `Workflow ${workflowId} completed — all ${board.tasks.length} tasks done`);
 
     board.tasks = [];
-    board.agents = [];
-    board.conflicts = [];
+    board.workflow_id = null;
     board.activeWorkflow = null;
     changed = true;
   }
 
+  // Write back with updated workers
+  if (board.workers) {
+    board.workers = filteredWorkers;
+  } else if (board.agents) {
+    board.agents = filteredWorkers;
+  }
+
   if (changed) {
     board.lastUpdated = new Date().toISOString();
-    writeJSONAtomic(BOARD_PATH, board);
+    try {
+      writeJSONAtomic(BOARD_PATH, board);
+    } catch (err) {
+      console.error(`[SharedStateSync] DEGRADED: board write failed — ${err.message}`);
+      appendDecision('system', 'DEGRADE', `Board write failed: ${err.message}`);
+    }
   }
 }
 

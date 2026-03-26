@@ -1,5 +1,10 @@
 ---
 description: Restate requirements, assess risks, and create step-by-step implementation plan. WAIT for user CONFIRM before touching any code.
+mode: Standard / Heavy
+when: 需求清楚但步骤多、跨多模块、需拆给 agent
+not_when: 单文件小修、单次问答、<30 分钟小任务
+next: /verify 或 /tdd
+heavy_deps: 无
 ---
 
 # Plan Command

@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Shared State Board",
+  "description": "Multi-agent coordination board. Only active in Heavy mode.",
+  "type": "object",
+  "required": ["version", "workflow_id", "mode", "tasks", "workers"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Schema version for compatibility checks. Increment on breaking changes."
+    },
+    "workflow_id": {
+      "type": ["string", "null"],
+      "description": "Current workflow identifier, null when idle."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["Heavy"],
+      "description": "Only Heavy mode uses shared-state."
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["task_id", "title", "owner", "status", "updated_at"],
+        "properties": {
+          "task_id": { "type": "string" },
+          "title": { "type": "string" },
+          "owner": { "type": ["string", "null"] },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "completed", "blocked"]
+          },
+          "depends_on": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "files_claimed": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "updated_at": { "type": "string", "format": "date-time" },
+          "handoff_note": { "type": "string" }
+        }
+      }
+    },
+    "workers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["agent_id", "role", "status"],
+        "properties": {
+          "agent_id": { "type": "string" },
+          "role": { "type": "string" },
+          "lease_until": { "type": "string", "format": "date-time" },
+          "last_heartbeat": { "type": "string", "format": "date-time" },
+          "status": {
+            "type": "string",
+            "enum": ["active", "idle", "completed", "degraded", "stale"]
+          }
+        }
+      }
+    }
+  }
+}

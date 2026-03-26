@@ -1,5 +1,11 @@
 ---
 description: Save current session state to a dated file in ~/.claude/sessions/ so work can be resumed in a future session with full context.
+mode: Standard / Heavy
+when: 工作中断、需跨会话续做、沉淀阶段结论
+not_when: 单次问答、无状态操作
+prev: 任何实施步骤
+next: /resume-session（下次会话）
+heavy_deps: sprint-memory（Heavy 模式下自动同步）
 ---
 
 # Save Session Command

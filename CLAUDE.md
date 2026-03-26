@@ -44,6 +44,28 @@ User Request: "给用户系统加上OAuth登录"
 
 ---
 
+## 任务模式路由
+
+> 每个任务开始时，自动判定流程强度并输出摘要。用户指令始终优先于自动路由。
+> 详细规则见 `.claude/rules/routing.md`。
+
+| 模式 | 适用场景 | 自动启用 | 禁用 |
+|------|---------|---------|------|
+| **Fast** | 解释代码、写文档、单文件小改、配置微调 | SessionStart、轻量格式化、最小摘要 | TDD 强制、shared-state、多 agent |
+| **Standard** | 普通功能开发、一般 bugfix、跨 2-5 文件 | Fast + 风险提醒、局部质量门、决策记忆 | shared-state、多 agent |
+| **Heavy** | 认证/支付/权限/迁移/部署/架构重构 | Standard + shared-state、sprint memory、冲突检测 | — |
+
+**路由信号**：风险关键词（auth, payment, deploy, migration 等）→ 自动升档；用户说"直接做"→ 降档。
+
+**每个任务开始输出**：`[Mode: Fast/Standard/Heavy] 原因 | 自动启用项 | 建议命令`
+
+**推荐命令链**：
+- Fast：直接做 → `/verify`
+- Standard：`/plan` → 实施 → `/verify`
+- Heavy：`/plan` → `/tdd` → 实施 → `/code-review` → `/verify`
+
+---
+
 ## 第一性原理 + 一致性守护协议
 
 > 所有任务（含"直接给代码"）必须经过以下流程。不可省略、不可跳步。
@@ -104,16 +126,23 @@ User Request: "给用户系统加上OAuth登录"
 
 ## Quick Commands (ECC)
 
-| Command | Purpose | Command | Purpose |
-|---------|---------|---------|---------|
-| `/plan` | 规划实现 | `/verify` | 验证检查 |
-| `/tdd` | 测试驱动开发 | `/learn` | 提取模式 |
-| `/code-review` | 代码审查 | `/save-session` | 保存会话 |
-| `/e2e` | E2E测试 | `/resume-session` | 恢复会话 |
-| `/build-fix` | 修复构建 | `/harness-audit` | 审计配置 |
-| `/design-consultation` | 设计咨询 | `/design-review` | 设计审查 |
-| `/careful` | 危险命令守卫 | `/freeze` / `/unfreeze` | 编辑范围锁 |
-| `/codex` | 跨AI审查 | | |
+| Command | Purpose | 适用模式 |
+|---------|---------|---------|
+| `/plan` | 规划实现 | Standard+ |
+| `/tdd` | 测试驱动开发 | Standard+ |
+| `/verify` | 验证检查 | 所有模式 |
+| `/code-review` | 代码审查 | Standard+ |
+| `/save-session` | 保存会话 | Standard+ |
+| `/resume-session` | 恢复会话 | Standard+ |
+| `/e2e` | E2E测试 | Standard+ |
+| `/build-fix` | 修复构建 | 所有模式 |
+| `/design-consultation` | 设计咨询 | Standard+ |
+| `/design-review` | 设计审查 | Standard+ |
+| `/careful` | 危险命令守卫 | 所有模式 |
+| `/freeze` / `/unfreeze` | 编辑范围锁 | 所有模式 |
+| `/learn` | 提取模式 | Standard+ |
+| `/codex` | 跨AI审查 | Standard+ |
+| `/harness-audit` | 审计配置 | 所有模式 |
 
 ## Agent Routing (Agency Agents - auto)
 
@@ -128,32 +157,70 @@ User Request: "给用户系统加上OAuth登录"
 | UI design | `design-ui-designer` | UX structure | `design-ux-architect` |
 | UX research | `design-ux-researcher` | Brand | `design-brand-guardian` |
 
-## File Structure (已审计 2026-03-21)
+## File Structure (已审计 2026-03-26)
 
 ```
 .claude/
-├── settings.json      ← 21 个 Hook 配置（5 种类型）
+├── settings.json      ← Hook 配置（按模式分层）
 ├── agents/            ← 26 个活跃 agents
 ├── skills/            ← 38 个活跃 skills
 ├── commands/          ← 28 个活跃 commands
-├── rules/common/      ← 10 个规则文件（仅 common 目录）
-├── scripts/hooks/     ← 21 个脚本文件（全部被引用或间接依赖）
-├── strategies/        ← Playbooks & runbooks
+├── rules/             ← 11 个规则文件（common/ + routing.md）
+├── scripts/hooks/     ← 27 个脚本文件（含新增 3 个 + lib/mode-check.js）
+├── strategies/        ← Playbooks & runbooks（含 autonomous-permissions.md）
+├── shared-state/      ← 多 agent 控制面（仅 Heavy 模式）
 ├── mcp-configs/       ← MCP server templates
 └── examples/          ← Workflow examples
 ```
 
-### Hook 配置分布
+### Hook 配置分布（按模式分层）
 
-| 类型 | 配置数 | 用途 |
-|------|--------|------|
-| PreToolUse | 5 | tmux 自动启动、危险命令守卫、冻结守卫、压缩建议、学习观察 |
-| PostToolUse | 6 | 学习观察、漂移检测、质量门、自动格式化、类型检查、console.log 警告 |
-| Stop | 8 | console.log 检查、会话持久化、评估、成本追踪、状态同步、冲刺记忆、记忆整合、记忆提升 |
-| PreCompact | 1 | 上下文压缩前保存状态 |
-| SessionStart | 1 | 加载上次上下文、检测包管理器 |
+| 层级 | 类型 | Hooks | 说明 |
+|------|------|-------|------|
+| **Always-on** | SessionStart | session-start, task-router | 上下文恢复 + 模式判定 |
+| **Always-on** | PreToolUse | careful-guard, freeze-guard | 安全守卫 |
+| **Always-on** | PostToolUse | post-edit-light | 轻量格式化 + 风险扫描 |
+| **Always-on** | Stop | stop-summary | 最小摘要 + console.log 检查 |
+| **Always-on** | PreCompact | pre-compact | 压缩前保存 |
+| **Standard+** | PreToolUse | auto-tmux-dev, suggest-compact, observe.sh | 模式门控 |
+| **Standard+** | PostToolUse | drift-detector, quality-gate, fault-hint, observe.sh | 模式门控 |
+| **Standard+** | Stop | session-end, cost-tracker | 模式门控 |
+| **Heavy** | PostToolUse | post-edit-typecheck | 完整类型检查 |
+| **Heavy** | Stop | evaluate-session, shared-state-sync, sprint-memory, shared-memory-sync, memory-consolidate, memory-promote | 重型记忆与协作 |
 
-> 注：`observe.sh` 位于 `skills/ecc-continuous-learning-v2/hooks/` 而非 `scripts/hooks/`
+> 所有 Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式下自动跳过。
+
+### 降级状态
+
+| 状态 | 含义 |
+|------|------|
+| `ok` | 正常运行 |
+| `warn` | 局部失败，主流程继续 |
+| `degraded` | 已关闭部分子系统（如 shared-state），主流程继续 |
+| `blocked` | 必须人工处理 |
+
+> 详细降级策略见 `docs/claude-triple-system-level8-redesign/recovery.md`
+
+## 跨工具共享记忆
+
+所有 AI 工具（Claude Code、Codex、OpenClaw）共享的记忆系统。
+
+```
+.memory/
+├── RULES.md       ← 使用规则（所有工具必读）
+├── today.md       ← 短期：当日工作日志（Stop Hook 自动写入）
+├── weekly.md      ← 中期：本周摘要（today 次日自动归档）
+└── long-term.md   ← 长期：永久知识库
+```
+
+**规则**：
+- 会话开始 → 读取 long-term.md → weekly.md → today.md
+- 会话过程 → 追加到 today.md（`### [工具名] HH:MM`）
+- 会话结束 → Stop Hook 自动写入
+- 每日轮转 → 旧 today 归档到 weekly
+- 每周沉淀 → >2周的 weekly 归档到 long-term
+
+详细规则见 `.memory/RULES.md`。
 
 ## Sources (all MIT)
 

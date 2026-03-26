@@ -7,6 +7,17 @@
 
 'use strict';
 
+// ── Mode gate: Standard+ only ───────────────────────────────
+const { requireMode } = require('../lib/mode-check');
+if (!requireMode('standard')) {
+  let d = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', c => { d += c; });
+  process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+  return;
+}
+// ─────────────────────────────────────────────────────────────
+
 const path = require('path');
 const {
   ensureDir,

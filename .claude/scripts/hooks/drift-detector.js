@@ -25,6 +25,18 @@ const fs = require('fs');
 const path = require('path');
 
 const PROJECT_ROOT = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
+
+// ── Mode gate: Standard+ only ───────────────────────────────
+const { requireMode } = require('../lib/mode-check');
+if (!requireMode('standard')) {
+  // Fast mode — skip drift detection, pass through stdin
+  let d = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', c => { d += c; });
+  process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+  return;
+}
+// ─────────────────────────────────────────────────────────────
 const SESSION_ID = (process.env.CLAUDE_SESSION_ID || 'default').replace(/[^a-zA-Z0-9_-]/g, '') || 'default';
 const STATE_DIR = path.join(PROJECT_ROOT, '.claude', '.drift-state');
 const STATE_FILE = path.join(STATE_DIR, `${SESSION_ID}.json`);

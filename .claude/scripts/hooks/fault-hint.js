@@ -13,6 +13,17 @@
 
 'use strict';
 
+// ── Mode gate: Standard+ only ───────────────────────────────
+const { requireMode } = require('../lib/mode-check');
+if (!requireMode('standard')) {
+  let d = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', c => { d += c; });
+  process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+  return;
+}
+// ─────────────────────────────────────────────────────────────
+
 const { readFile, log } = require('../lib/utils');
 
 const MAX_STDIN = 1024 * 1024; // 1MB limit

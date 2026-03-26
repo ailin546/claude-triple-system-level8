@@ -1,3 +1,13 @@
+---
+description: Comprehensive security and quality review of uncommitted changes.
+mode: Standard / Heavy
+when: 共享模块改动、高风险逻辑、准备交付或合并
+not_when: 纯文档改动、单行配置修改
+prev: /tdd 或实施完成
+next: /verify
+heavy_deps: 无
+---
+
 # Code Review
 
 Comprehensive security and quality review of uncommitted changes:

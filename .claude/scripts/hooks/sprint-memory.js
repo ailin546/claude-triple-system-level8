@@ -14,6 +14,19 @@
 const path = require('path');
 const fs = require('fs');
 
+// ── Mode gate: Heavy only ────────────────────────────────────
+try {
+  const { requireMode } = require('../lib/mode-check');
+  if (!requireMode('heavy')) {
+    let d = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', c => { d += c; });
+    process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+    return;
+  }
+} catch { /* mode-check not available — run anyway */ }
+// ─────────────────────────────────────────────────────────────
+
 const MEMORY_DIR = path.join(process.cwd(), '.claude', 'memory');
 const SHARED_STATE_DIR = path.join(process.cwd(), '.claude', 'shared-state');
 const BOARD_PATH = path.join(SHARED_STATE_DIR, 'board.json');
@@ -124,16 +137,18 @@ function main() {
         t.status === 'pending' || t.status === 'in_progress' || t.status === 'blocked'
       );
 
-      // Clear and rebuild unfinished work section
+      // Clear and rebuild unfinished work section (Open Loops)
       const sectionStart = content.indexOf('## Unfinished Work');
       if (sectionStart !== -1) {
         const sectionEnd = content.indexOf('\n---', sectionStart);
         if (sectionEnd !== -1) {
-          const header = '## Unfinished Work\n\n<!-- Auto-updated from board.json. Format: - [date] task description (status) -->\n';
+          const header = '## Unfinished Work\n\n<!-- Open loops: only decisions, constraints, and unfinished items -->\n';
           const taskLines = pendingTasks.length > 0
-            ? pendingTasks.map(t =>
-                `- [${today}] ${t.description} (${t.status})`
-              ).join('\n') + '\n'
+            ? pendingTasks.map(t => {
+                // Support both old (description) and new (title) field names
+                const desc = t.title || t.description || 'unknown task';
+                return `- [${today}] ${desc} (${t.status})`;
+              }).join('\n') + '\n'
             : '';
 
           content = content.slice(0, sectionStart) + header + taskLines + content.slice(sectionEnd);
