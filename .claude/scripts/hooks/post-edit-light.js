@@ -25,6 +25,24 @@ const RISK_KEYWORDS = [
   'rm -rf', 'force push', '--force',
 ];
 
+// Directories that signal at least Standard mode
+const STANDARD_DIRS = [
+  '/api/', '/server/', '/database/', '/migrations/', '/auth/',
+  '/config/', '/infra/', '/middleware/',
+];
+
+// Directories/patterns that signal Heavy mode
+const HEAVY_DIRS = [
+  '/payment/', '/billing/', '/deploy/', '/permission/',
+  '/shared-state/',
+];
+
+// File-level risk keywords that signal Standard+
+const ESCALATION_KEYWORDS = [
+  'auth', 'oauth', 'permission', 'billing', 'payment',
+  'deploy', 'migration', 'secret',
+];
+
 const MAX_STDIN = 1024 * 1024;
 
 /**
@@ -75,6 +93,40 @@ function run(rawInput) {
       if (foundRisks.length > 0) {
         log(`[PostEditLight] Risk keywords in ${filePath}: ${foundRisks.join(', ')}`);
       }
+    }
+
+    // ── 4. Auto-escalate mode based on file path and content ──
+    try {
+      const { getCurrentMode, setMode, MODE_LEVELS } = require('../lib/mode-check');
+      const currentMode = getCurrentMode();
+      const normalizedPath = filePath.replace(/\\/g, '/');
+
+      let targetMode = null;
+
+      // Check Heavy directories
+      if (HEAVY_DIRS.some(d => normalizedPath.includes(d))) {
+        targetMode = 'heavy';
+      }
+      // Check Standard directories
+      else if (STANDARD_DIRS.some(d => normalizedPath.includes(d))) {
+        targetMode = 'standard';
+      }
+      // Check escalation keywords in file path
+      else if (ESCALATION_KEYWORDS.some(kw => normalizedPath.toLowerCase().includes(kw))) {
+        targetMode = 'standard';
+      }
+
+      // Only escalate, never downgrade
+      if (targetMode) {
+        const currentLevel = MODE_LEVELS[currentMode] ?? 0;
+        const targetLevel = MODE_LEVELS[targetMode] ?? 0;
+        if (targetLevel > currentLevel) {
+          setMode(targetMode);
+          log(`[PostEditLight] Mode auto-escalated: ${currentMode} → ${targetMode} (triggered by ${filePath})`);
+        }
+      }
+    } catch {
+      // mode-check not available — non-blocking
     }
   } catch {
     // Invalid input — pass through silently

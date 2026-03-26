@@ -57,7 +57,11 @@ User Request: "给用户系统加上OAuth登录"
 
 **路由信号**：风险关键词（auth, payment, deploy, migration 等）→ 自动升档；用户说"直接做"→ 降档。
 
-**每个任务开始输出**：`[Mode: Fast/Standard/Heavy] 原因 | 自动启用项 | 建议命令`
+**每个任务开始**必须执行两步：
+1. 输出摘要：`[Mode: Fast/Standard/Heavy] 原因 | 自动启用项 | 建议命令`
+2. 写入模式：`node .claude/scripts/hooks/set-mode.js <mode>`（仅当判定为 Standard 或 Heavy 时执行）
+
+> 注：编辑高风险目录时 `post-edit-light.js` 也会自动升档，作为兜底。
 
 **推荐命令链**：
 - Fast：直接做 → `/verify`

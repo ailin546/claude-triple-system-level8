@@ -31,8 +31,13 @@ const MEMORY_DIR = path.join(process.cwd(), '.memory');
 const TODAY_FILE = path.join(MEMORY_DIR, 'today.md');
 const WEEKLY_FILE = path.join(MEMORY_DIR, 'weekly.md');
 
+/** Local date string (YYYY-MM-DD) — uses local timezone, not UTC */
 function getDateString() {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function getTimeString() {

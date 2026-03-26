@@ -56,17 +56,29 @@
 - 多文件但局部 → Standard
 - 跨模块多步骤 → Heavy
 
-## 路由器输出格式
+## 路由器输出与模式写入
 
-每个任务开始时输出：
+每个任务开始时必须执行两步：
 
+**Step 1：输出模式摘要**
 ```text
 [Mode: Fast/Standard/Heavy] 原因 | 自动启用项 | 建议命令
 ```
 
+**Step 2：写入模式文件**（仅 Standard/Heavy 时需要执行）
+```bash
+node .claude/scripts/hooks/set-mode.js standard
+# 或
+node .claude/scripts/hooks/set-mode.js heavy
+```
+
+> Fast 模式是默认值（SessionStart 已写入），无需额外执行。
+> `post-edit-light.js` 也会在编辑高风险目录时自动升档，作为兜底。
+
 示例：
 ```text
 [Mode: Standard] 跨 3 个文件，涉及用户可见行为 | 轻量检查 + 局部验证 + 决策记忆 | 建议: /plan
+> node .claude/scripts/hooks/set-mode.js standard
 ```
 
 ## 禁止行为

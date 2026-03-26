@@ -27,6 +27,7 @@ const PROJECT_ROOT = getProjectRoot();
 const MODE_FILE = path.join(PROJECT_ROOT, '.claude', '.task-mode');
 const MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
 const TODAY_FILE = path.join(MEMORY_DIR, 'today.md');
+const WEEKLY_FILE = path.join(MEMORY_DIR, 'weekly.md');
 
 // Exclusions for console.log check
 const EXCLUDED_PATTERNS = [
@@ -51,8 +52,56 @@ function getTimestamp() {
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 }
 
-function getDateString() {
-  return new Date().toISOString().split('T')[0];
+/** Local date string (YYYY-MM-DD) — fixes P3 timezone issue */
+function getLocalDateString() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Daily rotation: if today.md has entries from a previous day,
+ * archive them to weekly.md and reset today.md.
+ * Fixes P2: rotation was only in Heavy-mode shared-memory-sync.
+ */
+function rotateTodayIfNeeded() {
+  if (!fs.existsSync(TODAY_FILE)) return;
+
+  try {
+    const content = fs.readFileSync(TODAY_FILE, 'utf8');
+    if (!content.trim()) return;
+
+    // Extract date from first heading like "# Today — 2026-03-25"
+    const dateMatch = content.match(/# Today\s*[-—]\s*(\d{4}-\d{2}-\d{2})/);
+    if (!dateMatch) return;
+
+    const fileDate = dateMatch[1];
+    const today = getLocalDateString();
+
+    if (fileDate === today) return; // Same day, no rotation
+
+    // Archive to weekly.md
+    log(`[StopSummary] Rotating today.md (${fileDate}) → weekly.md`);
+    const archiveHeader = `\n## ${fileDate}\n\n`;
+    // Strip the "# Today — date" header before archiving
+    const bodyContent = content.replace(/^# Today\s*[-—]\s*\d{4}-\d{2}-\d{2}\n*/, '').trim();
+
+    if (bodyContent) {
+      if (!fs.existsSync(WEEKLY_FILE)) {
+        fs.writeFileSync(WEEKLY_FILE, `# Weekly Summary\n${archiveHeader}${bodyContent}\n`, 'utf8');
+      } else {
+        fs.appendFileSync(WEEKLY_FILE, `${archiveHeader}${bodyContent}\n`, 'utf8');
+      }
+    }
+
+    // Reset today.md for new day
+    fs.writeFileSync(TODAY_FILE, `# Today — ${today}\n\n## Sessions\n\n`, 'utf8');
+    log(`[StopSummary] Reset today.md for ${today}`);
+  } catch (err) {
+    log(`[StopSummary] Rotation error (non-blocking): ${err.message}`);
+  }
 }
 
 /**
@@ -93,6 +142,14 @@ function writeMinimalMemory(mode) {
       fs.mkdirSync(MEMORY_DIR, { recursive: true });
     }
 
+    // Rotate first, then append
+    rotateTodayIfNeeded();
+
+    // Ensure today.md exists with header
+    if (!fs.existsSync(TODAY_FILE)) {
+      fs.writeFileSync(TODAY_FILE, `# Today — ${getLocalDateString()}\n\n## Sessions\n\n`, 'utf8');
+    }
+
     const timestamp = getTimestamp();
     const entry = `### [Claude Code] ${timestamp}\n- Mode: ${mode}\n- Session ended normally\n\n`;
 
@@ -109,7 +166,7 @@ function main() {
   // Always: check console.log
   checkConsoleLogs();
 
-  // Fast/Standard: write minimal memory only
+  // Fast/Standard: write minimal memory with rotation
   // Heavy: skip — the full Stop chain handles memory
   if (mode !== 'heavy') {
     writeMinimalMemory(mode);

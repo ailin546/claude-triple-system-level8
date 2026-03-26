@@ -35,7 +35,8 @@ const LOG_FILE = path.join(HOMUNCULUS_DIR, 'promote-log.jsonl');
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 function getDateString() {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function shouldRun() {
