@@ -28,6 +28,8 @@ const MODE_FILE = path.join(PROJECT_ROOT, '.claude', '.task-mode');
 const MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
 const TODAY_FILE = path.join(MEMORY_DIR, 'today.md');
 const WEEKLY_FILE = path.join(MEMORY_DIR, 'weekly.md');
+const WRITE_LOCK_FILE = path.join(PROJECT_ROOT, '.claude', '.stop-summary-last');
+const MIN_WRITE_INTERVAL_MS = 5 * 60 * 1000; // At most once per 5 minutes
 
 // Exclusions for console.log check
 const EXCLUDED_PATTERNS = [
@@ -194,6 +196,17 @@ function writeMinimalMemory(mode, stdinContent) {
     // Rotate first
     rotateTodayIfNeeded();
 
+    // Throttle: skip if we wrote recently (Stop fires on every response)
+    try {
+      if (fs.existsSync(WRITE_LOCK_FILE)) {
+        const lastWrite = fs.statSync(WRITE_LOCK_FILE).mtimeMs;
+        if (Date.now() - lastWrite < MIN_WRITE_INTERVAL_MS) {
+          log('[StopSummary] Throttled (wrote <5min ago), skipping');
+          return;
+        }
+      }
+    } catch { /* lock file check failed — proceed */ }
+
     // Extract high-value content
     const { decisions, constraints, openLoops } = extractHighValueContent(stdinContent);
 
@@ -228,6 +241,8 @@ function writeMinimalMemory(mode, stdinContent) {
 
     const entry = parts.join('\n') + '\n\n';
     fs.appendFileSync(TODAY_FILE, entry, 'utf8');
+    // Update throttle lock
+    try { fs.writeFileSync(WRITE_LOCK_FILE, String(Date.now()), 'utf8'); } catch {}
     log(`[StopSummary] Appended ${decisions.length}d/${constraints.length}c/${openLoops.length}o to ${TODAY_FILE}`);
   } catch (err) {
     log(`[StopSummary] Memory write failed (non-blocking): ${err.message}`);

@@ -45,17 +45,25 @@ const HEAVY_BASH_PATTERNS = [
   /\b(payment|billing|auth|oauth|secret|token)\b.*\b(create|update|delete|set|rotate)\b/,
 ];
 
-// File path patterns → Standard
-const STANDARD_PATH_SEGMENTS = [
-  '/api/', '/server/', '/database/', '/migrations/',
-  '/config/', '/infra/', '/middleware/',
+// Directory names that signal Standard mode
+const STANDARD_DIR_NAMES = [
+  'api', 'server', 'database', 'migrations',
+  'config', 'infra', 'middleware',
 ];
 
-// File path patterns → Heavy
-const HEAVY_PATH_SEGMENTS = [
-  '/auth/', '/payment/', '/billing/', '/deploy/', '/permission/',
-  '/shared-state/', '/identity/', '/oauth/',
+// Directory names that signal Heavy mode
+const HEAVY_DIR_NAMES = [
+  'auth', 'payment', 'billing', 'deploy', 'permission',
+  'shared-state', 'identity', 'oauth',
 ];
+
+/**
+ * Check if a normalized path contains a directory segment.
+ * Matches both '/dir/' (mid-path) and 'dir/' (start of relative path).
+ */
+function pathContainsDir(normalizedPath, dirName) {
+  return normalizedPath.includes(`/${dirName}/`) || normalizedPath.startsWith(`${dirName}/`);
+}
 
 // ── Main logic ───────────────────────────────────────────────
 
@@ -81,11 +89,11 @@ function detectEscalation(input) {
     const filePath = (toolInput.file_path || '').replace(/\\/g, '/');
     if (!filePath) return null;
 
-    for (const seg of HEAVY_PATH_SEGMENTS) {
-      if (filePath.includes(seg)) return 'heavy';
+    for (const dir of HEAVY_DIR_NAMES) {
+      if (pathContainsDir(filePath, dir)) return 'heavy';
     }
-    for (const seg of STANDARD_PATH_SEGMENTS) {
-      if (filePath.includes(seg)) return 'standard';
+    for (const dir of STANDARD_DIR_NAMES) {
+      if (pathContainsDir(filePath, dir)) return 'standard';
     }
   }
 

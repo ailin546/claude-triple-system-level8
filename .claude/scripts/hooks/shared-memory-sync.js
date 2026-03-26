@@ -183,18 +183,20 @@ function main(stdinData) {
     todayContent = createTodayTemplate(today);
   }
 
-  // Append session entry
+  // Append session entry — only if we have meaningful content
+  // Stop hooks fire on every response, so skip empty/low-value entries
   const summary = extractSummaryFromStdin(stdinData);
   if (summary) {
     const entry = `\n### [Claude Code] ${time}\n- ${summary}\n`;
     todayContent += entry;
+    fs.writeFileSync(TODAY_FILE, todayContent, 'utf8');
   } else {
-    // Minimal entry — just mark that a session happened
-    const entry = `\n### [Claude Code] ${time}\n- Session ended\n`;
-    todayContent += entry;
+    // No summary available — only write if today.md was rotated (new file)
+    // Don't append "Session ended" noise on every response
+    if (!fs.existsSync(TODAY_FILE) || todayContent === createTodayTemplate(today)) {
+      fs.writeFileSync(TODAY_FILE, todayContent, 'utf8');
+    }
   }
-
-  fs.writeFileSync(TODAY_FILE, todayContent, 'utf8');
 }
 
 // Read stdin (Claude Code hook protocol) then run

@@ -25,17 +25,21 @@ const RISK_KEYWORDS = [
   'rm -rf', 'force push', '--force',
 ];
 
-// Directories that signal at least Standard mode
-const STANDARD_DIRS = [
-  '/api/', '/server/', '/database/', '/migrations/',
-  '/config/', '/infra/', '/middleware/',
+// Directory names that signal at least Standard mode
+const STANDARD_DIR_NAMES = [
+  'api', 'server', 'database', 'migrations',
+  'config', 'infra', 'middleware',
 ];
 
-// Directories/patterns that signal Heavy mode
-const HEAVY_DIRS = [
-  '/auth/', '/payment/', '/billing/', '/deploy/', '/permission/',
-  '/shared-state/', '/identity/', '/oauth/',
+// Directory names that signal Heavy mode
+const HEAVY_DIR_NAMES = [
+  'auth', 'payment', 'billing', 'deploy', 'permission',
+  'shared-state', 'identity', 'oauth',
 ];
+
+function pathContainsDir(normalizedPath, dirName) {
+  return normalizedPath.includes(`/${dirName}/`) || normalizedPath.startsWith(`${dirName}/`);
+}
 
 // File-level risk keywords that signal Standard+
 const ESCALATION_KEYWORDS = [
@@ -104,11 +108,11 @@ function run(rawInput) {
       let targetMode = null;
 
       // Check Heavy directories
-      if (HEAVY_DIRS.some(d => normalizedPath.includes(d))) {
+      if (HEAVY_DIR_NAMES.some(d => pathContainsDir(normalizedPath, d))) {
         targetMode = 'heavy';
       }
       // Check Standard directories
-      else if (STANDARD_DIRS.some(d => normalizedPath.includes(d))) {
+      else if (STANDARD_DIR_NAMES.some(d => pathContainsDir(normalizedPath, d))) {
         targetMode = 'standard';
       }
       // Check escalation keywords in file path
