@@ -220,5 +220,19 @@ process.stdin.on('end', () => {
   try { main(stdinData); } catch (err) {
     console.error('[SharedMemorySync] Error:', err.message);
   }
+
+  // Push shared memory to remote (if configured)
+  try {
+    const memorySync = require('../lib/memory-sync');
+    if (memorySync.isEnabled()) {
+      memorySync.push();
+      console.error('[SharedMemorySync] Memory sync: pushed to remote');
+    }
+  } catch (err) {
+    console.error(`[SharedMemorySync] Memory sync push skipped: ${err.message}`);
+  }
+
+  // Pass through stdin for downstream hooks
+  process.stdout.write(stdinData);
   process.exit(0);
 });

@@ -261,6 +261,18 @@ User Request: "给用户系统加上OAuth登录"
 - `stop-summary.js`（Always-on）和 `shared-memory-sync.js`（Heavy）都包含轮转逻辑
 - 检测到 today.md 日期非今日时，自动归档到 weekly.md 并重置
 
+**多设备/多 AI 同步**（可选，需配置）：
+- `.memory/` 可作为独立 git 仓库，实现跨设备、跨 AI 工具共享
+- 启用方式：`bash .claude/scripts/memory-init.sh <remote-url>`
+- SessionStart 自动 `git pull`，Stop 自动 `git commit + push`
+- 配置存储在 `.claude/.memory-remote`（不入库）
+- 未配置时所有同步逻辑为 no-op，不影响现有行为
+
+**自动沉淀到 CLAUDE.md**（Heavy 模式，每日一次）：
+- `memory-promote.js` 扫描记忆文件中的重复模式和教训
+- 出现 2+ 次的决策或显式 `→` 格式教训自动写入 CLAUDE.md 错误教训日志
+- 写入条目带 `[auto]` 标记，每次最多 5 条
+
 详细规则见 `.memory/RULES.md`。
 
 ## 错误教训日志
