@@ -28,11 +28,13 @@ const DANGEROUS_PATTERNS = [
   { pattern: /\brm\s+-[a-zA-Z]*r[a-zA-Z]*\s+\/(?!\btmp\b)/, desc: 'rm -r on root-level path' },
   { pattern: /\bDROP\s+(TABLE|DATABASE|SCHEMA)\b/i, desc: 'SQL DROP statement' },
   { pattern: /\bTRUNCATE\s+TABLE\b/i, desc: 'SQL TRUNCATE TABLE' },
-  { pattern: /\bDELETE\s+FROM\s+\S+\s*;?\s*$/im, desc: 'SQL DELETE without WHERE clause' },
+  { pattern: /\bDELETE\s+FROM\s+\S+(?![\s\S]*\bWHERE\b)/im, desc: 'SQL DELETE without WHERE clause' },
   { pattern: /\bgit\s+push\s+[^|;]*(-f|--force(?!-with-lease))/, desc: 'git push --force (use --force-with-lease instead)' },
   { pattern: /\bgit\s+reset\s+--hard\b/, desc: 'git reset --hard' },
   { pattern: /\bgit\s+clean\s+-[a-zA-Z]*f/, desc: 'git clean -f (force clean untracked files)' },
   { pattern: /\bgit\s+branch\s+-D\b/, desc: 'git branch -D (force delete branch)' },
+  { pattern: /\bgit\s+checkout\s+--\s+\./, desc: 'git checkout -- . (discard all unstaged changes)' },
+  { pattern: /\bgit\s+restore\s+\./, desc: 'git restore . (discard all unstaged changes)' },
   { pattern: /\bchmod\s+777\b/, desc: 'chmod 777 (world-writable)' },
   { pattern: />\s*\/dev\/sd[a-z]/, desc: 'write to raw disk device' },
   { pattern: /:\(\)\{\s*:\|\s*:&\s*\}\s*;/, desc: 'fork bomb' },
@@ -57,35 +59,37 @@ function main() {
   }
 
   // Read tool input from stdin
-  let input = '';
-  try {
-    input = fs.readFileSync(0, 'utf8');
-  } catch {
-    return;
-  }
+  let data = '';
+  process.stdin.setEncoding('utf8');
 
-  let toolInput;
-  try {
-    toolInput = JSON.parse(input);
-  } catch {
-    return;
-  }
+  process.stdin.on('data', chunk => {
+    data += chunk;
+  });
 
-  const command = toolInput.tool_input?.command || '';
-  if (!command) return;
-
-  for (const { pattern, desc } of DANGEROUS_PATTERNS) {
-    if (pattern.test(command)) {
-      const result = {
-        decision: 'block',
-        reason: `[careful-guard] Blocked: ${desc}\nCommand: ${command}\nUse /careful off to temporarily disable this check.`
-      };
-      process.stdout.write(JSON.stringify(result));
+  process.stdin.on('end', () => {
+    let toolInput;
+    try {
+      toolInput = JSON.parse(data);
+    } catch {
       return;
     }
-  }
 
-  // Command is safe — no output means allow
+    const command = toolInput.tool_input?.command || '';
+    if (!command) return;
+
+    for (const { pattern, desc } of DANGEROUS_PATTERNS) {
+      if (pattern.test(command)) {
+        const result = {
+          decision: 'block',
+          reason: `[careful-guard] Blocked: ${desc}\nCommand: ${command}\nUse /careful off to temporarily disable this check.`
+        };
+        process.stdout.write(JSON.stringify(result));
+        return;
+      }
+    }
+
+    // Command is safe — no output means allow
+  });
 }
 
 main();

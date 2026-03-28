@@ -25,7 +25,14 @@ try {
     process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
     return;
   }
-} catch { /* mode-check not available — run anyway */ }
+} catch {
+  // mode-check not available — default to skip (safe: don't run Heavy hooks in unknown mode)
+  let d = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', c => { d += c; });
+  process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+  return;
+}
 // ─────────────────────────────────────────────────────────────
 
 const HOMUNCULUS_DIR = path.join(os.homedir(), '.claude', 'homunculus');

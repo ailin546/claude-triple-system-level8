@@ -36,41 +36,43 @@ function main() {
   }
 
   // Read tool input from stdin
-  let input = '';
-  try {
-    input = fs.readFileSync(0, 'utf8');
-  } catch {
-    return;
-  }
+  let data = '';
+  process.stdin.setEncoding('utf8');
 
-  let toolInput;
-  try {
-    toolInput = JSON.parse(input);
-  } catch {
-    return;
-  }
+  process.stdin.on('data', chunk => {
+    data += chunk;
+  });
 
-  // Extract file path from Edit or Write tool input
-  const filePath = toolInput.tool_input?.file_path || '';
-  if (!filePath) return;
+  process.stdin.on('end', () => {
+    let toolInput;
+    try {
+      toolInput = JSON.parse(data);
+    } catch {
+      return;
+    }
 
-  // Resolve to absolute path
-  const absPath = path.resolve(filePath);
-  const absFreezeDir = path.resolve(freezeDir);
+    // Extract file path from Edit or Write tool input
+    const filePath = toolInput.tool_input?.file_path || '';
+    if (!filePath) return;
 
-  // Check if the target file is within the frozen directory
-  // Ensure trailing separator to prevent /src matching /src-other/file.js
-  const freezePrefix = absFreezeDir.endsWith(path.sep) ? absFreezeDir : absFreezeDir + path.sep;
-  if (!absPath.startsWith(freezePrefix) && absPath !== absFreezeDir) {
-    const result = {
-      decision: 'block',
-      reason: `[freeze-guard] Edit blocked: ${path.relative(PROJECT_ROOT, absPath)}\nEdits restricted to: ${path.relative(PROJECT_ROOT, absFreezeDir)}/\nRun /unfreeze to remove the restriction.`
-    };
-    process.stdout.write(JSON.stringify(result));
-    return;
-  }
+    // Resolve to absolute path
+    const absPath = path.resolve(filePath);
+    const absFreezeDir = path.resolve(freezeDir);
 
-  // File is within frozen directory — allow
+    // Check if the target file is within the frozen directory
+    // Ensure trailing separator to prevent /src matching /src-other/file.js
+    const freezePrefix = absFreezeDir.endsWith(path.sep) ? absFreezeDir : absFreezeDir + path.sep;
+    if (!absPath.startsWith(freezePrefix) && absPath !== absFreezeDir) {
+      const result = {
+        decision: 'block',
+        reason: `[freeze-guard] Edit blocked: ${path.relative(PROJECT_ROOT, absPath)}\nEdits restricted to: ${path.relative(PROJECT_ROOT, absFreezeDir)}/\nRun /unfreeze to remove the restriction.`
+      };
+      process.stdout.write(JSON.stringify(result));
+      return;
+    }
+
+    // File is within frozen directory — allow
+  });
 }
 
 main();

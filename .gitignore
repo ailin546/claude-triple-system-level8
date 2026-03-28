@@ -44,3 +44,5 @@ github-hunter/workdir/
 .claude/.stop-summary-last
 .claude/logs/
 .memory/today.md
+.memory/weekly.md
+.memory/long-term.md
