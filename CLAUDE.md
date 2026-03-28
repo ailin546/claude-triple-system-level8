@@ -46,26 +46,7 @@ User Request: "给用户系统加上OAuth登录"
 
 ## 任务模式路由
 
-> 每个任务开始时，自动判定流程强度并输出摘要。用户指令始终优先于自动路由。
-> 详细规则见 `.claude/rules/routing.md`。
-
-| 模式 | 适用场景 | 自动启用 | 禁用 |
-|------|---------|---------|------|
-| **Fast** | 解释代码、写文档、单文件小改、配置微调 | SessionStart、轻量格式化、最小摘要 | TDD 强制、shared-state、多 agent |
-| **Standard** | 普通功能开发、一般 bugfix、跨 2-5 文件 | Fast + 风险提醒、局部质量门、决策记忆 | shared-state、多 agent |
-| **Heavy** | 认证/支付/权限/迁移/部署/架构重构 | Standard + shared-state、sprint memory、冲突检测 | — |
-
-**自动升档机制**（`pre-tool-escalate.js`，Always-on）：
-- 风险信号检测：auth/payment/deploy 等关键词 → 自动升档
-- 跨文件累积：3 文件 → Standard，6 文件 → Heavy
-- 任务边界检测：5 分钟空闲间隔 → 自动 reset 到 fast
-
-**手动设定**：`node .claude/scripts/hooks/set-mode.js <mode>`
-**手动 reset**：`node .claude/scripts/hooks/set-mode.js --reset`
-
-**可观测性**：所有模式变化记录到 `.claude/logs/mode-trace.jsonl`
-
-**每个任务开始**输出摘要：`[Mode: Fast/Standard/Heavy] 原因 | 自动启用项 | 建议命令`
+> 详细规则见 `.claude/rules/routing.md`（自动加载）。
 
 **推荐命令链**：
 - Fast：直接做 → `/verify`
@@ -134,35 +115,21 @@ User Request: "给用户系统加上OAuth登录"
 
 ## Quick Commands (ECC)
 
+核心命令：
+
 | Command | Purpose | 适用模式 |
 |---------|---------|---------|
 | `/plan` | 规划实现 | Standard+ |
 | `/tdd` | 测试驱动开发 | Standard+ |
 | `/verify` | 验证检查 | 所有模式 |
 | `/code-review` | 代码审查 | Standard+ |
-| `/save-session` | 保存会话 | Standard+ |
-| `/resume-session` | 恢复会话 | Standard+ |
-| `/e2e` | E2E测试 | Standard+ |
 | `/build-fix` | 修复构建 | 所有模式 |
-| `/design-consultation` | 设计咨询 | Standard+ |
-| `/design-review` | 设计审查 | Standard+ |
-| `/careful` | 危险命令守卫 | 所有模式 |
+| `/save-session` / `/resume-session` | 保存/恢复会话 | Standard+ |
+| `/careful` | 危险命令守卫开关 | 所有模式 |
 | `/freeze` / `/unfreeze` | 编辑范围锁 | 所有模式 |
-| `/learn` | 提取模式 | Standard+ |
-| `/codex` | 跨AI审查 | Standard+ |
-| `/harness-audit` | 审计配置 | 所有模式 |
-| `/aside` | 不中断当前任务回答侧问题 | 所有模式 |
-| `/checkpoint` | 创建检查点 | 所有模式 |
-| `/eval` | 评估框架 | Standard+ |
-| `/grill` | 对抗性审查 | Standard+ |
-| `/learn-eval` | 提取模式+自评质量 | Standard+ |
-| `/memory-status` | 查看记忆状态 | 所有模式 |
-| `/quality-gate` | 质量门检查 | Standard+ |
-| `/refactor-clean` | 死代码清理 | Standard+ |
-| `/restore` | 从 Archive 恢复组件 | 所有模式 |
-| `/sessions` | 管理会话列表 | Standard+ |
-| `/test-coverage` | 测试覆盖率 | Standard+ |
-| `/update-docs` | 更新文档 | Standard+ |
+| `/codex` | 跨AI审查（Codex） | Standard+ |
+
+其他可用命令（28 个）见 `.claude/commands/` 目录。
 
 ## Agent Routing (Agency Agents - auto)
 
@@ -176,48 +143,6 @@ User Request: "给用户系统加上OAuth登录"
 | DB optimization | `engineering-database-optimizer` | Git workflow | `engineering-git-workflow-master` |
 | Technical docs | `engineering-technical-writer` | Performance | `testing-performance-benchmarker` |
 
-## File Structure (已审计 2026-03-28)
-
-```
-.claude/
-├── settings.json      ← Hook 配置（按模式分层）
-├── agents/            ← 26 个活跃 agents
-├── skills/            ← 38 个活跃 skills
-├── commands/          ← 28 个活跃 commands
-├── rules/             ← 11 个规则文件（common/ + routing.md）
-├── scripts/hooks/     ← 29 个 hook 脚本 + lib/ 下 6 个工具模块
-├── strategies/        ← Playbooks & runbooks（含 autonomous-permissions.md）
-├── shared-state/      ← 多 agent 控制面（仅 Heavy 模式）
-├── mcp-configs/       ← MCP server templates
-└── examples/          ← Workflow examples
-```
-
-### Hook 配置分布（按模式分层）
-
-| 层级 | 类型 | Hooks | 说明 |
-|------|------|-------|------|
-| **Always-on** | SessionStart | session-start, task-router | 上下文恢复 + 模式 reset + trace 截断 |
-| **Always-on** | PreToolUse | careful-guard, freeze-guard, pre-tool-escalate | 安全守卫 + 自动升档 + 跨文件追踪 + 任务边界检测 |
-| **Always-on** | PostToolUse | post-edit-light | 轻量格式化 + console.log 警告 |
-| **Always-on** | Stop | stop-summary, session-end | 高价值记忆抽取 + 会话状态持久化 |
-| **Always-on** | PreCompact | pre-compact | 压缩前保存 |
-| **Standard+** | PreToolUse | auto-tmux-dev, suggest-compact | 注册为 Always-on，脚本内 mode-gate |
-| **Standard+** | PostToolUse | drift-detector, quality-gate, fault-hint, post-edit-typecheck | 注册为 Always-on，脚本内 mode-gate |
-| **Standard+** | Stop | cost-tracker | 注册为 Always-on，脚本内 mode-gate |
-| **Heavy** | Stop | evaluate-session, shared-state-sync, sprint-memory, shared-memory-sync, memory-consolidate, memory-promote | 注册为 Always-on，脚本内 mode-gate |
-
-> **注意**：所有 hooks 在 `settings.json` 中均为常驻注册。Standard+/Heavy hooks 通过脚本内 `requireMode()` 决定是否执行逻辑，Fast 模式下自动跳过（透传 stdin）。
-
-### shared-state 任务接管语义
-
-当 Heavy 模式 `shared-state-sync.js` 检测到 stale worker（30 分钟无心跳）时：
-1. Worker status → `stale`，随后从 board 移除
-2. 其 in_progress 任务：owner 清空、status → `pending`、`needs_reassignment: true`、`stale_reclaimed_at` 记录时间
-3. `handoff_note` 保留上下文，供新 agent 参考
-4. stderr 输出待重新分配任务清单
-
-新 agent 认领任务时，写入方应清除 `needs_reassignment` 字段。
-
 ### 风险控制
 
 当前系统采用**全权限 + hook 守卫**模式（非配置层最小权限）：
@@ -225,16 +150,10 @@ User Request: "给用户系统加上OAuth登录"
 - 风险由运行时 hook 守卫承担：`careful-guard`（阻断破坏性命令）、`freeze-guard`（编辑范围锁）、`pre-tool-escalate`（自动升档）
 - 三层权限模型（见 `.claude/strategies/autonomous-permissions.md`）是治理框架和可选收紧方案，非默认强制配置
 
-### 降级状态
+### 降级策略
 
-| 状态 | 含义 |
-|------|------|
-| `ok` | 正常运行 |
-| `warn` | 局部失败，主流程继续 |
-| `degraded` | 已关闭部分子系统（如 shared-state），主流程继续 |
-| `blocked` | 必须人工处理 |
-
-> 详细降级策略见 `docs/claude-triple-system-level8-redesign/recovery.md`
+Hook 失败时：Always-on 记 warning 继续，Standard+ 降为 Fast，Heavy 降为 Standard。
+详见 `docs/claude-triple-system-level8-redesign/recovery.md`。
 
 ## 跨工具共享记忆
 
