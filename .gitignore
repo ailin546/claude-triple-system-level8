@@ -42,6 +42,7 @@ github-hunter/workdir/
 .claude/.task-mode
 .claude/.escalation-state.json
 .claude/.stop-summary-last
+.claude/.memory-promote-lock
 .claude/logs/
 .memory/today.md
 .memory/weekly.md
