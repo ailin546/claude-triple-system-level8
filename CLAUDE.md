@@ -176,7 +176,7 @@ User Request: "给用户系统加上OAuth登录"
 | DB optimization | `engineering-database-optimizer` | Git workflow | `engineering-git-workflow-master` |
 | Technical docs | `engineering-technical-writer` | Performance | `testing-performance-benchmarker` |
 
-## File Structure (已审计 2026-03-26)
+## File Structure (已审计 2026-03-28)
 
 ```
 .claude/
@@ -185,7 +185,7 @@ User Request: "给用户系统加上OAuth登录"
 ├── skills/            ← 38 个活跃 skills
 ├── commands/          ← 28 个活跃 commands
 ├── rules/             ← 11 个规则文件（common/ + routing.md）
-├── scripts/hooks/     ← 29 个 hook 脚本 + lib/ 下 5 个工具模块
+├── scripts/hooks/     ← 29 个 hook 脚本 + lib/ 下 6 个工具模块
 ├── strategies/        ← Playbooks & runbooks（含 autonomous-permissions.md）
 ├── shared-state/      ← 多 agent 控制面（仅 Heavy 模式）
 ├── mcp-configs/       ← MCP server templates
