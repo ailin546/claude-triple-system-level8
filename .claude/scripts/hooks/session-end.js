@@ -313,6 +313,8 @@ async function main() {
     log(`[SessionEnd] Created session file: ${sessionFile}`);
   }
 
+  // Pass stdin to stdout for downstream Stop hooks
+  process.stdout.write(stdinData);
   process.exit(0);
 }
 

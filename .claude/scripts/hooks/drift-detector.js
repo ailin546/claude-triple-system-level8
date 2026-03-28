@@ -48,7 +48,7 @@ function loadState() {
     return {
       score: 0,
       editedFiles: {},      // file -> edit count
-      editedDirs: new Set(), // unique directories
+      editedDirs: [],        // unique directories (array for JSON serialization)
       consecutiveTestFails: 0,
       lastTestPassed: null,
       revertCount: 0,
@@ -71,13 +71,19 @@ function saveState(state) {
 }
 
 function main() {
-  let input = '';
-  try {
-    input = fs.readFileSync(0, 'utf8');
-  } catch {
-    return;
-  }
+  let data = '';
+  process.stdin.setEncoding('utf8');
 
+  process.stdin.on('data', chunk => {
+    data += chunk;
+  });
+
+  process.stdin.on('end', () => {
+    processInput(data);
+  });
+}
+
+function processInput(input) {
   let toolResult;
   try {
     toolResult = JSON.parse(input);

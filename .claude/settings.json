@@ -166,7 +166,7 @@
             "command": "node \"${CLAUDE_PROJECT_ROOT:-.}/.claude/scripts/hooks/post-edit-typecheck.js\""
           }
         ],
-        "description": "[Heavy] TypeScript check after editing .ts/.tsx files (mode-gated)"
+        "description": "[Standard+] TypeScript check after editing .ts/.tsx files (mode-gated)"
       }
     ],
     "Stop": [

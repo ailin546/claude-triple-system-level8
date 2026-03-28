@@ -25,28 +25,6 @@ const RISK_KEYWORDS = [
   'rm -rf', 'force push', '--force',
 ];
 
-// Directory names that signal at least Standard mode
-const STANDARD_DIR_NAMES = [
-  'api', 'server', 'database', 'migrations',
-  'config', 'infra', 'middleware',
-];
-
-// Directory names that signal Heavy mode
-const HEAVY_DIR_NAMES = [
-  'auth', 'payment', 'billing', 'deploy', 'permission',
-  'shared-state', 'identity', 'oauth',
-];
-
-function pathContainsDir(normalizedPath, dirName) {
-  return normalizedPath.includes(`/${dirName}/`) || normalizedPath.startsWith(`${dirName}/`);
-}
-
-// File-level risk keywords that signal Standard+
-const ESCALATION_KEYWORDS = [
-  'auth', 'oauth', 'permission', 'billing', 'payment',
-  'deploy', 'migration', 'secret',
-];
-
 const MAX_STDIN = 1024 * 1024;
 
 /**
@@ -70,26 +48,25 @@ function run(rawInput) {
       }
     }
 
-    // ── 2. console.log warning ──
-    if (/\.(ts|tsx|js|jsx)$/.test(filePath)) {
-      const content = readFile(filePath);
-      if (content) {
-        const lines = content.split('\n');
-        const matches = [];
-        lines.forEach((line, idx) => {
-          if (/console\.log/.test(line)) {
-            matches.push((idx + 1) + ': ' + line.trim());
-          }
-        });
-        if (matches.length > 0) {
-          log(`[PostEditLight] console.log found in ${filePath}`);
-          matches.slice(0, 3).forEach(m => log(`  ${m}`));
+    // ── 2. Read file once for all checks ──
+    const content = readFile(filePath);
+
+    // ── 3. console.log warning ──
+    if (/\.(ts|tsx|js|jsx)$/.test(filePath) && content) {
+      const lines = content.split('\n');
+      const matches = [];
+      lines.forEach((line, idx) => {
+        if (/console\.log/.test(line)) {
+          matches.push((idx + 1) + ': ' + line.trim());
         }
+      });
+      if (matches.length > 0) {
+        log(`[PostEditLight] console.log found in ${filePath}`);
+        matches.slice(0, 3).forEach(m => log(`  ${m}`));
       }
     }
 
-    // ── 3. Risk keyword scan ──
-    const content = readFile(filePath);
+    // ── 4. Risk keyword scan ──
     if (content) {
       const foundRisks = RISK_KEYWORDS.filter(kw =>
         content.toLowerCase().includes(kw.toLowerCase())
@@ -99,39 +76,7 @@ function run(rawInput) {
       }
     }
 
-    // ── 4. Auto-escalate mode based on file path and content ──
-    try {
-      const { getCurrentMode, setMode, MODE_LEVELS } = require('../lib/mode-check');
-      const currentMode = getCurrentMode();
-      const normalizedPath = filePath.replace(/\\/g, '/');
-
-      let targetMode = null;
-
-      // Check Heavy directories
-      if (HEAVY_DIR_NAMES.some(d => pathContainsDir(normalizedPath, d))) {
-        targetMode = 'heavy';
-      }
-      // Check Standard directories
-      else if (STANDARD_DIR_NAMES.some(d => pathContainsDir(normalizedPath, d))) {
-        targetMode = 'standard';
-      }
-      // Check escalation keywords in file path
-      else if (ESCALATION_KEYWORDS.some(kw => normalizedPath.toLowerCase().includes(kw))) {
-        targetMode = 'standard';
-      }
-
-      // Only escalate, never downgrade
-      if (targetMode) {
-        const currentLevel = MODE_LEVELS[currentMode] ?? 0;
-        const targetLevel = MODE_LEVELS[targetMode] ?? 0;
-        if (targetLevel > currentLevel) {
-          setMode(targetMode);
-          log(`[PostEditLight] Mode auto-escalated: ${currentMode} → ${targetMode} (triggered by ${filePath})`);
-        }
-      }
-    } catch {
-      // mode-check not available — non-blocking
-    }
+    // Note: Mode auto-escalation is handled by pre-tool-escalate.js (SSOT)
   } catch {
     // Invalid input — pass through silently
   }

@@ -151,6 +151,18 @@ User Request: "给用户系统加上OAuth登录"
 | `/learn` | 提取模式 | Standard+ |
 | `/codex` | 跨AI审查 | Standard+ |
 | `/harness-audit` | 审计配置 | 所有模式 |
+| `/aside` | 不中断当前任务回答侧问题 | 所有模式 |
+| `/checkpoint` | 创建检查点 | 所有模式 |
+| `/eval` | 评估框架 | Standard+ |
+| `/grill` | 对抗性审查 | Standard+ |
+| `/learn-eval` | 提取模式+自评质量 | Standard+ |
+| `/memory-status` | 查看记忆状态 | 所有模式 |
+| `/quality-gate` | 质量门检查 | Standard+ |
+| `/refactor-clean` | 死代码清理 | Standard+ |
+| `/restore` | 从 Archive 恢复组件 | 所有模式 |
+| `/sessions` | 管理会话列表 | Standard+ |
+| `/test-coverage` | 测试覆盖率 | Standard+ |
+| `/update-docs` | 更新文档 | Standard+ |
 
 ## Agent Routing (Agency Agents - auto)
 
@@ -158,12 +170,11 @@ User Request: "给用户系统加上OAuth登录"
 |------|-------|------|-------|
 | React/Vue/CSS | `engineering-frontend-developer` | Security audit | `engineering-security-engineer` |
 | API/Database | `engineering-backend-architect` | CI/CD/Docker | `engineering-devops-automator` |
-| Mobile | `engineering-mobile-app-builder` | Code review | `engineering-code-reviewer` |
-| AI/ML | `engineering-ai-engineer` | Architecture | `engineering-software-architect` |
-| MCP tool | `specialized-mcp-builder` | Full project | `agents-orchestrator` |
+| AI/ML | `engineering-ai-engineer` | Code review | `engineering-code-reviewer` |
+| Architecture | `engineering-software-architect` | Full project | `agents-orchestrator` |
 | Prototype | `engineering-rapid-prototyper` | Tests | `testing-api-tester` |
-| UI design | `design-ui-designer` | UX structure | `design-ux-architect` |
-| UX research | `design-ux-researcher` | Brand | `design-brand-guardian` |
+| DB optimization | `engineering-database-optimizer` | Git workflow | `engineering-git-workflow-master` |
+| Technical docs | `engineering-technical-writer` | Performance | `testing-performance-benchmarker` |
 
 ## File Structure (已审计 2026-03-26)
 

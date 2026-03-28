@@ -126,7 +126,9 @@ if [ ! -d "$SUBMODULE_DIR/.claude" ]; then
     fi
   else
     echo "📦 [1/4] 添加子模块..."
-    git submodule add "$REPO_URL" "$SUBMODULE_DIR" 2>/dev/null || true
+    if ! git submodule add "$REPO_URL" "$SUBMODULE_DIR" 2>&1; then
+      echo "⚠ git submodule add 失败，可能子模块已存在或地址无效"
+    fi
   fi
 else
   echo "📦 [1/4] 子模块已存在"
