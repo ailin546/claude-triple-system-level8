@@ -1,5 +1,12 @@
 # Coding Style
 
+## Glue Code Principle
+
+优先连接，不造新轮子：
+- 能用现有组件/库/内部工具组合实现的，不写新逻辑
+- 胶水代码专注**连接、数据转换、流程编排**，保持轻量
+- 当胶水逻辑变复杂（超过单一职责），立即拆分为独立模块
+
 ## Immutability (CRITICAL)
 
 ALWAYS create new objects, NEVER mutate existing ones:

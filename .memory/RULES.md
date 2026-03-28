@@ -122,6 +122,9 @@ cd .memory && git add -A && git commit -m "memory: $(date +%Y-%m-%d) [Codex]" &&
 如果 .memory/ 是 git 仓库，结束前 cd .memory && git add -A && git commit -m "memory: [Cursor]" && git pull --rebase origin main && git push origin main
 ```
 
+### OpenClaw
+在 `.openclawrules` 中添加与 Cursor 相同的内容，将 `[Cursor]` 替换为 `[OpenClaw]`。
+
 ### 其他 AI 工具（通用模板）
 在工具的系统指令或项目配置中添加：
 ```
