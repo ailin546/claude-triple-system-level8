@@ -87,16 +87,75 @@
 
 ## 配置指引
 
-### Claude Code
+### Claude Code（全自动）
 - `session-start.js` 启动时自动读取 `.memory/` 下的记忆文件
 - `stop-summary.js`（Always-on）在 Fast/Standard 模式写入高价值记忆到 `today.md`
 - `shared-memory-sync.js`（Heavy-only）执行完整的会话同步和每日归档
+- 如配置了多设备同步，SessionStart 自动 `git pull`，Stop 自动 `git push`
 
-### Codex / 其他工具
-在工具配置中添加：
+### Codex
+在 `codex` 的 instructions 或项目的 `AGENTS.md` 中添加：
 ```
-每次会话开始先读取 {project}/.memory/ 下的 long-term.md、weekly.md、today.md。
-会话结束前更新 today.md。
+## 共享记忆协议
+每次会话开始，读取以下文件并了解上下文：
+1. .memory/long-term.md — 项目永久知识
+2. .memory/weekly.md — 本周摘要
+3. .memory/today.md — 今日已完成的工作
+
+每次会话结束前，在 .memory/today.md 的 ## Sessions 下追加：
+### [Codex] HH:MM
+- 做了什么（一句话）
+- 关键决策
+
+如果 .memory/ 是 git 仓库，结束前执行：
+cd .memory && git add -A && git commit -m "memory: $(date +%Y-%m-%d) [Codex]" && git pull --rebase origin main && git push origin main
+```
+
+### Cursor
+在 `.cursor/rules` 或项目的 `.cursorrules` 中添加：
+```
+## 共享记忆
+每次对话开始先读取 .memory/long-term.md、.memory/weekly.md、.memory/today.md。
+每次对话结束在 .memory/today.md 追加一条摘要，格式：
+### [Cursor] HH:MM
+- 做了什么
+如果 .memory/ 是 git 仓库，结束前 cd .memory && git add -A && git commit -m "memory: [Cursor]" && git pull --rebase origin main && git push origin main
+```
+
+### 其他 AI 工具（通用模板）
+在工具的系统指令或项目配置中添加：
+```
+每次会话开始读取 {project}/.memory/ 下的 long-term.md、weekly.md、today.md。
+会话结束前在 today.md 追加 ### [工具名] HH:MM 格式的摘要。
+如果 .memory/.git 存在，结束前执行 git add/commit/push 同步。
+```
+
+## 多设备同步
+
+`.memory/` 可作为独立 git 仓库实现跨设备共享：
+
+### 首次设置
+```bash
+# 1. 在 GitHub 创建私有空仓库（如 claude-memory）
+# 2. 运行初始化脚本
+bash .claude/scripts/memory-init.sh git@github.com:你的用户名/claude-memory.git
+```
+
+### 其他设备
+```bash
+# 同样运行初始化脚本（指向同一个仓库）
+bash .claude/scripts/memory-init.sh git@github.com:你的用户名/claude-memory.git
+```
+
+### 自动同步时序
+- Claude Code SessionStart → `git pull`（拉取最新）
+- Claude Code Stop → `git commit + push`（推送变更）
+- 其他 AI 工具需在各自的配置中执行同样的 git 操作
+
+### 手动同步（通常不需要）
+```bash
+cd .memory && git pull   # 拉取
+cd .memory && git push   # 推送
 ```
 
 ## 降级策略
@@ -106,3 +165,8 @@
 2. 会话结束时输出"本轮未持久化"警告
 3. 不尝试重试（避免数据损坏）
 4. 下次会话正常读取已有数据
+
+同步失败时：
+1. 网络不可用 → 本地写入，下次联网时自动推送
+2. 冲突 → 自动 rebase，失败则 merge（append-only 格式几乎不冲突）
+3. 推送失败 → 重试 3 次（2s/4s/8s），仍失败则记录日志跳过
