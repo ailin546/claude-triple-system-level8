@@ -77,8 +77,15 @@ function main() {
     const command = toolInput.tool_input?.command || '';
     if (!command) return;
 
+    // Strip quoted strings to avoid false positives from commit messages,
+    // echo statements, etc. Only scan the command structure itself.
+    const commandToCheck = command
+      .replace(/"(?:[^"\\]|\\.)*"/g, '""')   // strip double-quoted strings
+      .replace(/'(?:[^'\\]|\\.)*'/g, "''")    // strip single-quoted strings
+      .replace(/\$\(cat\s*<<[^)]*\)/gs, ''); // strip heredoc in $()
+
     for (const { pattern, desc } of DANGEROUS_PATTERNS) {
-      if (pattern.test(command)) {
+      if (pattern.test(commandToCheck)) {
         const result = {
           decision: 'block',
           reason: `[careful-guard] Blocked: ${desc}\nCommand: ${command}\nUse /careful off to temporarily disable this check.`
