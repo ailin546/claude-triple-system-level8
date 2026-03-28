@@ -133,34 +133,181 @@ fi
 # 清理备份
 rm -rf "$BACKUP_DIR" 2>/dev/null || true
 
-# ── Step 4: 确保 .gitignore 排除 .memory/ ──
-echo "[4/4] 检查 .gitignore..."
+# ── Step 4: 确保 .gitignore 排除 .memory/ 运行时数据 ──
+echo "[4/6] 检查 .gitignore..."
 GITIGNORE="$PROJECT_ROOT/.gitignore"
-if ! grep -q "^\.memory/$" "$GITIGNORE" 2>/dev/null; then
-  # 替换单个文件排除为整个目录排除
-  if grep -q "\.memory/" "$GITIGNORE" 2>/dev/null; then
-    echo "  → .gitignore 已包含 .memory/ 相关规则"
-  else
-    echo ".memory/" >> "$GITIGNORE"
-    echo "  → 已添加 .memory/ 到 .gitignore"
+for pattern in ".memory/today.md" ".memory/weekly.md" ".memory/long-term.md" ".memory/.git/"; do
+  if ! grep -qF "$pattern" "$GITIGNORE" 2>/dev/null; then
+    echo "$pattern" >> "$GITIGNORE"
+    echo "  → 已添加 $pattern 到 .gitignore"
   fi
+done
+echo "  ✓ .gitignore 已更新"
+
+# ── Step 5: 配置 AI 工具使用共享记忆 ──
+echo "[5/6] 配置 AI 工具..."
+
+MEMORY_SNIPPET_CLAUDE='## 共享记忆
+每次会话开始，按顺序读取 .memory/long-term.md → weekly.md → today.md。
+每次会话结束，在 .memory/today.md 的 ## Sessions 下追加摘要。
+格式：### [Claude Code] HH:MM，然后列出 Decisions/Constraints/Open loops。
+只记录高价值信息，禁止流水账。详细规则见 .memory/RULES.md。'
+
+MEMORY_SNIPPET_CURSOR='## 共享记忆
+每次对话开始先读取 .memory/long-term.md、.memory/weekly.md、.memory/today.md，了解项目上下文。
+每次对话结束在 .memory/today.md 的 ## Sessions 下追加：
+### [Cursor] HH:MM
+**Decisions:**
+- 关键决策
+**Open loops:**
+- 未完成事项
+只记录高价值信息（决策/约束/待办），禁止流水账。
+如果 .memory/.git 存在，结束前执行：cd .memory && git add -A && git commit -m "memory: [Cursor]" && git pull --rebase origin main && git push origin main
+详细规则见 .memory/RULES.md。'
+
+MEMORY_SNIPPET_WINDSURF='## 共享记忆
+每次对话开始先读取 .memory/long-term.md、.memory/weekly.md、.memory/today.md，了解项目上下文。
+每次对话结束在 .memory/today.md 的 ## Sessions 下追加：
+### [Windsurf] HH:MM
+**Decisions:**
+- 关键决策
+**Open loops:**
+- 未完成事项
+只记录高价值信息（决策/约束/待办），禁止流水账。
+如果 .memory/.git 存在，结束前执行：cd .memory && git add -A && git commit -m "memory: [Windsurf]" && git pull --rebase origin main && git push origin main
+详细规则见 .memory/RULES.md。'
+
+# 5a. CLAUDE.md
+CLAUDEMD="$PROJECT_ROOT/CLAUDE.md"
+if [ -f "$CLAUDEMD" ]; then
+  if grep -q "共享记忆" "$CLAUDEMD" 2>/dev/null; then
+    echo "  ✓ CLAUDE.md 已包含共享记忆配置"
+  else
+    echo "" >> "$CLAUDEMD"
+    echo "$MEMORY_SNIPPET_CLAUDE" >> "$CLAUDEMD"
+    echo "  → CLAUDE.md 已追加共享记忆配置"
+  fi
+else
+  echo "$MEMORY_SNIPPET_CLAUDE" > "$CLAUDEMD"
+  echo "  → 已创建 CLAUDE.md（含共享记忆配置）"
 fi
 
+# 5b. .cursorrules
+CURSORRULES="$PROJECT_ROOT/.cursorrules"
+if [ -f "$CURSORRULES" ]; then
+  if grep -q "共享记忆" "$CURSORRULES" 2>/dev/null; then
+    echo "  ✓ .cursorrules 已包含共享记忆配置"
+  else
+    echo "" >> "$CURSORRULES"
+    echo "$MEMORY_SNIPPET_CURSOR" >> "$CURSORRULES"
+    echo "  → .cursorrules 已追加共享记忆配置"
+  fi
+else
+  echo "$MEMORY_SNIPPET_CURSOR" > "$CURSORRULES"
+  echo "  → 已创建 .cursorrules（含共享记忆配置）"
+fi
+
+# 5c. .windsurfrules
+WINDSURFRULES="$PROJECT_ROOT/.windsurfrules"
+if [ -f "$WINDSURFRULES" ]; then
+  if grep -q "共享记忆" "$WINDSURFRULES" 2>/dev/null; then
+    echo "  ✓ .windsurfrules 已包含共享记忆配置"
+  else
+    echo "" >> "$WINDSURFRULES"
+    echo "$MEMORY_SNIPPET_WINDSURF" >> "$WINDSURFRULES"
+    echo "  → .windsurfrules 已追加共享记忆配置"
+  fi
+else
+  echo "$MEMORY_SNIPPET_WINDSURF" > "$WINDSURFRULES"
+  echo "  → 已创建 .windsurfrules（含共享记忆配置）"
+fi
+
+# 5d. Codex (AGENTS.md)
+AGENTSMD="$PROJECT_ROOT/AGENTS.md"
+MEMORY_SNIPPET_CODEX='## 共享记忆协议
+每次会话开始，读取以下文件了解上下文：
+1. .memory/long-term.md — 永久知识
+2. .memory/weekly.md — 本周摘要
+3. .memory/today.md — 今日工作
+
+每次会话结束前，在 .memory/today.md 的 ## Sessions 下追加：
+### [Codex] HH:MM
+**Decisions:**
+- 关键决策
+**Open loops:**
+- 未完成事项
+
+只记录高价值信息（决策/约束/待办），禁止流水账。
+如果 .memory/.git 存在，结束前执行：
+cd .memory && git add -A && git commit -m "memory: $(date +%Y-%m-%d) [Codex]" && git pull --rebase origin main && git push origin main
+详细规则见 .memory/RULES.md。'
+
+if [ -f "$AGENTSMD" ]; then
+  if grep -q "共享记忆" "$AGENTSMD" 2>/dev/null; then
+    echo "  ✓ AGENTS.md 已包含共享记忆配置"
+  else
+    echo "" >> "$AGENTSMD"
+    echo "$MEMORY_SNIPPET_CODEX" >> "$AGENTSMD"
+    echo "  → AGENTS.md 已追加共享记忆配置（Codex 用）"
+  fi
+else
+  echo "$MEMORY_SNIPPET_CODEX" > "$AGENTSMD"
+  echo "  → 已创建 AGENTS.md（含共享记忆配置，Codex 用）"
+fi
+
+# 5e. OpenClaw (.openclaw/rules 或 .openclawrules)
+OPENCLAWRULES="$PROJECT_ROOT/.openclawrules"
+MEMORY_SNIPPET_OPENCLAW='## 共享记忆
+每次会话开始先读取 .memory/long-term.md、.memory/weekly.md、.memory/today.md，了解项目上下文。
+每次会话结束在 .memory/today.md 的 ## Sessions 下追加：
+### [OpenClaw] HH:MM
+**Decisions:**
+- 关键决策
+**Open loops:**
+- 未完成事项
+只记录高价值信息（决策/约束/待办），禁止流水账。
+如果 .memory/.git 存在，结束前执行：cd .memory && git add -A && git commit -m "memory: [OpenClaw]" && git pull --rebase origin main && git push origin main
+详细规则见 .memory/RULES.md。'
+
+if [ -f "$OPENCLAWRULES" ]; then
+  if grep -q "共享记忆" "$OPENCLAWRULES" 2>/dev/null; then
+    echo "  ✓ .openclawrules 已包含共享记忆配置"
+  else
+    echo "" >> "$OPENCLAWRULES"
+    echo "$MEMORY_SNIPPET_OPENCLAW" >> "$OPENCLAWRULES"
+    echo "  → .openclawrules 已追加共享记忆配置"
+  fi
+else
+  echo "$MEMORY_SNIPPET_OPENCLAW" > "$OPENCLAWRULES"
+  echo "  → 已创建 .openclawrules（含共享记忆配置）"
+fi
+
+# ── Step 6: 保存配置 ──
+echo "[6/6] 保存远程地址配置..."
+echo "$REMOTE_URL" > "$REMOTE_FILE"
+echo "  → $REMOTE_FILE"
+
 echo ""
-echo "╔══════════════════════════════════════════════╗"
-echo "║  ✅ 初始化完成！                              ║"
-echo "╠══════════════════════════════════════════════╣"
-echo "║                                              ║"
-echo "║  自动同步已启用：                              ║"
-echo "║    会话启动 → 自动拉取最新记忆                 ║"
-echo "║    会话结束 → 自动推送记忆变更                 ║"
-echo "║                                              ║"
-echo "║  其他设备使用同一仓库：                        ║"
-echo "║    bash .claude/scripts/memory-init.sh \\     ║"
-echo "║      $REMOTE_URL"
-echo "║                                              ║"
-echo "║  手动操作（通常不需要）：                       ║"
-echo "║    cd .memory && git pull                    ║"
-echo "║    cd .memory && git push                    ║"
-echo "║                                              ║"
-echo "╚══════════════════════════════════════════════╝"
+echo "╔══════════════════════════════════════════════════════════╗"
+echo "║  ✅ 初始化完成！                                          ║"
+echo "╠══════════════════════════════════════════════════════════╣"
+echo "║                                                          ║"
+echo "║  已配置的 AI 工具：                                       ║"
+echo "║    Claude Code  → CLAUDE.md（Hook 自动同步）              ║"
+echo "║    Cursor       → .cursorrules                           ║"
+echo "║    Windsurf     → .windsurfrules                         ║"
+echo "║    Codex        → AGENTS.md                              ║"
+echo "║    OpenClaw     → .openclawrules                         ║"
+echo "║                                                          ║"
+echo "║  自动同步（Claude Code）：                                ║"
+echo "║    会话启动 → git pull（拉取最新记忆）                     ║"
+echo "║    会话结束 → git commit + push（推送变更）                ║"
+echo "║                                                          ║"
+echo "║  其他工具需在各自会话结束时手动执行：                       ║"
+echo "║    cd .memory && git add -A && git commit -m 'memory'    ║"
+echo "║    && git pull --rebase origin main && git push           ║"
+echo "║                                                          ║"
+echo "║  其他设备：                                               ║"
+echo "║    bash .claude/scripts/memory-init.sh $REMOTE_URL"
+echo "║                                                          ║"
+echo "╚══════════════════════════════════════════════════════════╝"

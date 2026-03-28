@@ -193,6 +193,10 @@ cd .memory && git add -A && git commit -m "memory: [Cursor]" && git pull --rebas
 
 在 `.windsurfrules` 中添加与 Cursor 相同的内容，将 `[Cursor]` 替换为 `[Windsurf]`。
 
+#### OpenClaw
+
+在 `.openclawrules` 中添加与 Cursor 相同的内容，将 `[Cursor]` 替换为 `[OpenClaw]`。
+
 #### 其他工具
 
 在该工具的项目级配置文件中添加：
@@ -388,6 +392,11 @@ On conversation end, append to .memory/today.md under ## Sessions:
 **Decisions:** - key decisions
 If .memory/.git exists, sync: cd .memory && git add -A && git commit -m "memory: [Cursor]" && git pull --rebase origin main && git push origin main
 ```
+
+#### Windsurf / OpenClaw
+
+Same as Cursor config above, replace `[Cursor]` with `[Windsurf]` or `[OpenClaw]` respectively.
+Config files: `.windsurfrules` for Windsurf, `.openclawrules` for OpenClaw.
 
 #### Other tools
 
