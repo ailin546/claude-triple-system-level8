@@ -276,6 +276,17 @@ async function main() {
   ensureDir(SESSIONS_DIR);
   ensureDir(LEARNED_DIR);
 
+  // Pull shared memory from remote (if configured)
+  try {
+    const memorySync = require('../lib/memory-sync');
+    if (memorySync.isEnabled()) {
+      memorySync.pull();
+      log('[SessionStart] Memory sync: pulled from remote');
+    }
+  } catch (err) {
+    log(`[SessionStart] Memory sync pull skipped: ${err.message}`);
+  }
+
   // Load shared memory (long-term → weekly → today)
   loadSharedMemory();
 

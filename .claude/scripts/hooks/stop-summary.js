@@ -299,6 +299,16 @@ function main() {
     writeMinimalMemory(mode, stdinData);
   }
 
+  // Push shared memory to remote (if configured)
+  try {
+    const memorySync = require('../lib/memory-sync');
+    if (memorySync.isEnabled()) {
+      memorySync.push();
+    }
+  } catch (err) {
+    log(`[StopSummary] Memory sync push skipped: ${err.message}`);
+  }
+
   log(`[StopSummary] Done (mode: ${mode})`);
 }
 

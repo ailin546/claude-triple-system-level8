@@ -42,7 +42,11 @@ github-hunter/workdir/
 .claude/.task-mode
 .claude/.escalation-state.json
 .claude/.stop-summary-last
+.claude/.memory-promote-lock
+.claude/.memory-remote
 .claude/logs/
+# Memory runtime data (synced via independent git repo)
 .memory/today.md
 .memory/weekly.md
 .memory/long-term.md
+.memory/.git/
