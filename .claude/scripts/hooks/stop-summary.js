@@ -29,7 +29,7 @@ const MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
 const TODAY_FILE = path.join(MEMORY_DIR, 'today.md');
 const WEEKLY_FILE = path.join(MEMORY_DIR, 'weekly.md');
 const WRITE_LOCK_FILE = path.join(PROJECT_ROOT, '.claude', '.stop-summary-last');
-const MIN_WRITE_INTERVAL_MS = 5 * 60 * 1000; // At most once per 5 minutes
+const MIN_WRITE_INTERVAL_MS = 60 * 1000; // At most once per 1 minute (was 5min, too aggressive)
 
 // Exclusions for console.log check
 const EXCLUDED_PATTERNS = [
@@ -134,84 +134,155 @@ function checkConsoleLogs() {
 }
 
 /**
- * Extract high-value signals from the current session.
- * Returns { decisions, constraints, openLoops } arrays.
- *
- * Conservative: only extracts what's clearly identifiable, skips if unsure.
- * Deliberately does NOT record:
- * - "N file(s) modified" — git status can show this anytime
- * - "Task ran in X mode" — mode itself is not a decision/constraint
+ * Extract session summary from transcript file.
+ * Returns { userTasks, filesModified } or null.
  */
-function extractHighValueContent(stdinContent) {
-  const result = { decisions: [], constraints: [], openLoops: [] };
+function extractFromTranscript(stdinContent) {
+  let transcriptPath = null;
+  try {
+    const input = JSON.parse(stdinContent);
+    transcriptPath = input.transcript_path;
+  } catch {}
+  if (!transcriptPath) transcriptPath = process.env.CLAUDE_TRANSCRIPT_PATH;
+  if (!transcriptPath || !fs.existsSync(transcriptPath)) return null;
 
   try {
-    // Check mode-trace for mode escalations (= decisions worth recording)
-    try {
-      const { MODE_TRACE_PATH } = require('../lib/mode-check');
-      if (fs.existsSync(MODE_TRACE_PATH)) {
-        const lines = fs.readFileSync(MODE_TRACE_PATH, 'utf8').trim().split('\n');
-        const cutoff = Date.now() - 60 * 60 * 1000; // last hour
-        for (const line of lines) {
-          try {
-            const entry = JSON.parse(line);
-            if (new Date(entry.timestamp).getTime() < cutoff) continue;
-            if (entry.prev_mode === entry.next_mode) continue;
-            if (entry.trigger === 'task-router' && entry.next_mode === 'fast') continue; // session init, not interesting
-            const desc = entry.overridden_by_user
-              ? `用户覆盖模式: ${entry.prev_mode} → ${entry.next_mode}`
-              : `自动升档: ${entry.prev_mode} → ${entry.next_mode} (${entry.reason})`;
-            result.decisions.push(desc);
-          } catch { /* skip malformed line */ }
-        }
-      }
-    } catch { /* mode-check not available */ }
+    const content = readFile(transcriptPath);
+    if (!content) return null;
 
-    // Check for NEW TODO/FIXME/HACK in git diff (only newly added lines)
-    if (isGitRepo()) {
+    const lines = content.split('\n').filter(Boolean);
+    const userTasks = [];
+    const filesModified = new Set();
+
+    for (const line of lines) {
       try {
-        const { execFileSync } = require('child_process');
-        const diff = execFileSync('git', ['diff', '--cached', '--diff-filter=AM', '-U0'], {
-          encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000
-        });
-        // Also check unstaged
-        const diffUnstaged = execFileSync('git', ['diff', '-U0'], {
-          encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000
-        });
-        const allDiff = diff + diffUnstaged;
-        let currentFile = '';
-        for (const line of allDiff.split('\n')) {
-          if (line.startsWith('diff --git')) {
-            const match = line.match(/b\/(.+)$/);
-            currentFile = match ? match[1] : '';
+        const entry = JSON.parse(line);
+
+        // Collect user messages (= task descriptions)
+        if (entry.type === 'user' || entry.role === 'user' || entry.message?.role === 'user') {
+          const rawContent = entry.message?.content ?? entry.content;
+          const text = typeof rawContent === 'string'
+            ? rawContent
+            : Array.isArray(rawContent)
+              ? rawContent.map(c => (c && c.text) || '').join(' ')
+              : '';
+          const trimmed = text.trim();
+          // Only keep substantive messages (skip short confirmations like "yes", "ok")
+          if (trimmed && trimmed.length > 10) {
+            userTasks.push(trimmed.slice(0, 150));
           }
-          // Only look at added lines in user code (skip hooks/scripts/tests/config)
-          if (line.startsWith('+') && !line.startsWith('+++')) {
-            // Skip hook/script/config files — their comments are not user TODOs
-            if (/\.(config|spec|test)\.[jt]sx?$/.test(currentFile)) continue;
-            if (/scripts\/|hooks\/|__tests__\/|__mocks__\//.test(currentFile)) continue;
-            // Must be a real annotation, not just the word in a comment about annotations
-            const todoMatch = line.match(/^\+\s*(?:\/\/|\/?\*|#)?\s*\b(TODO|FIXME|HACK|XXX)[\s:]+(.{3,})/i);
-            if (todoMatch) {
-              const tag = todoMatch[1].toUpperCase();
-              const msg = todoMatch[2].trim().slice(0, 100);
-              // Skip lines that are merely describing/documenting these tags
-              if (/\b(known|tech debt|constraint|open loop)\b/i.test(msg)) continue;
-              const basename = path.basename(currentFile);
-              if (tag === 'TODO') {
-                result.openLoops.push(`${basename}: ${tag}: ${msg}`);
-              } else {
-                result.constraints.push(`${basename}: ${tag}: ${msg}`);
+        }
+
+        // Collect modified files from tool_use
+        if (entry.type === 'tool_use' || entry.tool_name) {
+          const toolName = entry.tool_name || entry.name || '';
+          const filePath = entry.tool_input?.file_path || entry.input?.file_path || '';
+          if (filePath && (toolName === 'Edit' || toolName === 'Write')) {
+            filesModified.add(filePath);
+          }
+        }
+
+        // Extract from assistant message content blocks
+        if (entry.type === 'assistant' && Array.isArray(entry.message?.content)) {
+          for (const block of entry.message.content) {
+            if (block.type === 'tool_use') {
+              const filePath = block.input?.file_path || '';
+              if (filePath && (block.name === 'Edit' || block.name === 'Write')) {
+                filesModified.add(filePath);
               }
             }
           }
         }
-      } catch {
-        // git diff failed — skip
+      } catch { /* skip unparseable line */ }
+    }
+
+    return {
+      userTasks: userTasks.slice(-5), // Last 5 user requests
+      filesModified: Array.from(filesModified).slice(0, 15),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract high-value signals from the current session.
+ * Returns { decisions, constraints, openLoops, tasks, files } arrays.
+ *
+ * Data sources:
+ * 1. Transcript (via stdin json → transcript_path) — user tasks + files modified
+ * 2. Mode trace — escalation decisions
+ * 3. Git diff — new TODO/FIXME/HACK annotations
+ */
+function extractHighValueContent(stdinContent) {
+  const result = { decisions: [], constraints: [], openLoops: [], tasks: [], files: [] };
+
+  // Source 1: Transcript — user tasks and file changes
+  try {
+    const transcript = extractFromTranscript(stdinContent);
+    if (transcript) {
+      result.tasks = transcript.userTasks;
+      result.files = transcript.filesModified;
+    }
+  } catch { /* non-blocking */ }
+
+  // Source 2: Mode trace — escalation decisions (skip noise)
+  try {
+    const { MODE_TRACE_PATH } = require('../lib/mode-check');
+    if (fs.existsSync(MODE_TRACE_PATH)) {
+      const lines = fs.readFileSync(MODE_TRACE_PATH, 'utf8').trim().split('\n');
+      const cutoff = Date.now() - 60 * 60 * 1000; // last hour
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line);
+          if (new Date(entry.timestamp).getTime() < cutoff) continue;
+          if (entry.prev_mode === entry.next_mode) continue;
+          if (entry.trigger === 'task-router' && entry.next_mode === 'fast') continue;
+          // Only record user-initiated or significant escalations
+          if (entry.overridden_by_user) {
+            result.decisions.push(`用户覆盖模式: ${entry.prev_mode} → ${entry.next_mode}`);
+          }
+          // Skip auto-escalation noise — it's not a real "decision"
+        } catch { /* skip malformed line */ }
       }
     }
-  } catch {
-    // Can't parse stdin — that's fine, just means less context
+  } catch { /* mode-check not available */ }
+
+  // Source 3: Git diff — new TODO/FIXME/HACK in user code
+  if (isGitRepo()) {
+    try {
+      const { execFileSync } = require('child_process');
+      const diff = execFileSync('git', ['diff', '--cached', '--diff-filter=AM', '-U0'], {
+        encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000
+      });
+      const diffUnstaged = execFileSync('git', ['diff', '-U0'], {
+        encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000
+      });
+      const allDiff = diff + diffUnstaged;
+      let currentFile = '';
+      for (const line of allDiff.split('\n')) {
+        if (line.startsWith('diff --git')) {
+          const match = line.match(/b\/(.+)$/);
+          currentFile = match ? match[1] : '';
+        }
+        if (line.startsWith('+') && !line.startsWith('+++')) {
+          if (/\.(config|spec|test)\.[jt]sx?$/.test(currentFile)) continue;
+          if (/scripts\/|hooks\/|__tests__\/|__mocks__\//.test(currentFile)) continue;
+          const todoMatch = line.match(/^\+\s*(?:\/\/|\/?\*|#)?\s*\b(TODO|FIXME|HACK|XXX)[\s:]+(.{3,})/i);
+          if (todoMatch) {
+            const tag = todoMatch[1].toUpperCase();
+            const msg = todoMatch[2].trim().slice(0, 100);
+            if (/\b(known|tech debt|constraint|open loop)\b/i.test(msg)) continue;
+            const basename = path.basename(currentFile);
+            if (tag === 'TODO') {
+              result.openLoops.push(`${basename}: ${tag}: ${msg}`);
+            } else {
+              result.constraints.push(`${basename}: ${tag}: ${msg}`);
+            }
+          }
+        }
+      }
+    } catch { /* git diff failed — skip */ }
   }
 
   return result;
@@ -246,10 +317,10 @@ function writeMinimalMemory(mode, stdinContent) {
     } catch { /* lock file check failed — proceed */ }
 
     // Extract high-value content
-    const { decisions, constraints, openLoops } = extractHighValueContent(stdinContent);
+    const { decisions, constraints, openLoops, tasks, files } = extractHighValueContent(stdinContent);
 
     // If nothing worth recording, skip entirely — no noise
-    const hasContent = decisions.length > 0 || constraints.length > 0 || openLoops.length > 0;
+    const hasContent = tasks.length > 0 || decisions.length > 0 || constraints.length > 0 || openLoops.length > 0;
     if (!hasContent) {
       log('[StopSummary] No high-value content to record, skipping write');
       return;
@@ -263,6 +334,17 @@ function writeMinimalMemory(mode, stdinContent) {
     // Build entry with only non-empty sections
     const timestamp = getTimestamp();
     const parts = [`### [Claude Code] ${timestamp}`];
+
+    // User tasks — what was worked on this session
+    if (tasks.length > 0) {
+      parts.push('**Tasks:**');
+      tasks.forEach(t => parts.push(`- ${t.replace(/\n/g, ' ')}`));
+    }
+
+    // Files modified — what changed
+    if (files.length > 0) {
+      parts.push(`**Files:** ${files.map(f => path.basename(f)).join(', ')}`);
+    }
 
     if (decisions.length > 0) {
       parts.push('**Decisions:**');
@@ -281,7 +363,7 @@ function writeMinimalMemory(mode, stdinContent) {
     fs.appendFileSync(TODAY_FILE, entry, 'utf8');
     // Update throttle lock
     try { fs.writeFileSync(WRITE_LOCK_FILE, String(Date.now()), 'utf8'); } catch {}
-    log(`[StopSummary] Appended ${decisions.length}d/${constraints.length}c/${openLoops.length}o to ${TODAY_FILE}`);
+    log(`[StopSummary] Appended ${tasks.length}t/${decisions.length}d/${constraints.length}c/${openLoops.length}o to ${TODAY_FILE}`);
   } catch (err) {
     log(`[StopSummary] Memory write failed (non-blocking): ${err.message}`);
   }
