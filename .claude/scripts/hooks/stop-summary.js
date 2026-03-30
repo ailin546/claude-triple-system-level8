@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
- * Stop Hook: Lightweight session summary (Always-on)
+ * Stop Hook: Session summary → .memory/today.md (Always-on)
  *
- * Records only high-value information at session end:
- * - Decisions made (and reasons)
- * - Constraints discovered
- * - Open loops (unfinished work)
- *
- * Replaces the 9-hook Stop chain for Fast/Standard modes.
- * Heavy mode still runs the full Stop chain.
+ * Extracts meaningful content from the session transcript:
+ * - User requests (what was asked)
+ * - Files modified (what changed)
+ * - Mode escalations (decisions)
+ * - Git TODO/FIXME annotations (open loops)
  *
  * Writes to .memory/today.md (cross-tool shared memory).
- * Also checks for console.log in modified files (merged from check-console-log.js).
+ * Also checks for console.log in modified files.
+ *
+ * Throttle: per-session (same session ID only writes once).
  *
  * Cross-platform (Windows, macOS, Linux)
  * Non-blocking: errors are logged but never block exit.
@@ -28,8 +28,7 @@ const MODE_FILE = path.join(PROJECT_ROOT, '.claude', '.task-mode');
 const MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
 const TODAY_FILE = path.join(MEMORY_DIR, 'today.md');
 const WEEKLY_FILE = path.join(MEMORY_DIR, 'weekly.md');
-const WRITE_LOCK_FILE = path.join(PROJECT_ROOT, '.claude', '.stop-summary-last');
-const MIN_WRITE_INTERVAL_MS = 60 * 1000; // At most once per 1 minute (was 5min, too aggressive)
+const LAST_SESSION_FILE = path.join(PROJECT_ROOT, '.claude', '.stop-summary-session');
 
 // Exclusions for console.log check
 const EXCLUDED_PATTERNS = [
@@ -54,7 +53,6 @@ function getTimestamp() {
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 }
 
-/** Local date string (YYYY-MM-DD) — fixes P3 timezone issue */
 function getLocalDateString() {
   const d = new Date();
   const y = d.getFullYear();
@@ -63,10 +61,13 @@ function getLocalDateString() {
   return `${y}-${m}-${day}`;
 }
 
+function getSessionId() {
+  return process.env.CLAUDE_SESSION_ID || '';
+}
+
 /**
  * Daily rotation: if today.md has entries from a previous day,
  * archive them to weekly.md and reset today.md.
- * Fixes P2: rotation was only in Heavy-mode shared-memory-sync.
  */
 function rotateTodayIfNeeded() {
   if (!fs.existsSync(TODAY_FILE)) return;
@@ -75,19 +76,16 @@ function rotateTodayIfNeeded() {
     const content = fs.readFileSync(TODAY_FILE, 'utf8');
     if (!content.trim()) return;
 
-    // Extract date from first heading like "# Today — 2026-03-25"
     const dateMatch = content.match(/# Today\s*[-—]\s*(\d{4}-\d{2}-\d{2})/);
     if (!dateMatch) return;
 
     const fileDate = dateMatch[1];
     const today = getLocalDateString();
 
-    if (fileDate === today) return; // Same day, no rotation
+    if (fileDate === today) return;
 
-    // Archive to weekly.md
     log(`[StopSummary] Rotating today.md (${fileDate}) → weekly.md`);
     const archiveHeader = `\n## ${fileDate}\n\n`;
-    // Strip the "# Today — date" header before archiving
     const bodyContent = content.replace(/^# Today\s*[-—]\s*\d{4}-\d{2}-\d{2}\n*/, '').trim();
 
     if (bodyContent) {
@@ -98,7 +96,6 @@ function rotateTodayIfNeeded() {
       }
     }
 
-    // Reset today.md for new day
     fs.writeFileSync(TODAY_FILE, `# Today — ${today}\n\n## Sessions\n\n`, 'utf8');
     log(`[StopSummary] Reset today.md for ${today}`);
   } catch (err) {
@@ -106,9 +103,6 @@ function rotateTodayIfNeeded() {
   }
 }
 
-/**
- * Check for console.log in modified files (merged from check-console-log.js).
- */
 function checkConsoleLogs() {
   if (!isGitRepo()) return;
 
@@ -133,32 +127,28 @@ function checkConsoleLogs() {
   }
 }
 
+// ── Transcript parsing ──────────────────────────────────────────────
+
 /**
- * Extract session summary from transcript file.
- * Returns { userTasks, filesModified } or null.
+ * Parse the session transcript (JSONL) and extract:
+ * - userTasks: what the user asked (first line of each message, deduped)
+ * - filesModified: files written/edited
+ * - toolsUsed: unique tool names
  */
-function extractFromTranscript(stdinContent) {
-  let transcriptPath = null;
-  try {
-    const input = JSON.parse(stdinContent);
-    transcriptPath = input.transcript_path;
-  } catch {}
-  if (!transcriptPath) transcriptPath = process.env.CLAUDE_TRANSCRIPT_PATH;
-  if (!transcriptPath || !fs.existsSync(transcriptPath)) return null;
+function parseTranscript(transcriptPath) {
+  const result = { userTasks: [], filesModified: new Set(), toolsUsed: new Set() };
 
   try {
-    const content = readFile(transcriptPath);
-    if (!content) return null;
+    if (!transcriptPath || !fs.existsSync(transcriptPath)) return result;
 
+    const content = fs.readFileSync(transcriptPath, 'utf8');
     const lines = content.split('\n').filter(Boolean);
-    const userTasks = [];
-    const filesModified = new Set();
 
     for (const line of lines) {
       try {
         const entry = JSON.parse(line);
 
-        // Collect user messages (= task descriptions)
+        // User messages → task descriptions
         if (entry.type === 'user' || entry.role === 'user' || entry.message?.role === 'user') {
           const rawContent = entry.message?.content ?? entry.content;
           const text = typeof rawContent === 'string'
@@ -167,203 +157,224 @@ function extractFromTranscript(stdinContent) {
               ? rawContent.map(c => (c && c.text) || '').join(' ')
               : '';
           const trimmed = text.trim();
-          // Only keep substantive messages (skip short confirmations like "yes", "ok")
-          if (trimmed && trimmed.length > 10) {
-            userTasks.push(trimmed.slice(0, 150));
+          if (trimmed) {
+            // Take first meaningful line, max 120 chars
+            const firstLine = trimmed.split('\n')[0].slice(0, 120);
+            // Skip very short or system-like messages
+            if (firstLine.length > 2 && !firstLine.startsWith('<system')) {
+              result.userTasks.push(firstLine);
+            }
           }
         }
 
-        // Collect modified files from tool_use
-        if (entry.type === 'tool_use' || entry.tool_name) {
-          const toolName = entry.tool_name || entry.name || '';
-          const filePath = entry.tool_input?.file_path || entry.input?.file_path || '';
-          if (filePath && (toolName === 'Edit' || toolName === 'Write')) {
-            filesModified.add(filePath);
-          }
-        }
-
-        // Extract from assistant message content blocks
+        // Tool uses from assistant content blocks
         if (entry.type === 'assistant' && Array.isArray(entry.message?.content)) {
           for (const block of entry.message.content) {
             if (block.type === 'tool_use') {
+              const toolName = block.name || '';
+              if (toolName) result.toolsUsed.add(toolName);
+
               const filePath = block.input?.file_path || '';
-              if (filePath && (block.name === 'Edit' || block.name === 'Write')) {
-                filesModified.add(filePath);
+              if (filePath && (toolName === 'Edit' || toolName === 'Write')) {
+                // Store relative path, strip project root
+                const rel = filePath.startsWith(PROJECT_ROOT)
+                  ? filePath.slice(PROJECT_ROOT.length + 1)
+                  : filePath;
+                result.filesModified.add(rel);
               }
             }
           }
         }
+
+        // Direct tool_use entries
+        if (entry.type === 'tool_use' || entry.tool_name) {
+          const toolName = entry.tool_name || entry.name || '';
+          if (toolName) result.toolsUsed.add(toolName);
+
+          const filePath = entry.tool_input?.file_path || entry.input?.file_path || '';
+          if (filePath && (toolName === 'Edit' || toolName === 'Write')) {
+            const rel = filePath.startsWith(PROJECT_ROOT)
+              ? filePath.slice(PROJECT_ROOT.length + 1)
+              : filePath;
+            result.filesModified.add(rel);
+          }
+        }
       } catch { /* skip unparseable line */ }
     }
-
-    return {
-      userTasks: userTasks.slice(-5), // Last 5 user requests
-      filesModified: Array.from(filesModified).slice(0, 15),
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Extract high-value signals from the current session.
- * Returns { decisions, constraints, openLoops, tasks, files } arrays.
- *
- * Data sources:
- * 1. Transcript (via stdin json → transcript_path) — user tasks + files modified
- * 2. Mode trace — escalation decisions
- * 3. Git diff — new TODO/FIXME/HACK annotations
- */
-function extractHighValueContent(stdinContent) {
-  const result = { decisions: [], constraints: [], openLoops: [], tasks: [], files: [] };
-
-  // Source 1: Transcript — user tasks and file changes
-  try {
-    const transcript = extractFromTranscript(stdinContent);
-    if (transcript) {
-      result.tasks = transcript.userTasks;
-      result.files = transcript.filesModified;
-    }
-  } catch { /* non-blocking */ }
-
-  // Source 2: Mode trace — escalation decisions (skip noise)
-  try {
-    const { MODE_TRACE_PATH } = require('../lib/mode-check');
-    if (fs.existsSync(MODE_TRACE_PATH)) {
-      const lines = fs.readFileSync(MODE_TRACE_PATH, 'utf8').trim().split('\n');
-      const cutoff = Date.now() - 60 * 60 * 1000; // last hour
-      for (const line of lines) {
-        try {
-          const entry = JSON.parse(line);
-          if (new Date(entry.timestamp).getTime() < cutoff) continue;
-          if (entry.prev_mode === entry.next_mode) continue;
-          if (entry.trigger === 'task-router' && entry.next_mode === 'fast') continue;
-          // Only record user-initiated or significant escalations
-          if (entry.overridden_by_user) {
-            result.decisions.push(`用户覆盖模式: ${entry.prev_mode} → ${entry.next_mode}`);
-          }
-          // Skip auto-escalation noise — it's not a real "decision"
-        } catch { /* skip malformed line */ }
-      }
-    }
-  } catch { /* mode-check not available */ }
-
-  // Source 3: Git diff — new TODO/FIXME/HACK in user code
-  if (isGitRepo()) {
-    try {
-      const { execFileSync } = require('child_process');
-      const diff = execFileSync('git', ['diff', '--cached', '--diff-filter=AM', '-U0'], {
-        encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000
-      });
-      const diffUnstaged = execFileSync('git', ['diff', '-U0'], {
-        encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000
-      });
-      const allDiff = diff + diffUnstaged;
-      let currentFile = '';
-      for (const line of allDiff.split('\n')) {
-        if (line.startsWith('diff --git')) {
-          const match = line.match(/b\/(.+)$/);
-          currentFile = match ? match[1] : '';
-        }
-        if (line.startsWith('+') && !line.startsWith('+++')) {
-          if (/\.(config|spec|test)\.[jt]sx?$/.test(currentFile)) continue;
-          if (/scripts\/|hooks\/|__tests__\/|__mocks__\//.test(currentFile)) continue;
-          const todoMatch = line.match(/^\+\s*(?:\/\/|\/?\*|#)?\s*\b(TODO|FIXME|HACK|XXX)[\s:]+(.{3,})/i);
-          if (todoMatch) {
-            const tag = todoMatch[1].toUpperCase();
-            const msg = todoMatch[2].trim().slice(0, 100);
-            if (/\b(known|tech debt|constraint|open loop)\b/i.test(msg)) continue;
-            const basename = path.basename(currentFile);
-            if (tag === 'TODO') {
-              result.openLoops.push(`${basename}: ${tag}: ${msg}`);
-            } else {
-              result.constraints.push(`${basename}: ${tag}: ${msg}`);
-            }
-          }
-        }
-      }
-    } catch { /* git diff failed — skip */ }
+  } catch (err) {
+    log(`[StopSummary] Transcript parse error: ${err.message}`);
   }
 
   return result;
 }
 
 /**
- * Write high-value memory to .memory/today.md.
- * Only writes if there's actual content worth recording.
- * If no decisions/constraints/open loops found, skips entirely — no noise.
- *
- * Only writes in Fast/Standard mode.
- * Heavy mode defers to the full Stop chain (sprint-memory, shared-memory-sync, etc.)
+ * Extract mode escalations from mode-trace.jsonl (last hour).
  */
-function writeMinimalMemory(mode, stdinContent) {
+function extractModeEscalations() {
+  const escalations = [];
+  try {
+    const { MODE_TRACE_PATH } = require('../lib/mode-check');
+    if (!fs.existsSync(MODE_TRACE_PATH)) return escalations;
+
+    const lines = fs.readFileSync(MODE_TRACE_PATH, 'utf8').trim().split('\n');
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+        if (new Date(entry.timestamp).getTime() < cutoff) continue;
+        if (entry.prev_mode === entry.next_mode) continue;
+        if (entry.trigger === 'task-router' && entry.next_mode === 'fast') continue;
+        escalations.push(
+          entry.overridden_by_user
+            ? `模式覆盖: ${entry.prev_mode} → ${entry.next_mode}`
+            : `自动升档: ${entry.prev_mode} → ${entry.next_mode} (${entry.reason})`
+        );
+      } catch { /* skip */ }
+    }
+  } catch { /* mode-check not available */ }
+  return escalations;
+}
+
+/**
+ * Extract new TODO/FIXME from git diff.
+ */
+function extractGitAnnotations() {
+  const annotations = [];
+  if (!isGitRepo()) return annotations;
+
+  try {
+    const { execFileSync } = require('child_process');
+    const diff = execFileSync('git', ['diff', '--cached', '--diff-filter=AM', '-U0'], {
+      encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000
+    });
+    const diffUnstaged = execFileSync('git', ['diff', '-U0'], {
+      encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000
+    });
+    const allDiff = diff + diffUnstaged;
+    let currentFile = '';
+    for (const line of allDiff.split('\n')) {
+      if (line.startsWith('diff --git')) {
+        const match = line.match(/b\/(.+)$/);
+        currentFile = match ? match[1] : '';
+      }
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        if (/\.(config|spec|test)\.[jt]sx?$/.test(currentFile)) continue;
+        if (/scripts\/|hooks\/|__tests__\/|__mocks__\//.test(currentFile)) continue;
+        const todoMatch = line.match(/^\+\s*(?:\/\/|\/?\*|#)?\s*\b(TODO|FIXME|HACK|XXX)[\s:]+(.{3,})/i);
+        if (todoMatch) {
+          const tag = todoMatch[1].toUpperCase();
+          const msg = todoMatch[2].trim().slice(0, 100);
+          if (/\b(known|tech debt|constraint|open loop)\b/i.test(msg)) continue;
+          annotations.push(`${path.basename(currentFile)}: ${tag}: ${msg}`);
+        }
+      }
+    }
+  } catch { /* git diff failed */ }
+  return annotations;
+}
+
+// ── Main write logic ────────────────────────────────────────────────
+
+/**
+ * Build and write session summary to .memory/today.md.
+ *
+ * Throttle: per-session ID (same session writes at most once).
+ * If no session ID available, falls back to 5-min time throttle.
+ */
+function writeSessionMemory(mode, stdinContent) {
   try {
     if (!fs.existsSync(MEMORY_DIR)) {
       fs.mkdirSync(MEMORY_DIR, { recursive: true });
     }
 
-    // Rotate first
     rotateTodayIfNeeded();
 
-    // Throttle: skip if we wrote recently (Stop fires on every response)
-    try {
-      if (fs.existsSync(WRITE_LOCK_FILE)) {
-        const lastWrite = fs.statSync(WRITE_LOCK_FILE).mtimeMs;
-        if (Date.now() - lastWrite < MIN_WRITE_INTERVAL_MS) {
-          log('[StopSummary] Throttled (wrote <5min ago), skipping');
-          return;
+    // ── Per-session throttle ──
+    const sessionId = getSessionId();
+    if (sessionId) {
+      try {
+        if (fs.existsSync(LAST_SESSION_FILE)) {
+          const lastId = fs.readFileSync(LAST_SESSION_FILE, 'utf8').trim();
+          if (lastId === sessionId) {
+            log('[StopSummary] Same session already recorded, skipping');
+            return;
+          }
         }
-      }
-    } catch { /* lock file check failed — proceed */ }
+      } catch { /* proceed */ }
+    }
 
-    // Extract high-value content
-    const { decisions, constraints, openLoops, tasks, files } = extractHighValueContent(stdinContent);
+    // ── Get transcript path from stdin ──
+    let transcriptPath = null;
+    try {
+      const input = JSON.parse(stdinContent);
+      transcriptPath = input.transcript_path;
+    } catch {
+      transcriptPath = process.env.CLAUDE_TRANSCRIPT_PATH;
+    }
 
-    // If nothing worth recording, skip entirely — no noise
-    const hasContent = tasks.length > 0 || decisions.length > 0 || constraints.length > 0 || openLoops.length > 0;
-    if (!hasContent) {
-      log('[StopSummary] No high-value content to record, skipping write');
+    // ── Gather all content sources ──
+    const transcript = parseTranscript(transcriptPath);
+    const escalations = extractModeEscalations();
+    const annotations = extractGitAnnotations();
+
+    // ── Decide if worth writing ──
+    // Only write metadata (files, escalations, annotations).
+    // Session CONTENT summaries are written by Claude in-conversation,
+    // not by this hook. This prevents noisy user-message dumps.
+    const hasFiles = transcript.filesModified.size > 0;
+    const hasEscalations = escalations.length > 0;
+    const hasAnnotations = annotations.length > 0;
+
+    if (!hasFiles && !hasEscalations && !hasAnnotations) {
+      log('[StopSummary] No metadata to record, skipping (content written by Claude)');
       return;
     }
 
-    // Ensure today.md exists with header
+    // ── Ensure today.md exists ──
     if (!fs.existsSync(TODAY_FILE)) {
       fs.writeFileSync(TODAY_FILE, `# Today — ${getLocalDateString()}\n\n## Sessions\n\n`, 'utf8');
     }
 
-    // Build entry with only non-empty sections
+    // ── Build minimal metadata entry ──
     const timestamp = getTimestamp();
-    const parts = [`### [Claude Code] ${timestamp}`];
+    const parts = [];
 
-    // User tasks — what was worked on this session
-    if (tasks.length > 0) {
-      parts.push('**Tasks:**');
-      tasks.forEach(t => parts.push(`- ${t.replace(/\n/g, ' ')}`));
+    // Files modified (max 10) — append to existing session entry if Claude already wrote one
+    if (hasFiles) {
+      const files = Array.from(transcript.filesModified)
+        .filter(f => !f.startsWith('.memory/'))  // Skip memory files themselves
+        .slice(0, 10);
+      if (files.length > 0) {
+        parts.push(`**Files:** ${files.join(', ')}`);
+      }
     }
 
-    // Files modified — what changed
-    if (files.length > 0) {
-      parts.push(`**Files:** ${files.map(f => path.basename(f)).join(', ')}`);
+    // Mode escalations
+    if (hasEscalations) {
+      escalations.forEach(e => parts.push(`- ${e}`));
     }
 
-    if (decisions.length > 0) {
-      parts.push('**Decisions:**');
-      decisions.forEach(d => parts.push(`- ${d}`));
-    }
-    if (constraints.length > 0) {
-      parts.push('**Constraints:**');
-      constraints.forEach(c => parts.push(`- ${c}`));
-    }
-    if (openLoops.length > 0) {
+    // Git annotations
+    if (hasAnnotations) {
       parts.push('**Open loops:**');
-      openLoops.forEach(o => parts.push(`- ${o}`));
+      annotations.forEach(a => parts.push(`- ${a}`));
     }
 
-    const entry = parts.join('\n') + '\n\n';
+    if (parts.length === 0) {
+      log('[StopSummary] No meaningful metadata after filtering, skipping');
+      return;
+    }
+
+    const entry = `### [Claude Code] ${timestamp}\n` + parts.join('\n') + '\n\n';
     fs.appendFileSync(TODAY_FILE, entry, 'utf8');
-    // Update throttle lock
-    try { fs.writeFileSync(WRITE_LOCK_FILE, String(Date.now()), 'utf8'); } catch {}
-    log(`[StopSummary] Appended ${tasks.length}t/${decisions.length}d/${constraints.length}c/${openLoops.length}o to ${TODAY_FILE}`);
+
+    // Update session throttle
+    if (sessionId) {
+      try { fs.writeFileSync(LAST_SESSION_FILE, sessionId, 'utf8'); } catch {}
+    }
+
+    log(`[StopSummary] Recorded: ${transcript.userTasks.length} tasks, ${transcript.filesModified.size} files, ${escalations.length} escalations`);
   } catch (err) {
     log(`[StopSummary] Memory write failed (non-blocking): ${err.message}`);
   }
@@ -372,13 +383,12 @@ function writeMinimalMemory(mode, stdinContent) {
 function main() {
   const mode = getCurrentMode();
 
-  // Always: check console.log
   checkConsoleLogs();
 
-  // Fast/Standard: write high-value memory only (with rotation)
+  // Fast/Standard: write session memory
   // Heavy: skip — the full Stop chain handles memory
   if (mode !== 'heavy') {
-    writeMinimalMemory(mode, stdinData);
+    writeSessionMemory(mode, stdinData);
   }
 
   // Push shared memory to remote (if configured)
