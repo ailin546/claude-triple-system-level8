@@ -36,6 +36,11 @@ function getClaudeDir() {
   return path.join(os.homedir(), '.claude');
 }
 
+/** ~/.memory directory (global cross-project memory) */
+function getGlobalMemoryDir() {
+  return path.join(os.homedir(), '.memory');
+}
+
 /** Project-local .claude/sessions directory */
 function getSessionsDir() {
   return path.join(getProjectRoot(), '.claude', 'sessions');
@@ -189,6 +194,7 @@ function log(msg) {
 module.exports = {
   getProjectRoot,
   getClaudeDir,
+  getGlobalMemoryDir,
   getSessionsDir,
   getLearnedSkillsDir,
   getTempDir,

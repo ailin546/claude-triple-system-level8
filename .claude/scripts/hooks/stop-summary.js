@@ -21,7 +21,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { isGitRepo, getGitModifiedFiles, readFile, log, getProjectRoot } = require('../lib/utils');
+const { isGitRepo, getGitModifiedFiles, readFile, log, getProjectRoot, getGlobalMemoryDir } = require('../lib/utils');
 
 const PROJECT_ROOT = getProjectRoot();
 const MODE_FILE = path.join(PROJECT_ROOT, '.claude', '.task-mode');
@@ -29,6 +29,8 @@ const MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
 const TODAY_FILE = path.join(MEMORY_DIR, 'today.md');
 const WEEKLY_FILE = path.join(MEMORY_DIR, 'weekly.md');
 const LAST_SESSION_FILE = path.join(PROJECT_ROOT, '.claude', '.stop-summary-session');
+const GLOBAL_MEMORY_DIR = getGlobalMemoryDir();
+const GLOBAL_INDEX_FILE = path.join(GLOBAL_MEMORY_DIR, 'index.md');
 
 // Exclusions for console.log check
 const EXCLUDED_PATTERNS = [
@@ -285,7 +287,8 @@ function extractGitAnnotations() {
 function writeSessionMemory(mode, stdinContent) {
   try {
     if (!fs.existsSync(MEMORY_DIR)) {
-      fs.mkdirSync(MEMORY_DIR, { recursive: true });
+      log('[StopSummary] .memory/ not found, skipping (only writes to existing memory dirs)');
+      return;
     }
 
     rotateTodayIfNeeded();
@@ -380,6 +383,51 @@ function writeSessionMemory(mode, stdinContent) {
   }
 }
 
+/**
+ * Update ~/.memory/index.md with current project info.
+ * Creates ~/.memory/ if it doesn't exist.
+ * Format: markdown table with project name, path, last active, has .memory/
+ */
+function updateGlobalIndex() {
+  try {
+    if (!fs.existsSync(GLOBAL_MEMORY_DIR)) {
+      fs.mkdirSync(GLOBAL_MEMORY_DIR, { recursive: true });
+    }
+
+    const projectName = path.basename(PROJECT_ROOT);
+    const hasMemory = fs.existsSync(MEMORY_DIR) ? 'Yes' : 'No';
+    const now = getLocalDateString() + ' ' + getTimestamp();
+
+    // Read existing index or create new
+    let content = '';
+    if (fs.existsSync(GLOBAL_INDEX_FILE)) {
+      content = fs.readFileSync(GLOBAL_INDEX_FILE, 'utf8');
+    }
+
+    if (!content.includes('| Project |')) {
+      // Create new index with header
+      content = `# Global Memory Index\n\n| Project | Path | Last Active | Has .memory/ |\n|---------|------|-------------|-------------|\n`;
+    }
+
+    // Check if project already has a row — update it
+    const escapedPath = PROJECT_ROOT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rowRegex = new RegExp(`^\\|[^|]*\\|\\s*${escapedPath}\\s*\\|.*$`, 'm');
+
+    const newRow = `| ${projectName} | ${PROJECT_ROOT} | ${now} | ${hasMemory} |`;
+
+    if (rowRegex.test(content)) {
+      content = content.replace(rowRegex, newRow);
+    } else {
+      content = content.trimEnd() + '\n' + newRow + '\n';
+    }
+
+    fs.writeFileSync(GLOBAL_INDEX_FILE, content, 'utf8');
+    log(`[StopSummary] Global index updated: ${projectName}`);
+  } catch (err) {
+    log(`[StopSummary] Global index update failed (non-blocking): ${err.message}`);
+  }
+}
+
 function main() {
   const mode = getCurrentMode();
 
@@ -390,6 +438,9 @@ function main() {
   if (mode !== 'heavy') {
     writeSessionMemory(mode, stdinData);
   }
+
+  // Update global memory index (~/.memory/index.md)
+  updateGlobalIndex();
 
   // Push shared memory to remote (if configured)
   try {

@@ -18,18 +18,27 @@ const fs = require('fs');
 try {
   const { requireMode } = require('../lib/mode-check');
   if (!requireMode('heavy')) {
+    // Pass through stdin → stdout and exit (skip in non-heavy modes)
     let d = '';
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', c => { d += c; });
     process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+    // Cannot use `return` at top level when run as script (SyntaxError → catch → runs anyway)
+    // Instead, prevent the rest of the file from executing by never reaching it:
+    module.exports = {};  // no-op marker
     return;
   }
-} catch {
-  // mode-check not available — default to skip (safe: don't run Heavy hooks in unknown mode)
+} catch (err) {
+  // If mode-check failed due to top-level return SyntaxError or missing module,
+  // default to skipping (not running) to prevent noise in non-heavy modes
   let d = '';
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', c => { d += c; });
-  process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+  process.stdin.on('end', () => {
+    process.stderr.write(`[shared-memory-sync] Mode gate error, skipping: ${err.message}\n`);
+    process.stdout.write(d);
+    process.exit(0);
+  });
   return;
 }
 // ─────────────────────────────────────────────────────────────
@@ -170,7 +179,7 @@ function extractSummaryFromStdin(stdinData) {
 
 function main(stdinData) {
   if (!fs.existsSync(MEMORY_DIR)) {
-    console.error('[SharedMemorySync] warn: .memory/ directory not found, shared memory write skipped');
+    // .memory dir doesn't exist — skip silently
     return;
   }
 
@@ -190,20 +199,18 @@ function main(stdinData) {
     todayContent = createTodayTemplate(today);
   }
 
-  // Append session entry — only if we have meaningful content
-  // Stop hooks fire on every response, so skip empty/low-value entries
+  // Append session entry
   const summary = extractSummaryFromStdin(stdinData);
   if (summary) {
     const entry = `\n### [Claude Code] ${time}\n- ${summary}\n`;
     todayContent += entry;
-    fs.writeFileSync(TODAY_FILE, todayContent, 'utf8');
   } else {
-    // No summary available — only write if today.md was rotated (new file)
-    // Don't append "Session ended" noise on every response
-    if (!fs.existsSync(TODAY_FILE) || todayContent === createTodayTemplate(today)) {
-      fs.writeFileSync(TODAY_FILE, todayContent, 'utf8');
-    }
+    // Minimal entry — just mark that a session happened
+    const entry = `\n### [Claude Code] ${time}\n- Session ended\n`;
+    todayContent += entry;
   }
+
+  fs.writeFileSync(TODAY_FILE, todayContent, 'utf8');
 }
 
 // Read stdin (Claude Code hook protocol) then run
@@ -220,19 +227,5 @@ process.stdin.on('end', () => {
   try { main(stdinData); } catch (err) {
     console.error('[SharedMemorySync] Error:', err.message);
   }
-
-  // Push shared memory to remote (if configured)
-  try {
-    const memorySync = require('../lib/memory-sync');
-    if (memorySync.isEnabled()) {
-      memorySync.push();
-      console.error('[SharedMemorySync] Memory sync: pushed to remote');
-    }
-  } catch (err) {
-    console.error(`[SharedMemorySync] Memory sync push skipped: ${err.message}`);
-  }
-
-  // Pass through stdin for downstream hooks
-  process.stdout.write(stdinData);
   process.exit(0);
 });

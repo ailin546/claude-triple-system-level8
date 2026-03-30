@@ -216,7 +216,55 @@ function buildStructuredSummary(rawContent) {
 // ── Shared Memory ────────────────────────────────────────────
 
 const MEMORY_DIR = path.join(process.cwd(), '.memory');
+const GLOBAL_MEMORY_DIR = path.join(
+  process.env.HOME || process.env.USERPROFILE || '/tmp',
+  '.memory'
+);
 const MAX_MEMORY_BYTES = 1024; // Cap each memory file excerpt
+
+/**
+ * Read global memory (~/.memory/) and inject into context.
+ * Reads: long-term.md → today.md (no weekly at global level).
+ * Non-blocking: missing dir/files are silently skipped.
+ */
+function loadGlobalMemory() {
+  if (!fs.existsSync(GLOBAL_MEMORY_DIR)) {
+    log('[SessionStart] ~/.memory/ not found, skipping global memory');
+    return;
+  }
+
+  const memoryFiles = [
+    { name: 'long-term.md', label: 'Global long-term' },
+    { name: 'today.md', label: 'Global today' },
+  ];
+
+  const parts = [];
+  for (const { name, label } of memoryFiles) {
+    const filePath = path.join(GLOBAL_MEMORY_DIR, name);
+    const content = readFile(filePath);
+    if (!content || !content.trim()) continue;
+
+    const lines = content.split('\n');
+    const bodyLines = lines.filter(l => !l.startsWith('# ') && !l.startsWith('> '));
+    const body = bodyLines.join('\n').trim();
+    if (!body || body === '## Sessions') continue;
+
+    let excerpt = body;
+    if (Buffer.byteLength(excerpt, 'utf8') > MAX_MEMORY_BYTES) {
+      const buf = Buffer.from(excerpt, 'utf8');
+      let end = MAX_MEMORY_BYTES - 3;
+      while (end > 0 && (buf[end] & 0xC0) === 0x80) end--;
+      excerpt = buf.subarray(0, end).toString('utf8') + '...';
+    }
+
+    parts.push(`**${label}:**\n${excerpt}`);
+  }
+
+  if (parts.length > 0) {
+    output(`## Global Memory\n${parts.join('\n\n')}`);
+    log(`[SessionStart] Loaded ${parts.length} global memory file(s)`);
+  }
+}
 
 /**
  * Read shared memory files and inject a compact summary.
@@ -287,7 +335,10 @@ async function main() {
     log(`[SessionStart] Memory sync pull skipped: ${err.message}`);
   }
 
-  // Load shared memory (long-term → weekly → today)
+  // Load global memory (~/.memory/) first
+  loadGlobalMemory();
+
+  // Load project-local shared memory (long-term → weekly → today)
   loadSharedMemory();
 
   // Load most recent session — inject structured summary, not full text
