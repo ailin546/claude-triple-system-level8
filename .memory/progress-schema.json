@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "progress.json",
+  "title": "Structured Progress File",
+  "description": "Agent-optimized 结构化进度文件，用于跨 session 上下文恢复。灵感来自 Anthropic 的 claude-progress.txt + feature_list.json 设计。",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema 版本号"
+    },
+    "project_goal": {
+      "type": "string",
+      "description": "当前项目/sprint 的总体目标（一句话）"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "最后更新时间 (ISO 8601)"
+    },
+    "session_state": {
+      "type": "string",
+      "enum": ["clean", "broken", "in_progress"],
+      "description": "上次会话结束时代码库状态。clean=可运行可提交, broken=有失败的测试或构建错误, in_progress=功能未完成但代码不坏"
+    },
+    "current_feature": {
+      "type": ["object", "null"],
+      "description": "正在进行的功能（如果有）",
+      "properties": {
+        "name": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["planning", "implementing", "evaluating", "done"]
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "description": "如 AC-1" },
+              "description": { "type": "string" },
+              "priority": { "type": "string", "enum": ["MUST", "SHOULD"] },
+              "status": { "type": "string", "enum": ["pending", "pass", "fail"] }
+            },
+            "required": ["id", "description", "priority", "status"]
+          }
+        },
+        "evaluation_round": {
+          "type": "integer",
+          "description": "当前评估轮次（0 = 尚未评估）"
+        }
+      },
+      "required": ["name", "status"]
+    },
+    "completed_features": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "已完成的功能列表（简短名称）"
+    },
+    "blockers": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "当前阻塞问题"
+    },
+    "next_steps": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "下一步行动（优先级排序）"
+    }
+  },
+  "required": ["version", "last_updated", "session_state"]
+}
