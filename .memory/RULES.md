@@ -31,7 +31,7 @@
 
 **用途**：跨 session 快速恢复上下文，比读散文效率高。
 
-**读取时机**：`session-start.js` 在读取 today.md 之前先读 progress.json。
+**读取时机**：Claude 在每次会话开始时手动读取 progress.json（`session-start.js` 集成待实现）。
 
 **写入时机**：
 - 功能状态变更时（planning → implementing → evaluating → done）
