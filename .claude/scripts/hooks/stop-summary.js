@@ -113,12 +113,6 @@ function checkConsoleLogs() {
 // ── Main memory logic ────────────────────────────────────────────────
 
 /**
- * Build and write session summary to .memory/today.md.
- *
- * Throttle: per-session ID (same session writes at most once).
- * If no session ID available, falls back to 5-min time throttle.
- */
-/**
  * Handle .memory/today.md maintenance — rotation only, NO content writing.
  *
  * All session content is written by Claude in-conversation (see rules/common/session-memory.md).
@@ -184,6 +178,102 @@ function updateGlobalIndex() {
   }
 }
 
+// ── Error Lessons Auto-Promote ───────────────────────────────
+
+const PROMOTE_LOCK = path.join(PROJECT_ROOT, '.claude', '.promote-lock');
+const PROMOTE_MARKER = '[auto]';
+
+/**
+ * Scan .memory/ files for repeated "→" pattern lessons.
+ * If a lesson appears 2+ times across memory files, auto-append to CLAUDE.md.
+ * Runs at most once per day (lock file).
+ * Writes to BOTH CLAUDE.md files (root + .claude/) for consistency.
+ */
+function promoteLessons() {
+  try {
+    // Daily throttle
+    if (fs.existsSync(PROMOTE_LOCK)) {
+      const lockDate = fs.readFileSync(PROMOTE_LOCK, 'utf8').trim();
+      if (lockDate === getLocalDateString()) return;
+    }
+
+    // Scan memory files for "→" pattern lessons
+    const memoryFiles = [TODAY_FILE, WEEKLY_FILE, path.join(MEMORY_DIR, 'long-term.md')];
+    const lessonCounts = {};  // lesson text → count
+
+    for (const file of memoryFiles) {
+      if (!fs.existsSync(file)) continue;
+      const content = fs.readFileSync(file, 'utf8');
+      const lines = content.split('\n');
+      for (const line of lines) {
+        // Match lines with → pattern (error → fix format)
+        const match = line.match(/^-\s+(.+→.+)$/);
+        if (match) {
+          const lesson = match[1].trim();
+          // Skip already-promoted lessons and very short ones
+          if (lesson.includes(PROMOTE_MARKER)) continue;
+          if (lesson.length < 10) continue;
+          lessonCounts[lesson] = (lessonCounts[lesson] || 0) + 1;
+        }
+      }
+    }
+
+    // Find lessons appearing 2+ times
+    const candidates = Object.entries(lessonCounts)
+      .filter(([, count]) => count >= 2)
+      .map(([lesson]) => lesson)
+      .slice(0, 5);  // Max 5 per day
+
+    if (candidates.length === 0) {
+      // Touch lock even if nothing to promote (prevent re-scanning today)
+      fs.writeFileSync(PROMOTE_LOCK, getLocalDateString(), 'utf8');
+      return;
+    }
+
+    // Read CLAUDE.md and check which lessons are already there
+    const claudeMdFiles = [
+      path.join(PROJECT_ROOT, 'CLAUDE.md'),
+      path.join(PROJECT_ROOT, '.claude', 'CLAUDE.md'),
+    ];
+
+    const rootClaudeMd = claudeMdFiles[0];
+    if (!fs.existsSync(rootClaudeMd)) {
+      fs.writeFileSync(PROMOTE_LOCK, getLocalDateString(), 'utf8');
+      return;
+    }
+
+    const claudeContent = fs.readFileSync(rootClaudeMd, 'utf8');
+    const today = getLocalDateString();
+    const newLessons = candidates.filter(lesson => !claudeContent.includes(lesson));
+
+    if (newLessons.length === 0) {
+      fs.writeFileSync(PROMOTE_LOCK, getLocalDateString(), 'utf8');
+      return;
+    }
+
+    // Append to both CLAUDE.md files
+    const entries = newLessons.map(l => `- [${today}] ${l} ${PROMOTE_MARKER}`).join('\n');
+    const marker = '<!-- 新错误追加在此行下方 -->';
+
+    for (const file of claudeMdFiles) {
+      if (!fs.existsSync(file)) continue;
+      let content = fs.readFileSync(file, 'utf8');
+      if (content.includes(marker)) {
+        content = content.replace(marker, `${marker}\n${entries}`);
+      } else {
+        // Fallback: append before Sources section
+        content = content.replace(/\n---\n\n## Sources/, `\n${entries}\n\n---\n\n## Sources`);
+      }
+      fs.writeFileSync(file, content, 'utf8');
+    }
+
+    log(`[StopSummary] Promoted ${newLessons.length} lesson(s) to CLAUDE.md`);
+    fs.writeFileSync(PROMOTE_LOCK, getLocalDateString(), 'utf8');
+  } catch (err) {
+    log(`[StopSummary] Lesson promotion error (non-blocking): ${err.message}`);
+  }
+}
+
 function main() {
   checkConsoleLogs();
 
@@ -192,6 +282,9 @@ function main() {
 
   // Update global memory index (~/.memory/index.md)
   updateGlobalIndex();
+
+  // Auto-promote repeated error lessons to CLAUDE.md (daily)
+  promoteLessons();
 
   // Push shared memory to remote (if configured)
   try {

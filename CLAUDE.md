@@ -142,9 +142,9 @@ PROJECT/.memory/                    ← 项目级（各项目独立）
 - 配置存储在 `.claude/.memory-remote`（不入库）
 - 未配置时所有同步逻辑为 no-op，不影响现有行为
 
-**自动沉淀到 CLAUDE.md**（Heavy 模式，每日一次）：
-- `memory-promote.js` 扫描记忆文件中的重复模式和教训
-- 出现 2+ 次的决策或显式 `→` 格式教训自动写入 CLAUDE.md 错误教训日志
+**自动沉淀到 CLAUDE.md**（每日一次）：
+- `stop-summary.js` 扫描记忆文件中的重复模式和教训
+- 出现 2+ 次的显式 `→` 格式教训自动写入 CLAUDE.md 错误教训日志
 - 写入条目带 `[auto]` 标记，每次最多 5 条
 
 详细规则见 `.memory/RULES.md`。

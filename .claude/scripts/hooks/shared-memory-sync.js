@@ -199,17 +199,10 @@ function main(stdinData) {
     todayContent = createTodayTemplate(today);
   }
 
-  // Append session entry
-  const summary = extractSummaryFromStdin(stdinData);
-  if (summary) {
-    const entry = `\n### [Claude Code] ${time}\n- ${summary}\n`;
-    todayContent += entry;
-  } else {
-    // Minimal entry — just mark that a session happened
-    const entry = `\n### [Claude Code] ${time}\n- Session ended\n`;
-    todayContent += entry;
-  }
-
+  // In dual-track model, session content is written by Claude in-conversation.
+  // This hook only handles rotation (above). No content appended to today.md.
+  // stop-summary.js handles rotation for Fast/Standard modes.
+  // This hook handles rotation for Heavy mode (where stop-summary skipped it before).
   fs.writeFileSync(TODAY_FILE, todayContent, 'utf8');
 }
 
