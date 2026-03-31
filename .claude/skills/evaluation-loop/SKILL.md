@@ -44,7 +44,7 @@ Generator 完成功能
 │ Step 2: E2E 验证（有前端时触发）          │
 │  → 调用 e2e-runner Agent                 │
 │  → 使用 Playwright MCP 交互实际应用       │
-│  → 截图存到 .claude/shared-state/artifacts/│
+│  → 截图存到项目临时目录或 artifacts/       │
 │  → 无前端变更 → 跳过                     │
 └────────────────┬────────────────────────┘
                  │
