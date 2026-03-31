@@ -112,7 +112,7 @@ Generator 完成功能
 Evaluator **禁止**：
 - 自行发明评分标准
 - 给出不基于证据的评价
-- 评分高于 B+ 除非有截图 + 测试 + 覆盖率三重证据
+- 违反 `evaluation-rubric.md` 中的禁止行为（包括无压倒性证据给满分）
 
 ## 与现有工具的关系
 
@@ -125,6 +125,7 @@ Evaluator **禁止**：
 | `qa-health-score` Skill | 可选——最终评分 | 在 /verify 阶段调用 |
 | TDD 流程 | 微观循环（函数级） | evaluation-loop 是宏观循环（功能级） |
 | `code-reviewer` Agent | 工程质量审查 | evaluation-loop 之后、/verify 之前 |
+| `ecc-eval-harness` Skill | 开发阶段 eval 框架（pass@k） | 互补：eval-harness 管"能力回归测试"，evaluation-loop 管"功能验收循环" |
 
 ```
 层级关系：

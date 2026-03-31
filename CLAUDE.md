@@ -51,7 +51,7 @@ User Request: "给用户系统加上OAuth登录"
 **推荐命令链**：
 - Fast：直接做 → `/verify`
 - Standard：`/plan` → 实施 → `/verify`
-- Heavy：`/plan` → `/tdd` → 实施 → `/code-review` → `/verify`
+- Heavy：`/plan` → `/tdd` → 实施 → `evaluation-loop` → `/code-review` → `/verify`
 
 ---
 
