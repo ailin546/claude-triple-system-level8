@@ -94,38 +94,25 @@ Agent (planner):
 
 ## Implementation Phases
 
-### Phase 1: Database Schema
-- Add notifications table with columns: id, user_id, market_id, type, status, created_at
-- Add user_notification_preferences table for channel preferences
-- Create indexes on user_id and market_id for performance
+### Phase 1: 通知数据持久化
+- 存储通知记录及用户通知偏好
+- 支持按用户和市场快速查询
 
-### Phase 2: Notification Service
-- Create notification service in lib/notifications.ts
-- Implement notification queue using BullMQ/Redis
-- Add retry logic for failed deliveries
-- Create notification templates
+### Phase 2: 通知触发与投递
+- 市场 resolve 时可靠地通知所有持仓用户
+- 投递失败时自动重试
+- 支持多种通知渠道（应用内、邮件、webhook）
 
-### Phase 3: Integration Points
-- Hook into market resolution logic (when status changes to "resolved")
-- Query all users with positions in market
-- Enqueue notifications for each user
-
-### Phase 4: Frontend Components
-- Create NotificationBell component in header
-- Add NotificationList modal
-- Implement real-time updates via Supabase subscriptions
-- Add notification preferences page
-
-## Dependencies
-- Redis (for queue)
-- Email service (SendGrid/Resend)
-- Supabase real-time subscriptions
+### Phase 3: 前端通知入口
+- 用户可查看自己的通知列表
+- 通知实时推送到客户端
+- 支持通知偏好设置
 
 ## Risks
-- HIGH: Email deliverability (SPF/DKIM required)
-- MEDIUM: Performance with 1000+ users per market
-- MEDIUM: Notification spam if markets resolve frequently
-- LOW: Real-time subscription overhead
+- HIGH: 邮件投递可靠性（需 SPF/DKIM 配置）
+- MEDIUM: 大量用户（1000+）同时通知的性能
+- MEDIUM: 频繁 resolve 导致通知泛滥
+- LOW: 实时推送连接开销
 
 ## Acceptance Criteria
 
