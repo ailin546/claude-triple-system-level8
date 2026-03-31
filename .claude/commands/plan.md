@@ -13,10 +13,11 @@ This command invokes the **planner** agent to create a comprehensive implementat
 
 ## What This Command Does
 
-1. **Restate Requirements** - Clarify what needs to be built
+1. **Restate Requirements** - Clarify what needs to be built (What & Why)
 2. **Identify Risks** - Surface potential issues and blockers
 3. **Create Step Plan** - Break down implementation into phases
-4. **Wait for Confirmation** - MUST receive user approval before proceeding
+4. **Define Acceptance Criteria** - Concrete, verifiable conditions for "done"
+5. **Wait for Confirmation** - MUST receive user approval before proceeding
 
 ## When to Use
 
@@ -36,7 +37,46 @@ The planner agent will:
 3. **Identify dependencies** between components
 4. **Assess risks** and potential blockers
 5. **Estimate complexity** (High/Medium/Low)
-6. **Present the plan** and WAIT for your explicit confirmation
+6. **Output Acceptance Criteria** with MUST/SHOULD priority (see below)
+7. **Present the plan** and WAIT for your explicit confirmation
+
+## Planner Constraints
+
+**聚焦 What 和 Why，不指定 How。**
+
+Planner 的职责是定义产品需求和验收标准，不是规定技术实现细节。
+
+- ✅ "用户可以通过 Google OAuth 登录" (What)
+- ✅ "需要 OAuth 是因为减少密码管理负担" (Why)
+- ❌ "使用 passport.js 的 GoogleStrategy，配置 callback URL 为 /auth/callback" (How)
+
+**原因**：Anthropic 的经验表明，当 Planner 包含细粒度技术实现细节时，这些细节会级联错误到 Generator 的工作中。让实施者自行决定技术方案，Planner 只负责定义"做什么"和"怎样算完成"。
+
+## Acceptance Criteria 格式
+
+每个 Plan 必须包含 `## Acceptance Criteria` 段落，供 evaluation-loop skill 验证：
+
+```markdown
+## Acceptance Criteria
+
+### MUST (硬性，不通过则 FAIL)
+- [ ] AC-1: [具体的、可验证的条件]
+- [ ] AC-2: [具体的、可验证的条件]
+
+### SHOULD (软性，不通过仅建议修改)
+- [ ] AC-3: [期望达到的条件]
+- [ ] AC-4: [期望达到的条件]
+```
+
+**好的 AC**：具体、可验证、无歧义
+- ✅ "用户点击 Google 登录按钮后跳转到 Google 授权页面"
+- ✅ "登录成功后返回应用首页，显示用户头像"
+- ✅ "登录失败时显示错误提示，不跳转"
+
+**差的 AC**：模糊、不可验证
+- ❌ "登录体验流畅"
+- ❌ "代码质量好"
+- ❌ "性能可接受"
 
 ## Example Usage
 
@@ -87,11 +127,20 @@ Agent (planner):
 - MEDIUM: Notification spam if markets resolve frequently
 - LOW: Real-time subscription overhead
 
+## Acceptance Criteria
+
+### MUST
+- [ ] AC-1: 用户点击通知铃铛图标，弹出通知列表
+- [ ] AC-2: 市场 resolve 后 30s 内，相关用户收到通知
+- [ ] AC-3: 通知包含市场名称、结果和用户持仓结果
+- [ ] AC-4: 所有新增 API 端点有对应测试
+
+### SHOULD
+- [ ] AC-5: 支持邮件通知渠道
+- [ ] AC-6: 用户可配置通知偏好
+- [ ] AC-7: 通知列表支持"标记已读"
+
 ## Estimated Complexity: MEDIUM
-- Backend: 4-6 hours
-- Frontend: 3-4 hours
-- Testing: 2-3 hours
-- Total: 9-13 hours
 
 **WAITING FOR CONFIRMATION**: Proceed with this plan? (yes/no/modify)
 ```
@@ -110,7 +159,9 @@ If you want changes, respond with:
 After planning:
 - Use `/tdd` to implement with test-driven development
 - Use `/build-fix` if build errors occur
+- Use `evaluation-loop` skill to run Generator-Evaluator feedback cycle against Acceptance Criteria
 - Use `/code-review` to review completed implementation
+- Use `/verify` for final objective checks
 
 ## Related Agents
 

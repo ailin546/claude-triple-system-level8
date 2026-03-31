@@ -8,10 +8,12 @@
 
 ```
 {project}/.memory/
-├── RULES.md       ← 本文件：使用规则（只读）
-├── today.md       ← 短期：当日工作日志
-├── weekly.md      ← 中期：本周摘要（保留 2 周）
-└── long-term.md   ← 长期：永久知识库
+├── RULES.md              ← 本文件：使用规则（只读）
+├── today.md              ← 短期：当日工作日志（人类可读叙述）
+├── weekly.md             ← 中期：本周摘要（保留 2 周）
+├── long-term.md          ← 长期：永久知识库
+├── progress.json         ← 结构化进度文件（Agent 可读，跨 session 恢复用）
+└── progress-schema.json  ← progress.json 的 JSON Schema
 ```
 
 ## 核心规则
@@ -22,6 +24,48 @@
 1. `long-term.md` — 了解项目全貌和核心约定
 2. `weekly.md` — 了解本周进展和决策
 3. `today.md` — 了解今日已完成的工作，避免重复
+
+### 1.5 结构化进度文件：progress.json
+
+`progress.json` 是 Agent 优化的结构化进度文件，补充 today.md 的人类可读叙述。
+
+**用途**：跨 session 快速恢复上下文，比读散文效率高。
+
+**读取时机**：`session-start.js` 在读取 today.md 之前先读 progress.json。
+
+**写入时机**：
+- 功能状态变更时（planning → implementing → evaluating → done）
+- 会话结束时更新 `session_state`（clean / broken / in_progress）
+- evaluation-loop 更新 acceptance criteria 的 pass/fail 状态
+
+**与 today.md 的关系**：
+- `progress.json` 记机器可读的状态（JSON 格式，模型不易乱改）
+- `today.md` 记人类可读的叙述（决策、约束、Open Loops）
+- 两者互补，不互相替代
+
+**Schema**：见 `progress-schema.json`。
+
+**示例**：
+```json
+{
+  "version": 1,
+  "project_goal": "为用户系统添加 OAuth 登录",
+  "last_updated": "2026-03-31T10:30:00Z",
+  "session_state": "clean",
+  "current_feature": {
+    "name": "Google OAuth 集成",
+    "status": "evaluating",
+    "acceptance_criteria": [
+      {"id": "AC-1", "description": "用户可点击 Google 登录按钮", "priority": "MUST", "status": "pass"},
+      {"id": "AC-2", "description": "登录失败显示错误提示", "priority": "MUST", "status": "fail"}
+    ],
+    "evaluation_round": 1
+  },
+  "completed_features": ["用户注册", "密码登录"],
+  "blockers": [],
+  "next_steps": ["修复 AC-2 错误提示", "添加 GitHub OAuth"]
+}
+```
 
 ### 2. 会话过程中：实时更新 today.md
 
