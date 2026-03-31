@@ -46,7 +46,12 @@ The Feature Implementation Workflow describes the development pipeline: research
    - Address CRITICAL and HIGH issues
    - Fix MEDIUM issues when possible
 
-5. **Commit & Push**
+5. **Verify** (`/verify pre-pr`)
+   - Build + types + lint + tests + security scan
+   - If `/plan` has Acceptance Criteria → 自动触发 `evaluation-loop`（独立 Evaluator 评估）
+   - 标准见 `evaluation-rubric.md`
+
+6. **Commit & Push**
    - Detailed commit messages
    - Follow conventional commits format
    - See [git-workflow.md](./git-workflow.md) for commit message format and PR process

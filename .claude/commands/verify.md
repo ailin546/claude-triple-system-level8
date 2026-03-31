@@ -66,7 +66,7 @@ $ARGUMENTS can be:
 - `quick` - Only build + types
 - `full` - All checks (default)
 - `pre-commit` - Checks relevant for commits
-- `pre-pr` - Full checks plus security scan
+- `pre-pr` - Full checks + security scan; if `/plan` has Acceptance Criteria → auto-trigger `evaluation-loop`
 - `fault` - Fault scenario analysis (see below)
 
 ## Fault Mode (`/verify fault`)
