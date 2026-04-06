@@ -1,6 +1,8 @@
 # Task Routing — 三档模式分流
 
-> 每个任务开始时，自动判定流程强度。详细设计见 `docs/claude-triple-system-level8-redesign/routing.md`。
+> **[MANDATORY] 每条用户消息的回复必须以模式摘要开头。无一例外。**
+> 格式：`[Mode: Fast/Standard/Heavy] 原因`
+> 即使是后续消息、追问、或同一任务的延续，也必须输出。漏掉 = 违规。
 
 ## 模式定义
 
@@ -58,9 +60,9 @@
 
 ## 路由器输出与模式写入
 
-每个任务开始时必须执行两步：
+**[MANDATORY] 每条回复的第一行必须是模式摘要。** 这不是建议，是硬性要求。
 
-**Step 1：输出模式摘要**
+**Step 1：输出模式摘要**（每条回复都要）
 ```text
 [Mode: Fast/Standard/Heavy] 原因 | 自动启用项 | 建议命令
 ```

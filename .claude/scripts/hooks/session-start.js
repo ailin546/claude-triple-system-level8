@@ -374,6 +374,11 @@ async function main() {
   const pm = getPackageManager();
   log(`[SessionStart] Package manager: ${pm.name} (${pm.source})`);
 
+  // Output host identifier for multi-machine collaboration
+  const hostname = require('os').hostname();
+  output(`Host: ${hostname}`);
+  log(`[SessionStart] Host: ${hostname}`);
+
   // Detect project type
   const projectInfo = detectProjectType();
   if (projectInfo.languages.length > 0 || projectInfo.frameworks.length > 0) {
