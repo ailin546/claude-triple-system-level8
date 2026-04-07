@@ -11,14 +11,15 @@ The visual counterpart of `/code-review`.
 ## Process
 
 1. Read the skill at `.claude/skills/design-review/SKILL.md`
-2. Execute the 7-step workflow defined there:
+2. Execute the 8-step workflow defined there:
    - **Step 1**: Identify changed UI files (css, tsx, jsx, vue, svelte, html)
-   - **Step 2**: Design token compliance (no hardcoded colors, spacing, fonts)
-   - **Step 3**: Accessibility audit (WCAG AA checklist)
-   - **Step 4**: Responsive design check (320px to 1920px)
-   - **Step 5**: Visual consistency (typography, spacing rhythm, states)
-   - **Step 6**: Performance impact (CSS size, heavy filters, images)
-   - **Step 7**: Generate report with severity ratings
+   - **Step 2**: DESIGN.md conformance (if project has one — validate against spec)
+   - **Step 3**: Design token compliance (no hardcoded colors, spacing, fonts)
+   - **Step 4**: Accessibility audit (WCAG AA checklist)
+   - **Step 5**: Responsive design check (320px to 1920px)
+   - **Step 6**: Visual consistency (typography, spacing rhythm, states)
+   - **Step 7**: Performance impact (CSS size, heavy filters, images)
+   - **Step 8**: Generate report with severity ratings
 
 ## Quick Checks
 

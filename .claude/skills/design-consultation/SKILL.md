@@ -26,15 +26,38 @@ accessibility, and brand concerns upfront.
 Collect information about the design task:
 
 1. **User request** — What is being built or changed?
-2. **Existing design tokens** — Check for CSS variables, theme files, design system:
+2. **DESIGN.md baseline** — Check for project-level design spec:
+   ```bash
+   # Check for DESIGN.md (awesome-design-md format)
+   ls DESIGN.md design.md 2>/dev/null
+   ```
+   If `DESIGN.md` exists, load it as the **primary design constraint**. All agent
+   recommendations in Step 2 must align with its 9 sections:
+   - Visual Theme & Atmosphere → overall mood and aesthetic direction
+   - Color Palette & Roles → exact color values and usage rules
+   - Typography Rules → font families, sizes, weights, line-heights
+   - Component Stylings → button, card, input, nav patterns
+   - Layout Principles → grid, spacing, container widths
+   - Depth & Elevation → shadows, borders, layering
+   - Design Do's and Don'ts → explicit constraints
+   - Responsive Behavior → breakpoints and adaptation rules
+   - Agent Prompt Guide → direct instructions for AI implementation
+
+   If no `DESIGN.md` exists, proceed with discovery (steps 2b–2d below).
+
+   > **Tip**: To bootstrap a DESIGN.md, copy one from
+   > [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md)
+   > (58+ brand templates, MIT) and customize to your project.
+
+3. **Existing design tokens** — Check for CSS variables, theme files, design system:
    ```bash
    # Find existing design tokens
    find . -name "*.css" -o -name "*.scss" -o -name "*.less" | head -20
    grep -r "var(--" --include="*.css" -l 2>/dev/null | head -10
    grep -r "design-system\|tokens\|theme" --include="*.{css,json,ts,js}" -l 2>/dev/null | head -10
    ```
-3. **Tech stack** — Framework (React/Vue/Svelte/vanilla), CSS approach (Tailwind/modules/BEM)
-4. **Target devices** — Mobile-first? Desktop-only? Both?
+4. **Tech stack** — Framework (React/Vue/Svelte/vanilla), CSS approach (Tailwind/modules/BEM)
+5. **Target devices** — Mobile-first? Desktop-only? Both?
 
 ### Step 2: Dispatch Parallel Design Agents
 
@@ -47,6 +70,10 @@ Launch 3 specialized agents in parallel for independent perspectives:
 | `design-ux-researcher` | User Perspective | User needs, cognitive load, task completion, usability patterns |
 
 Each agent receives the same context and independently produces recommendations.
+
+> **When DESIGN.md exists**: Agents must treat it as the source of truth for colors,
+> typography, spacing, and component patterns. Recommendations should extend or
+> apply the spec, not contradict it. Flag any conflicts explicitly.
 
 ### Step 3: Accessibility Gate
 

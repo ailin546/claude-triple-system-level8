@@ -29,9 +29,37 @@ BASE=$(git merge-base HEAD origin/main 2>/dev/null || echo "origin/main")
 git diff --name-only $BASE...HEAD | grep -E '\.(css|scss|less|tsx|jsx|vue|svelte|html|styl)$'
 ```
 
-### Step 2: Design Token Compliance
+### Step 2: DESIGN.md Conformance (if exists)
 
-Check that implementations use design tokens instead of hardcoded values:
+If the project root contains a `DESIGN.md` (e.g. from
+[awesome-design-md](https://github.com/VoltAgent/awesome-design-md)), validate
+changed files against its specification:
+
+```bash
+# Check for DESIGN.md
+ls DESIGN.md design.md 2>/dev/null
+```
+
+When present, verify each section:
+
+| DESIGN.md Section | What to Check |
+|-------------------|---------------|
+| Color Palette & Roles | Used colors match spec values; semantic roles respected |
+| Typography Rules | Font families, weights, sizes match spec |
+| Component Stylings | Buttons, cards, inputs follow spec patterns |
+| Layout Principles | Grid, spacing, container widths align with spec |
+| Depth & Elevation | Shadows and borders match spec definitions |
+| Design Do's and Don'ts | No violations of explicit prohibitions |
+| Responsive Behavior | Breakpoints match spec definitions |
+
+**Severity**: Deviation from DESIGN.md spec = **HIGH** (design system violation).
+
+> If no DESIGN.md exists, skip this step silently.
+
+### Step 3: Design Token Compliance
+
+Check that implementations use design tokens instead of hardcoded values (when no
+DESIGN.md, this remains the primary color/spacing validation):
 
 | Check | Bad | Good |
 |-------|-----|------|
@@ -55,7 +83,7 @@ grep -rn 'margin\|padding\|gap' --include="*.css" --include="*.scss" | grep -E '
 grep -rn 'font-size' --include="*.css" --include="*.scss" | grep -E '[0-9]+px' | grep -v 'var('
 ```
 
-### Step 3: Accessibility Audit
+### Step 4: Accessibility Audit
 
 Run checks against WCAG AA standards:
 
@@ -81,7 +109,7 @@ npx axe <url> 2>/dev/null || echo "axe not available"
 | 9 | `prefers-reduced-motion` respected | MEDIUM | Search for animations without media query |
 | 10 | Logical tab order | MEDIUM | Verify tabindex usage |
 
-### Step 4: Responsive Design Check
+### Step 5: Responsive Design Check
 
 Verify responsive behavior at standard breakpoints:
 
@@ -98,7 +126,7 @@ Check for:
 - Touch target sizes on mobile
 - Grid/flex layout behavior at breakpoints
 
-### Step 5: Visual Consistency
+### Step 6: Visual Consistency
 
 | Check | What to Look For |
 |-------|-----------------|
@@ -111,7 +139,7 @@ Check for:
 | Empty states | Meaningful messaging when no data |
 | Error states | Clear error display with recovery actions |
 
-### Step 6: Performance Impact
+### Step 7: Performance Impact
 
 ```bash
 # Check CSS bundle size impact
@@ -124,7 +152,7 @@ grep -rn 'box-shadow\|filter\|backdrop-filter\|will-change' --include="*.css" --
 git diff --name-only $BASE...HEAD | grep -E '\.(png|jpg|jpeg|gif|svg|webp)$'
 ```
 
-### Step 7: Output Report
+### Step 8: Output Report
 
 ```
 ## Design Review Report
