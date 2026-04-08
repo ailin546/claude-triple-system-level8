@@ -20,9 +20,12 @@ const path = require('path');
 // ── Mode gate: Standard+ only ───────────────────────────────
 const { requireMode, MODE_TRACE_PATH } = require('../lib/mode-check');
 if (!requireMode('standard')) {
+  const MAX = 1024 * 1024;
   let d = '';
   process.stdin.setEncoding('utf8');
-  process.stdin.on('data', c => { d += c; });
+  process.stdin.on('data', c => {
+    if (d.length < MAX) d += c.substring(0, Math.min(c.length, MAX - d.length));
+  });
   process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
   return;
 }
@@ -88,10 +91,7 @@ function analyzeModeTransitions(entries) {
     transitions[key] = (transitions[key] || 0) + 1;
     triggerCounts[e.trigger] = (triggerCounts[e.trigger] || 0) + 1;
     if (e.matched_signal) {
-      const normalized = e.matched_signal.length > 60
-        ? e.matched_signal.slice(0, 60) + '...'
-        : e.matched_signal;
-      signalCounts[normalized] = (signalCounts[normalized] || 0) + 1;
+      signalCounts[e.matched_signal] = (signalCounts[e.matched_signal] || 0) + 1;
     }
   }
 
@@ -208,6 +208,14 @@ function generateThresholdSuggestions(allTraceEntries) {
     suggestions.push(`Standard 阈值偏高: 中位数触发文件数 ${median}, 当前阈值 ${currentStandard} → 建议降低到 ${newVal}`);
   }
 
+  if (median > currentHeavy * 2) {
+    const newVal = Math.min(currentHeavy + 2, 20);
+    suggestions.push(`Heavy 阈值偏低: 中位数触发文件数 ${median}, 当前阈值 ${currentHeavy} → 建议提高到 ${newVal}`);
+  } else if (median < currentHeavy * 0.5 && currentHeavy > 4) {
+    const newVal = Math.max(currentHeavy - 1, 4);
+    suggestions.push(`Heavy 阈值偏高: 中位数触发文件数 ${median}, 当前阈值 ${currentHeavy} → 建议降低到 ${newVal}`);
+  }
+
   return suggestions.length > 0 ? { median, currentStandard, currentHeavy, suggestions } : null;
 }
 
@@ -272,7 +280,8 @@ function generateReport(dateStr) {
     if (modeAnalysis.topSignals.length > 0) {
       parts.push('最频繁升档信号:');
       for (const [signal, count] of modeAnalysis.topSignals) {
-        parts.push(`- ${signal} (${count}次)`);
+        const display = signal.length > 60 ? signal.slice(0, 60) + '...' : signal;
+        parts.push(`- ${display} (${count}次)`);
       }
     }
   } else {
@@ -399,10 +408,21 @@ function main() {
     fs.writeFileSync(LOCK_FILE, today, 'utf8');
   } catch { /* non-blocking */ }
 
-  // Truncate hook-effectiveness log if needed
+  // Truncate logs to prevent unbounded growth
   try {
     const { truncateLog } = require('../lib/hook-effectiveness');
     truncateLog();
+  } catch { /* non-blocking */ }
+
+  try {
+    if (fs.existsSync(MEMORY_ACCESS_PATH)) {
+      const content = fs.readFileSync(MEMORY_ACCESS_PATH, 'utf8');
+      const lines = content.trim().split('\n');
+      if (lines.length > 2000) {
+        const kept = lines.slice(-1000).join('\n') + '\n';
+        fs.writeFileSync(MEMORY_ACCESS_PATH, kept, 'utf8');
+      }
+    }
   } catch { /* non-blocking */ }
 }
 
