@@ -67,3 +67,13 @@ For complex problems, use split role sub-agents:
 - Security expert
 - Consistency reviewer
 - Redundancy checker
+
+## Audit Task Routing（强制）
+
+当用户要求全局性审查/审计时，**必须遵循 `audit-protocol.md`**，不可自行编排。
+
+关键约束：
+1. **Explore agent 不出结论** — 只做信息收集，HIGH+ 判定必须由有 Bash 能力的 agent 或主 agent 验证
+2. **安全独立启动** — security-reviewer 必须作为独立 agent，不可合并到功能审计
+3. **主 agent 亲自验证** — 所有 HIGH+ 发现必须由主 agent 运行验证命令确认
+4. **4 阶段流程** — 信息收集 → 安全审计 → 主 agent 验证 → 对抗性审查
