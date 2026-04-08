@@ -48,30 +48,45 @@ function log(msg) {
   process.stderr.write(`${msg}\n`);
 }
 
+const MAX_JSONL_SIZE = 5 * 1024 * 1024; // 5MB guard
+
 /**
- * Parse a JSONL file into an array of objects.
- * Silently skips malformed lines.
+ * Read a file safely. Returns null on any error or if file exceeds maxSize.
  */
-function parseJsonl(filePath) {
+function safeRead(filePath, maxSize) {
   try {
-    if (!fs.existsSync(filePath)) return [];
-    const content = fs.readFileSync(filePath, 'utf8');
-    return content.trim().split('\n')
-      .filter(line => line.trim())
-      .map(line => {
-        try { return JSON.parse(line); } catch { return null; }
-      })
-      .filter(Boolean);
+    const stat = fs.statSync(filePath);
+    if (maxSize && stat.size > maxSize) return null;
+    return fs.readFileSync(filePath, 'utf8');
   } catch {
-    return [];
+    return null;
   }
 }
 
 /**
- * Filter entries from today only.
+ * Parse a JSONL file into an array of objects.
+ * If datePrefix is provided, only parses lines whose raw text contains it (fast pre-filter).
+ * Skips files >5MB.
  */
-function filterToday(entries, dateStr) {
-  return entries.filter(e => e.timestamp && e.timestamp.startsWith(dateStr));
+function parseJsonl(filePath, datePrefix) {
+  const content = safeRead(filePath, MAX_JSONL_SIZE);
+  if (!content) return [];
+  const results = [];
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    if (datePrefix && !line.includes(datePrefix)) continue;
+    try { results.push(JSON.parse(line)); } catch { /* skip */ }
+  }
+  return results;
+}
+
+/**
+ * Parse all entries from a JSONL file (no date filter). Skips files >5MB.
+ */
+function parseJsonlAll(filePath) {
+  return parseJsonl(filePath, null);
 }
 
 // ── Analysis Functions ──────────────────────────────────────
@@ -138,31 +153,25 @@ function analyzeMemoryAccess(entries) {
  * Analyze memory staleness — find entries in long-term.md that are old.
  */
 function analyzeMemoryStaleness() {
-  const longTermPath = path.join(MEMORY_DIR, 'long-term.md');
-  if (!fs.existsSync(longTermPath)) return null;
+  const content = safeRead(path.join(MEMORY_DIR, 'long-term.md'));
+  if (!content) return null;
 
-  try {
-    const content = fs.readFileSync(longTermPath, 'utf8');
-    const lines = content.split('\n');
-    const entries = [];
-    const dateRegex = /\[(\d{4}-\d{2}-\d{2})\]/;
+  const now = Date.now();
+  const dateRegex = /\[(\d{4}-\d{2}-\d{2})\]/;
+  const entries = [];
 
-    for (const line of lines) {
-      const match = line.match(dateRegex);
-      if (match && line.trim().startsWith('-')) {
-        const entryDate = new Date(match[1]);
-        const ageMs = Date.now() - entryDate.getTime();
-        const ageDays = Math.floor(ageMs / (86400 * 1000));
-        if (ageDays > 30) {
-          entries.push({ text: line.trim().slice(0, 100), ageDays, date: match[1] });
-        }
-      }
+  for (const line of content.split('\n')) {
+    if (!line.trimStart().startsWith('-')) continue;
+    const match = line.match(dateRegex);
+    if (!match) continue;
+    const ageDays = Math.floor((now - new Date(match[1]).getTime()) / 86400000);
+    if (ageDays > 30) {
+      entries.push({ text: line.trim().slice(0, 100), ageDays, date: match[1] });
+      if (entries.length >= 10) break; // early exit
     }
-
-    return entries.length > 0 ? entries.slice(0, 10) : null;
-  } catch {
-    return null;
   }
+
+  return entries.length > 0 ? entries : null;
 }
 
 /**
@@ -191,8 +200,9 @@ function generateThresholdSuggestions(allTraceEntries) {
   let currentStandard = 3;
   let currentHeavy = 6;
   try {
-    if (fs.existsSync(THRESHOLD_FILE)) {
-      const config = JSON.parse(fs.readFileSync(THRESHOLD_FILE, 'utf8'));
+    const raw = safeRead(THRESHOLD_FILE);
+    if (raw) {
+      const config = JSON.parse(raw);
       currentStandard = config.cross_file_standard || 3;
       currentHeavy = config.cross_file_heavy || 6;
     }
@@ -231,17 +241,22 @@ function checkRecurringPatterns() {
 
     if (files.length < 3) return null;
 
-    // Simple check: look for repeated top signals across days
+    // Extract signal sections by splitting on ## headings
     const signalHistory = {};
     for (const f of files) {
-      const content = fs.readFileSync(path.join(LOGS_DIR, f), 'utf8');
-      const signalMatch = content.match(/最频繁升档信号[\s\S]*?(?=\n##|\n$)/);
-      if (signalMatch) {
-        const lines = signalMatch[0].split('\n').filter(l => l.startsWith('- '));
-        for (const l of lines) {
-          const key = l.replace(/\(\d+次\)/, '').trim();
-          signalHistory[key] = (signalHistory[key] || 0) + 1;
-        }
+      const content = safeRead(path.join(LOGS_DIR, f), MAX_JSONL_SIZE);
+      if (!content) continue;
+      const sections = content.split(/\n## /);
+      const signalSection = sections.find(s => s.startsWith('模式切换统计'));
+      if (!signalSection) continue;
+      // Find lines after "最频繁升档信号:" marker
+      const markerIdx = signalSection.indexOf('最频繁升档信号');
+      if (markerIdx === -1) continue;
+      const afterMarker = signalSection.slice(markerIdx).split('\n').slice(1);
+      for (const l of afterMarker) {
+        if (!l.startsWith('- ')) break; // stop at first non-list line
+        const key = l.replace(/\(\d+次\)/, '').trim();
+        signalHistory[key] = (signalHistory[key] || 0) + 1;
       }
     }
 
@@ -260,9 +275,9 @@ function checkRecurringPatterns() {
 function generateReport(dateStr) {
   const parts = [`# 审计洞察报告 — ${dateStr}\n`];
 
-  // 1. Mode transitions
-  const allTrace = parseJsonl(MODE_TRACE_PATH);
-  const todayTrace = filterToday(allTrace, dateStr);
+  // 1. Mode transitions (need both today-only and all for threshold analysis)
+  const todayTrace = parseJsonl(MODE_TRACE_PATH, dateStr);
+  const allTrace = parseJsonlAll(MODE_TRACE_PATH);
   const modeAnalysis = analyzeModeTransitions(todayTrace);
 
   parts.push('## 模式切换统计\n');
@@ -289,9 +304,8 @@ function generateReport(dateStr) {
   }
   parts.push('');
 
-  // 2. Hook effectiveness
-  const allHookEvents = parseJsonl(HOOK_EFFECTIVENESS_PATH);
-  const todayHookEvents = filterToday(allHookEvents, dateStr);
+  // 2. Hook effectiveness (today only)
+  const todayHookEvents = parseJsonl(HOOK_EFFECTIVENESS_PATH, dateStr);
   const hookAnalysis = analyzeHookEffectiveness(todayHookEvents);
 
   parts.push('## Hook 效能统计\n');
@@ -307,9 +321,8 @@ function generateReport(dateStr) {
   }
   parts.push('');
 
-  // 3. Memory access
-  const allMemAccess = parseJsonl(MEMORY_ACCESS_PATH);
-  const todayMemAccess = filterToday(allMemAccess, dateStr);
+  // 3. Memory access (today only)
+  const todayMemAccess = parseJsonl(MEMORY_ACCESS_PATH, dateStr);
   const memAnalysis = analyzeMemoryAccess(todayMemAccess);
 
   parts.push('## 记忆访问统计\n');
@@ -378,15 +391,11 @@ function main() {
   const today = getLocalDateString();
 
   // Daily throttle
-  try {
-    if (fs.existsSync(LOCK_FILE)) {
-      const lockDate = fs.readFileSync(LOCK_FILE, 'utf8').trim();
-      if (lockDate === today) {
-        log('[AuditInsights] Already ran today, skipping.');
-        return;
-      }
-    }
-  } catch { /* proceed */ }
+  const lockDate = safeRead(LOCK_FILE);
+  if (lockDate && lockDate.trim() === today) {
+    log('[AuditInsights] Already ran today, skipping.');
+    return;
+  }
 
   // Ensure logs directory
   if (!fs.existsSync(LOGS_DIR)) {
@@ -415,12 +424,11 @@ function main() {
   } catch { /* non-blocking */ }
 
   try {
-    if (fs.existsSync(MEMORY_ACCESS_PATH)) {
-      const content = fs.readFileSync(MEMORY_ACCESS_PATH, 'utf8');
-      const lines = content.trim().split('\n');
+    const memLog = safeRead(MEMORY_ACCESS_PATH);
+    if (memLog) {
+      const lines = memLog.trim().split('\n');
       if (lines.length > 2000) {
-        const kept = lines.slice(-1000).join('\n') + '\n';
-        fs.writeFileSync(MEMORY_ACCESS_PATH, kept, 'utf8');
+        fs.writeFileSync(MEMORY_ACCESS_PATH, lines.slice(-1000).join('\n') + '\n', 'utf8');
       }
     }
   } catch { /* non-blocking */ }
