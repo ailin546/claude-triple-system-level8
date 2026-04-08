@@ -18,16 +18,9 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
-const os = require('os');
 const PROJECT_ROOT = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
-// Prefer global ~/.memory/ if it exists and is a git repo; fall back to project-level
-const GLOBAL_MEMORY_DIR = path.join(os.homedir(), '.memory');
-const PROJECT_MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
-const MEMORY_DIR = (fs.existsSync(path.join(GLOBAL_MEMORY_DIR, '.git')))
-  ? GLOBAL_MEMORY_DIR
-  : PROJECT_MEMORY_DIR;
-const GLOBAL_REMOTE_FILE = path.join(os.homedir(), '.claude', '.memory-remote');
-const PROJECT_REMOTE_FILE = path.join(PROJECT_ROOT, '.claude', '.memory-remote');
+const MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
+const REMOTE_FILE = path.join(PROJECT_ROOT, '.claude', '.memory-remote');
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [2000, 4000, 8000]; // exponential backoff
 
@@ -46,23 +39,12 @@ function getRemoteUrl() {
   if (process.env.MEMORY_REMOTE) {
     return process.env.MEMORY_REMOTE.trim();
   }
-  // Check project-level first, then global
-  for (const f of [PROJECT_REMOTE_FILE, GLOBAL_REMOTE_FILE]) {
-    try {
-      const url = fs.readFileSync(f, 'utf8').trim();
-      if (url) return url;
-    } catch {}
+  try {
+    const url = fs.readFileSync(REMOTE_FILE, 'utf8').trim();
+    return url || null;
+  } catch {
+    return null;
   }
-  // If ~/.memory/ is already a git repo with a remote, use that
-  if (isMemoryGitRepo()) {
-    try {
-      const result = execFileSync('git', ['remote', 'get-url', 'origin'], {
-        cwd: MEMORY_DIR, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
-      }).trim();
-      if (result) return result;
-    } catch {}
-  }
-  return null;
 }
 
 /**

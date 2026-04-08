@@ -6,6 +6,10 @@ The Feature Implementation Workflow describes the development pipeline: research
 
 ## Feature Implementation Workflow
 
+> 以下流程适用于 **Standard+ 模式**的功能开发。
+> Fast 模式下仅需：直接实现 → `/verify` → commit。
+> 各阶段可按实际需要裁剪，非所有步骤都强制执行。
+
 0. **Research & Reuse** _(mandatory before any new implementation)_
    - **GitHub code search first:** Run `gh search repos` and `gh search code` to find existing implementations, templates, and patterns before writing anything new.
    - **Library docs second:** Use Context7 or primary vendor docs to confirm API behavior, package usage, and version-specific details before implementing.
@@ -20,9 +24,9 @@ The Feature Implementation Workflow describes the development pipeline: research
    - Identify dependencies and risks
    - Break down into phases
 
-1.5. **Design Consultation** _(auto-trigger for UI/UX tasks)_
-   - If the task involves UI components, pages, layouts, or visual changes:
-     - Auto-invoke `design-consultation` skill
+1.5. **Design Consultation** _(Claude 检测后主动调用，非 hook 级自动化)_
+   - 当任务涉及 UI 组件、页面、布局或视觉变更时：
+     - Claude 主动调用 `design-consultation` skill
      - Parallel agents: UI Designer + UX Architect + UX Researcher
      - Accessibility gate (WCAG AA)
      - Wait for user confirmation on design brief before coding
@@ -35,9 +39,9 @@ The Feature Implementation Workflow describes the development pipeline: research
    - Refactor (IMPROVE)
    - Verify 80%+ coverage
 
-3. **Design Review** _(auto-trigger for UI/UX changes)_
+3. **Design Review** _(Claude 检测后主动调用，非 hook 级自动化)_
    - If implementation touched CSS/styling/component files:
-     - Auto-invoke `design-review` skill before code review
+     - Claude 主动调用 `design-review` skill before code review
      - Check: design token compliance, accessibility, responsive, visual consistency
      - Fix CRITICAL/HIGH issues before proceeding
 
@@ -48,8 +52,8 @@ The Feature Implementation Workflow describes the development pipeline: research
 
 5. **Verify** (`/verify pre-pr`)
    - Build + types + lint + tests + security scan
-   - If `/plan` has Acceptance Criteria → 自动触发 `evaluation-loop`（独立 Evaluator 评估）
-   - 标准见 `evaluation-rubric.md`
+   - Heavy 模式下，若 `/plan` 定义了 Acceptance Criteria → 触发 `evaluation-loop`（独立 Evaluator 评估）
+   - 评分标准见 `evaluation-rubric.md`
 
 6. **Commit & Push**
    - Detailed commit messages

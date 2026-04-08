@@ -9,7 +9,10 @@ Test Types (ALL required):
 
 ## Test-Driven Development
 
-MANDATORY workflow:
+Standard+ 模式下的功能开发和有明确 AC 的 bugfix 使用 TDD 流程。
+Fast 模式下的小修复、配置微调、文档变更不强制 TDD。
+
+TDD 流程（当适用时）：
 1. Write test first (RED)
 2. Run test - it should FAIL
 3. Write minimal implementation (GREEN)
