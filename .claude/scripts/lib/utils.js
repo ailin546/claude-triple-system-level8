@@ -17,17 +17,24 @@ const { execFileSync } = require('child_process');
 
 /**
  * Return the project root via CLAUDE_PROJECT_ROOT or git.
- * Falls back to process.cwd().
+ * Falls back to process.cwd(). Guards against ~/.claude nesting —
+ * see scripts/lib/project-root.js for rationale.
  */
 function getProjectRoot() {
-  if (process.env.CLAUDE_PROJECT_ROOT) return process.env.CLAUDE_PROJECT_ROOT;
+  const { isInsideHomeClaude, HOME_CLAUDE_DIR } = require('./project-root');
+  if (process.env.CLAUDE_PROJECT_ROOT) {
+    const explicit = process.env.CLAUDE_PROJECT_ROOT;
+    return isInsideHomeClaude(explicit) ? HOME_CLAUDE_DIR : explicit;
+  }
   try {
-    return execFileSync('git', ['rev-parse', '--show-toplevel'], {
+    const gitRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
+    return isInsideHomeClaude(gitRoot) ? HOME_CLAUDE_DIR : gitRoot;
   } catch {
-    return process.cwd();
+    const cwd = process.cwd();
+    return isInsideHomeClaude(cwd) ? HOME_CLAUDE_DIR : cwd;
   }
 }
 

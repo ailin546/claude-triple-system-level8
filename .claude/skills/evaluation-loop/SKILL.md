@@ -106,13 +106,13 @@ Generator 完成功能
 标准按优先级从高到低：
 
 1. **`/plan` 输出的 Acceptance Criteria**（最具体，每个任务不同）
-2. **`.claude/rules/common/evaluation-rubric.md`**（通用模板，人维护）
+2. **`~/.claude/on-demand/evaluation-rubric.md`**（通用模板，人维护；skill 启动时必须 Read 加载）
 3. **项目已有工具的客观输出**（测试结果、覆盖率、lint 报告）
 
 Evaluator **禁止**：
 - 自行发明评分标准
 - 给出不基于证据的评价
-- 违反 `evaluation-rubric.md` 中的禁止行为（包括无压倒性证据给满分）
+- 违反 `~/.claude/on-demand/evaluation-rubric.md` 中的禁止行为（包括无压倒性证据给满分）
 
 ## 与现有工具的关系
 

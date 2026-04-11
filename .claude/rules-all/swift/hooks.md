@@ -5,7 +5,7 @@ paths:
 ---
 # Swift Hooks
 
-> This file extends [common/hooks.md](../common/hooks.md) with Swift specific content.
+> This file extends [common/infrastructure.md#hooks-system-layered](../common/infrastructure.md#hooks-system-layered) with Swift specific content.
 
 ## PostToolUse Hooks
 

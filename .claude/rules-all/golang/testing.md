@@ -6,7 +6,7 @@ paths:
 ---
 # Go Testing
 
-> This file extends [common/testing.md](../common/testing.md) with Go specific content.
+> This file extends [common/quality-and-security.md#testing-requirements](../common/quality-and-security.md#testing-requirements) with Go specific content.
 
 ## Framework
 

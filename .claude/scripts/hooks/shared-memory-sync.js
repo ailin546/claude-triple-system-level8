@@ -43,7 +43,8 @@ try {
 }
 // ─────────────────────────────────────────────────────────────
 
-const MEMORY_DIR = path.join(process.cwd(), '.memory');
+const { getProjectRoot } = require('../lib/project-root');
+const MEMORY_DIR = path.join(getProjectRoot(), '.memory');
 const TODAY_FILE = path.join(MEMORY_DIR, 'today.md');
 const WEEKLY_FILE = path.join(MEMORY_DIR, 'weekly.md');
 

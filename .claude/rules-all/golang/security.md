@@ -6,7 +6,7 @@ paths:
 ---
 # Go Security
 
-> This file extends [common/security.md](../common/security.md) with Go specific content.
+> This file extends [common/quality-and-security.md#security-guidelines](../common/quality-and-security.md#security-guidelines) with Go specific content.
 
 ## Secret Management
 

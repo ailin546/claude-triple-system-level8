@@ -11,7 +11,8 @@
 const path = require('path');
 const fs = require('fs');
 
-const PROJECT_ROOT = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
+const { getProjectRoot } = require('../lib/project-root');
+const PROJECT_ROOT = getProjectRoot();
 const RULES_ALL = path.join(PROJECT_ROOT, '.claude', 'rules-all');
 const RULES_ACTIVE = path.join(PROJECT_ROOT, '.claude', 'rules');
 

@@ -8,7 +8,7 @@ paths:
 ---
 # Perl Hooks
 
-> This file extends [common/hooks.md](../common/hooks.md) with Perl-specific content.
+> This file extends [common/infrastructure.md#hooks-system-layered](../common/infrastructure.md#hooks-system-layered) with Perl-specific content.
 
 ## PostToolUse Hooks
 

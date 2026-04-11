@@ -34,8 +34,9 @@ try {
 }
 // ─────────────────────────────────────────────────────────────
 
-const MEMORY_DIR = path.join(process.cwd(), '.claude', 'memory');
-const SHARED_STATE_DIR = path.join(process.cwd(), '.claude', 'shared-state');
+const { getProjectRoot } = require('../lib/project-root');
+const MEMORY_DIR = path.join(getProjectRoot(), '.claude', 'memory');
+const SHARED_STATE_DIR = path.join(getProjectRoot(), '.claude', 'shared-state');
 const BOARD_PATH = path.join(SHARED_STATE_DIR, 'board.json');
 
 function getISOWeek(date) {

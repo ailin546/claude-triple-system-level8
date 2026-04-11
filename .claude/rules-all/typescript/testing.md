@@ -7,7 +7,7 @@ paths:
 ---
 # TypeScript/JavaScript Testing
 
-> This file extends [common/testing.md](../common/testing.md) with TypeScript/JavaScript specific content.
+> This file extends [common/quality-and-security.md#testing-requirements](../common/quality-and-security.md#testing-requirements) with TypeScript/JavaScript specific content.
 
 ## E2E Testing
 

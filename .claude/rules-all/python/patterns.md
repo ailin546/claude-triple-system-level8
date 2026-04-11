@@ -5,7 +5,7 @@ paths:
 ---
 # Python Patterns
 
-> This file extends [common/patterns.md](../common/patterns.md) with Python specific content.
+> This file extends [common/workflow.md#common-patterns](../common/workflow.md#common-patterns) with Python specific content.
 
 ## Protocol (Duck Typing)
 

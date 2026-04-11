@@ -70,7 +70,7 @@ For complex problems, use split role sub-agents:
 
 ## Audit Task Routing（强制）
 
-当用户要求全局性审查/审计时，**必须遵循 `audit-protocol.md`**，不可自行编排。
+当用户要求全局性审查/审计时，**必须遵循 `~/.claude/on-demand/audit-protocol.md`**（按需加载，不在 common 下自动加载）；走 `/audit` 或 `/audit-crate` 命令时由命令入口显式引入。不可自行编排。
 
 关键约束：
 1. **Explore agent 不出结论** — 只做信息收集，HIGH+ 判定必须由有 Bash 能力的 agent 或主 agent 验证

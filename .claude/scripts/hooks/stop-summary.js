@@ -7,7 +7,7 @@
  * 4. Push to remote (if configured)
  *
  * Does NOT write session content to today.md — that's Claude's job
- * (see rules/common/session-memory.md).
+ * (see rules/common/workflow.md#session-memory).
  *
  * Cross-platform. Non-blocking: errors never block exit.
  */
@@ -48,7 +48,43 @@ function getLocalDateString() {
   return `${y}-${m}-${day}`;
 }
 
-/* rotateTodayIfNeeded removed — replaced by rotateMemoryDir() below */
+/**
+ * Daily rotation: if today.md has entries from a previous day,
+ * archive them to weekly.md and reset today.md.
+ */
+function rotateTodayIfNeeded() {
+  if (!fs.existsSync(TODAY_FILE)) return;
+
+  try {
+    const content = fs.readFileSync(TODAY_FILE, 'utf8');
+    if (!content.trim()) return;
+
+    const dateMatch = content.match(/# Today\s*[-—]\s*(\d{4}-\d{2}-\d{2})/);
+    if (!dateMatch) return;
+
+    const fileDate = dateMatch[1];
+    const today = getLocalDateString();
+
+    if (fileDate === today) return;
+
+    log(`[StopSummary] Rotating today.md (${fileDate}) → weekly.md`);
+    const archiveHeader = `\n## ${fileDate}\n\n`;
+    const bodyContent = content.replace(/^# Today\s*[-—]\s*\d{4}-\d{2}-\d{2}\n*/, '').trim();
+
+    if (bodyContent) {
+      if (!fs.existsSync(WEEKLY_FILE)) {
+        fs.writeFileSync(WEEKLY_FILE, `# Weekly Summary\n${archiveHeader}${bodyContent}\n`, 'utf8');
+      } else {
+        fs.appendFileSync(WEEKLY_FILE, `${archiveHeader}${bodyContent}\n`, 'utf8');
+      }
+    }
+
+    fs.writeFileSync(TODAY_FILE, `# Today — ${today}\n\n## Sessions\n\n`, 'utf8');
+    log(`[StopSummary] Reset today.md for ${today}`);
+  } catch (err) {
+    log(`[StopSummary] Rotation error (non-blocking): ${err.message}`);
+  }
+}
 
 function checkConsoleLogs() {
   if (!isGitRepo()) return;
@@ -77,116 +113,30 @@ function checkConsoleLogs() {
 // ── Main memory logic ────────────────────────────────────────────────
 
 /**
- * Rotate a specific today.md → weekly.md on date change.
- * @param {string} todayFile - path to today.md
- * @param {string} weeklyFile - path to weekly.md
- * @param {string} label - log label
- */
-function rotateMemoryDir(todayFile, weeklyFile, label) {
-  if (!fs.existsSync(todayFile)) return;
-  try {
-    const content = fs.readFileSync(todayFile, 'utf8');
-    if (!content.trim()) return;
-
-    const dateMatch = content.match(/# Today\s*[-—]\s*(\d{4}-\d{2}-\d{2})/);
-    if (!dateMatch) return;
-
-    const fileDate = dateMatch[1];
-    const today = getLocalDateString();
-    if (fileDate === today) return;
-
-    log(`[StopSummary] Rotating ${label} today.md (${fileDate}) → weekly.md`);
-    const archiveHeader = `\n## ${fileDate}\n\n`;
-    const bodyContent = content.replace(/^# Today\s*[-—]\s*\d{4}-\d{2}-\d{2}\n*/, '').trim();
-
-    if (bodyContent) {
-      if (!fs.existsSync(weeklyFile)) {
-        fs.writeFileSync(weeklyFile, `# Weekly Summary\n${archiveHeader}${bodyContent}\n`, 'utf8');
-      } else {
-        fs.appendFileSync(weeklyFile, `${archiveHeader}${bodyContent}\n`, 'utf8');
-      }
-    }
-
-    fs.writeFileSync(todayFile, `# Today — ${today}\n\n## Sessions\n\n`, 'utf8');
-    log(`[StopSummary] Reset ${label} today.md for ${today}`);
-  } catch (err) {
-    log(`[StopSummary] ${label} rotation error (non-blocking): ${err.message}`);
-  }
-}
-
-/**
  * Handle .memory/today.md maintenance — rotation only, NO content writing.
  *
- * All session content is written by Claude in-conversation (see rules/common/session-memory.md).
+ * All session content is written by Claude in-conversation (see rules/common/workflow.md#session-memory).
  * This hook ONLY:
- * 1. Rotates today.md → weekly.md on date change (both project + global)
+ * 1. Rotates today.md → weekly.md on date change
  * 2. Creates today.md template if missing after rotation
  */
 function maintainProjectMemory() {
-  // Project-level .memory/
   try {
-    if (fs.existsSync(MEMORY_DIR)) {
-      rotateMemoryDir(TODAY_FILE, WEEKLY_FILE, 'project');
-      log('[StopSummary] Project memory maintained (rotation check only)');
-    } else {
-      log('[StopSummary] .memory/ not found, skipping project rotation');
+    if (!fs.existsSync(MEMORY_DIR)) {
+      log('[StopSummary] .memory/ not found, skipping');
+      return;
     }
+    rotateTodayIfNeeded();
+    log('[StopSummary] Project memory maintained (rotation check only)');
   } catch (err) {
     log(`[StopSummary] Project memory maintenance error (non-blocking): ${err.message}`);
   }
-
-  // Global ~/.memory/
-  try {
-    const globalToday = path.join(GLOBAL_MEMORY_DIR, 'today.md');
-    const globalWeekly = path.join(GLOBAL_MEMORY_DIR, 'weekly.md');
-    if (fs.existsSync(GLOBAL_MEMORY_DIR)) {
-      rotateMemoryDir(globalToday, globalWeekly, 'global');
-      log('[StopSummary] Global memory maintained (rotation check only)');
-    }
-  } catch (err) {
-    log(`[StopSummary] Global memory maintenance error (non-blocking): ${err.message}`);
-  }
 }
 
 /**
- * Generate a short summary from git-modified files.
- * Groups by directory/extension and returns a human-readable one-liner.
- * @returns {string} e.g. "hooks/3, rules/1, memory/2" or "no changes"
- */
-function getChangeSummary() {
-  try {
-    const files = getGitModifiedFiles();
-    if (files.length === 0) return 'no changes';
-
-    // Group by top-level directory relative to project root
-    const groups = {};
-    for (const f of files) {
-      const rel = path.relative(PROJECT_ROOT, f);
-      const parts = rel.split(path.sep);
-      // Use first meaningful directory or filename
-      let key;
-      if (parts.length === 1) {
-        key = path.extname(parts[0]) || 'root';
-      } else if (parts[0] === '.claude' && parts.length > 2) {
-        key = parts[1]; // e.g. "scripts", "rules", "skills"
-      } else {
-        key = parts[0];
-      }
-      groups[key] = (groups[key] || 0) + 1;
-    }
-
-    // Format: "scripts/3, rules/1" (top 4 groups)
-    const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]).slice(0, 4);
-    return sorted.map(([k, v]) => `${k}/${v}`).join(', ') + ` (${files.length} files)`;
-  } catch {
-    return 'unknown';
-  }
-}
-
-/**
- * Update ~/.memory/index.md with current project info and change summary.
+ * Update ~/.memory/index.md with current project info.
  * Creates ~/.memory/ if it doesn't exist.
- * Format: markdown table with project name, path, last active, summary
+ * Format: markdown table with project name, path, last active, has .memory/
  */
 function updateGlobalIndex() {
   try {
@@ -194,11 +144,9 @@ function updateGlobalIndex() {
       fs.mkdirSync(GLOBAL_MEMORY_DIR, { recursive: true });
     }
 
-    const os = require('os');
     const projectName = path.basename(PROJECT_ROOT);
-    const host = os.hostname();
+    const hasMemory = fs.existsSync(MEMORY_DIR) ? 'Yes' : 'No';
     const now = getLocalDateString() + ' ' + getTimestamp();
-    const summary = getChangeSummary();
 
     // Read existing index or create new
     let content = '';
@@ -206,31 +154,16 @@ function updateGlobalIndex() {
       content = fs.readFileSync(GLOBAL_INDEX_FILE, 'utf8');
     }
 
-    // Migrate old formats to new 5-column format with Host
-    if (content.includes('| Has .memory/ |') || (content.includes('| Changes |') && !content.includes('| Host |'))) {
-      // Full rebuild of header
-      const lines = content.split('\n');
-      const dataLines = lines.filter(l => l.startsWith('|') && !l.startsWith('| Project') && !l.startsWith('|---'));
-      content = `# Global Memory Index\n\n| Project | Host | Path | Last Active | Changes |\n|---------|------|------|-------------|--------|\n`;
-      // Re-add data lines with unknown host
-      for (const line of dataLines) {
-        const cols = line.split('|').map(c => c.trim()).filter(Boolean);
-        if (cols.length >= 3) {
-          content += `| ${cols[0]} | unknown | ${cols[1]} | ${cols[2]} | ${cols[3] || ''} |\n`;
-        }
-      }
-    }
-
     if (!content.includes('| Project |')) {
-      content = `# Global Memory Index\n\n| Project | Host | Path | Last Active | Changes |\n|---------|------|------|-------------|--------|\n`;
+      // Create new index with header
+      content = `# Global Memory Index\n\n| Project | Path | Last Active | Has .memory/ |\n|---------|------|-------------|-------------|\n`;
     }
 
-    // Match by project path + host (same project on different hosts = different rows)
+    // Check if project already has a row — update it
     const escapedPath = PROJECT_ROOT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const escapedHost = host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const rowRegex = new RegExp(`^\\|[^|]*\\|\\s*${escapedHost}\\s*\\|\\s*${escapedPath}\\s*\\|.*$`, 'm');
+    const rowRegex = new RegExp(`^\\|[^|]*\\|\\s*${escapedPath}\\s*\\|.*$`, 'm');
 
-    const newRow = `| ${projectName} | ${host} | ${PROJECT_ROOT} | ${now} | ${summary} |`;
+    const newRow = `| ${projectName} | ${PROJECT_ROOT} | ${now} | ${hasMemory} |`;
 
     if (rowRegex.test(content)) {
       content = content.replace(rowRegex, newRow);
@@ -239,7 +172,7 @@ function updateGlobalIndex() {
     }
 
     fs.writeFileSync(GLOBAL_INDEX_FILE, content, 'utf8');
-    log(`[StopSummary] Global index updated: ${projectName}@${host} — ${summary}`);
+    log(`[StopSummary] Global index updated: ${projectName}`);
   } catch (err) {
     log(`[StopSummary] Global index update failed (non-blocking): ${err.message}`);
   }

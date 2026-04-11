@@ -6,7 +6,7 @@ paths:
 ---
 # Go Coding Style
 
-> This file extends [common/coding-style.md](../common/coding-style.md) with Go specific content.
+> This file extends [common/quality-and-security.md#coding-style](../common/quality-and-security.md#coding-style) with Go specific content.
 
 ## Formatting
 

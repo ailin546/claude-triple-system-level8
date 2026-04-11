@@ -35,7 +35,8 @@ try {
 }
 // ─────────────────────────────────────────────────────────────
 
-const SHARED_STATE_DIR = path.join(process.cwd(), '.claude', 'shared-state');
+const { getProjectRoot } = require('../lib/project-root');
+const SHARED_STATE_DIR = path.join(getProjectRoot(), '.claude', 'shared-state');
 const BOARD_PATH = path.join(SHARED_STATE_DIR, 'board.json');
 const DECISIONS_PATH = path.join(SHARED_STATE_DIR, 'decisions.log');
 const ARTIFACTS_DIR = path.join(SHARED_STATE_DIR, 'artifacts');

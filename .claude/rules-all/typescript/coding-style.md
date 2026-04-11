@@ -7,7 +7,7 @@ paths:
 ---
 # TypeScript/JavaScript Coding Style
 
-> This file extends [common/coding-style.md](../common/coding-style.md) with TypeScript/JavaScript specific content.
+> This file extends [common/quality-and-security.md#coding-style](../common/quality-and-security.md#coding-style) with TypeScript/JavaScript specific content.
 
 ## Types and Interfaces
 

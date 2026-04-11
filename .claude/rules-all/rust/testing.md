@@ -6,7 +6,7 @@ paths:
 ---
 # Rust Testing
 
-> This file extends [common/testing.md](../common/testing.md) with Rust specific content.
+> This file extends [common/quality-and-security.md#testing-requirements](../common/quality-and-security.md#testing-requirements) with Rust specific content.
 
 ## Framework
 

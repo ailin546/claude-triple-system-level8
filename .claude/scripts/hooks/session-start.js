@@ -215,7 +215,8 @@ function buildStructuredSummary(rawContent) {
 
 // ── Shared Memory ────────────────────────────────────────────
 
-const MEMORY_DIR = path.join(process.cwd(), '.memory');
+const { getProjectRoot } = require('../lib/project-root');
+const MEMORY_DIR = path.join(getProjectRoot(), '.memory');
 const GLOBAL_MEMORY_DIR = path.join(
   process.env.HOME || process.env.USERPROFILE || '/tmp',
   '.memory'
@@ -373,11 +374,6 @@ async function main() {
   // Detect and report package manager
   const pm = getPackageManager();
   log(`[SessionStart] Package manager: ${pm.name} (${pm.source})`);
-
-  // Output host identifier for multi-machine collaboration
-  const hostname = require('os').hostname();
-  output(`Host: ${hostname}`);
-  log(`[SessionStart] Host: ${hostname}`);
 
   // Detect project type
   const projectInfo = detectProjectType();

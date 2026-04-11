@@ -33,7 +33,8 @@ try {
 }
 // ─────────────────────────────────────────────────────────────
 
-const MEMORY_DIR = path.join(process.cwd(), '.claude', 'memory');
+const { getProjectRoot } = require('../lib/project-root');
+const MEMORY_DIR = path.join(getProjectRoot(), '.claude', 'memory');
 const LONG_TERM_FILE = path.join(MEMORY_DIR, 'long-term.md');
 const LOCK_FILE = path.join(MEMORY_DIR, '.consolidate-lock');
 

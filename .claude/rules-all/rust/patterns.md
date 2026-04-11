@@ -6,7 +6,7 @@ paths:
 ---
 # Rust Patterns
 
-> This file extends [common/patterns.md](../common/patterns.md) with Rust specific content.
+> This file extends [common/workflow.md#common-patterns](../common/workflow.md#common-patterns) with Rust specific content.
 
 ## Builder Pattern
 

@@ -24,7 +24,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const PROJECT_ROOT = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
+const { getProjectRoot } = require('../lib/project-root');
+const PROJECT_ROOT = getProjectRoot();
 
 // ── Mode gate: Standard+ only ───────────────────────────────
 const { requireMode } = require('../lib/mode-check');

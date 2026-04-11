@@ -6,7 +6,7 @@ paths:
 ---
 # Rust Coding Style
 
-> This file extends [common/coding-style.md](../common/coding-style.md) with Rust specific content.
+> This file extends [common/quality-and-security.md#coding-style](../common/quality-and-security.md#coding-style) with Rust specific content.
 
 ## Formatting
 

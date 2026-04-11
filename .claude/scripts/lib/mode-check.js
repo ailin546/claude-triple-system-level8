@@ -15,7 +15,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const PROJECT_ROOT = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
+const { getProjectRoot } = require('./project-root');
+const PROJECT_ROOT = getProjectRoot();
 const MODE_FILE = path.join(PROJECT_ROOT, '.claude', '.task-mode');
 
 const MODE_LEVELS = { fast: 0, standard: 1, heavy: 2 };

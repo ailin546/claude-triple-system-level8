@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { getProjectRoot } = require('./project-root');
 
 /**
  * Load active profiles from environment and config.
@@ -31,7 +32,7 @@ function getActiveProfiles() {
   }
 
   // From project config file
-  const projectRoot = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
+  const projectRoot = getProjectRoot();
   const configPath = path.join(projectRoot, '.claude', 'hook-profiles.json');
   try {
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
@@ -56,7 +57,7 @@ function getActiveProfiles() {
  * @returns {Object<string, string[]>} Hook ID to required profiles
  */
 function getHookProfileMap() {
-  const projectRoot = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
+  const projectRoot = getProjectRoot();
   const mapPath = path.join(projectRoot, '.claude', 'hook-flags.json');
   try {
     return JSON.parse(fs.readFileSync(mapPath, 'utf8'));

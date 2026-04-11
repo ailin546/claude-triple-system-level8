@@ -6,7 +6,7 @@ paths:
 ---
 # Rust Performance
 
-> This file extends [common/performance.md](../common/performance.md) with Rust specific content.
+> This file extends [common/infrastructure.md#performance-optimization](../common/infrastructure.md#performance-optimization) with Rust specific content.
 
 ## Profiling
 

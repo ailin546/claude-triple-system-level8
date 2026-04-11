@@ -18,7 +18,8 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
-const PROJECT_ROOT = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
+const { getProjectRoot } = require('./project-root');
+const PROJECT_ROOT = getProjectRoot();
 const MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
 const REMOTE_FILE = path.join(PROJECT_ROOT, '.claude', '.memory-remote');
 const MAX_RETRIES = 3;

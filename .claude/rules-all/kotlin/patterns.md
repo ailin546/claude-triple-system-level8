@@ -5,7 +5,7 @@ paths:
 ---
 # Kotlin Patterns
 
-> This file extends [common/patterns.md](../common/patterns.md) with Kotlin and Android/KMP-specific content.
+> This file extends [common/workflow.md#common-patterns](../common/workflow.md#common-patterns) with Kotlin and Android/KMP-specific content.
 
 ## Dependency Injection
 

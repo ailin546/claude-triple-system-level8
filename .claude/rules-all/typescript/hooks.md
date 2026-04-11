@@ -7,7 +7,7 @@ paths:
 ---
 # TypeScript/JavaScript Hooks
 
-> This file extends [common/hooks.md](../common/hooks.md) with TypeScript/JavaScript specific content.
+> This file extends [common/infrastructure.md#hooks-system-layered](../common/infrastructure.md#hooks-system-layered) with TypeScript/JavaScript specific content.
 
 ## PostToolUse Hooks
 

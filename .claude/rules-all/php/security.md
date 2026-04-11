@@ -6,7 +6,7 @@ paths:
 ---
 # PHP Security
 
-> This file extends [common/security.md](../common/security.md) with PHP specific content.
+> This file extends [common/quality-and-security.md#security-guidelines](../common/quality-and-security.md#security-guidelines) with PHP specific content.
 
 ## Input and Output
 

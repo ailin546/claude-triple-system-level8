@@ -23,6 +23,26 @@ No user prompt needed:
 2. Code just written/modified - Use **code-reviewer** agent
 3. Bug fix or new feature - Use **tdd-guide** agent
 4. Architectural decision - Use **architect** agent
+5. UI/UX work starting - Use **design-consultation** skill (auto-trigger, see below)
+6. UI code just written - Use **design-review** skill (auto-trigger, see below)
+
+## Design System Auto-Trigger
+
+When the task involves UI/visual changes, the design system activates automatically:
+
+**Before implementation** — auto-invoke `design-consultation` skill when the request involves:
+- New pages, screens, or layouts
+- New UI components (buttons, forms, cards, modals, navigation)
+- Color, typography, or spacing changes
+- Responsive design or dark mode work
+- UX flow changes or information architecture
+
+**After implementation** — auto-invoke `design-review` skill when:
+- CSS/SCSS/styling files have been created or modified
+- Component files (.tsx/.jsx/.vue/.svelte) with visual elements were changed
+- Design tokens or theme variables were added/modified
+
+Detection: if changed files match `*.css|*.scss|*.less|*.tsx|*.jsx|*.vue|*.svelte` AND contain visual keywords (color, margin, padding, font, display, grid, flex, background, border, shadow, theme), auto-trigger design-review before code-review.
 
 ## Parallel Task Execution
 
@@ -47,3 +67,13 @@ For complex problems, use split role sub-agents:
 - Security expert
 - Consistency reviewer
 - Redundancy checker
+
+## Audit Task Routing（强制）
+
+当用户要求全局性审查/审计时，**必须遵循 `~/.claude/on-demand/audit-protocol.md`**（按需加载，不在 common 下自动加载）；走 `/audit` 或 `/audit-crate` 命令时由命令入口显式引入。不可自行编排。
+
+关键约束：
+1. **Explore agent 不出结论** — 只做信息收集，HIGH+ 判定必须由有 Bash 能力的 agent 或主 agent 验证
+2. **安全独立启动** — security-reviewer 必须作为独立 agent，不可合并到功能审计
+3. **主 agent 亲自验证** — 所有 HIGH+ 发现必须由主 agent 运行验证命令确认
+4. **4 阶段流程** — 信息收集 → 安全审计 → 主 agent 验证 → 对抗性审查

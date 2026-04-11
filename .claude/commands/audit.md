@@ -1,6 +1,8 @@
 # /audit — Layer 3 Multi-Agent Full Audit
 
-Trigger a full platform audit following the 4-phase protocol defined in `~/.claude/rules/common/audit-protocol.md`.
+**Step 0 (mandatory)**: Read `~/.claude/on-demand/audit-protocol.md` first — it contains the 4-phase protocol, 3 iron rules, and severity criteria. This file is NOT auto-loaded to save context; you MUST load it at command start.
+
+Trigger a full platform audit following the 4-phase protocol defined in `~/.claude/on-demand/audit-protocol.md`.
 
 ## Pre-requisites
 

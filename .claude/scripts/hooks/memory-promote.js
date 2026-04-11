@@ -35,7 +35,8 @@ try {
 }
 // ─────────────────────────────────────────────────────────────
 
-const PROJECT_ROOT = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
+const { getProjectRoot } = require('../lib/project-root');
+const PROJECT_ROOT = getProjectRoot();
 const HOMUNCULUS_DIR = path.join(os.homedir(), '.claude', 'homunculus');
 const LOCK_FILE = path.join(HOMUNCULUS_DIR, '.promote-lock');
 const LOG_FILE = path.join(HOMUNCULUS_DIR, 'promote-log.jsonl');

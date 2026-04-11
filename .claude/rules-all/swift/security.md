@@ -5,7 +5,7 @@ paths:
 ---
 # Swift Security
 
-> This file extends [common/security.md](../common/security.md) with Swift specific content.
+> This file extends [common/quality-and-security.md#security-guidelines](../common/quality-and-security.md#security-guidelines) with Swift specific content.
 
 ## Secret Management
 

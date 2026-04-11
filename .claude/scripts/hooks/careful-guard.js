@@ -16,7 +16,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const PROJECT_ROOT = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
+const { getProjectRoot } = require('../lib/project-root');
+const PROJECT_ROOT = getProjectRoot();
 const STATE_FILE = path.join(PROJECT_ROOT, '.claude', '.careful-enabled');
 
 /**

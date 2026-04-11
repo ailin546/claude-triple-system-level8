@@ -5,7 +5,7 @@ paths:
 ---
 # Python Coding Style
 
-> This file extends [common/coding-style.md](../common/coding-style.md) with Python specific content.
+> This file extends [common/quality-and-security.md#coding-style](../common/quality-and-security.md#coding-style) with Python specific content.
 
 ## Standards
 

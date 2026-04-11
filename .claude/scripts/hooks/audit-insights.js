@@ -31,7 +31,8 @@ if (!requireMode('standard')) {
 }
 // ─────────────────────────────────────────────────────────────
 
-const PROJECT_ROOT = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
+const { getProjectRoot } = require('../lib/project-root');
+const PROJECT_ROOT = getProjectRoot();
 const LOGS_DIR = path.join(PROJECT_ROOT, '.claude', 'logs');
 const LOCK_FILE = path.join(PROJECT_ROOT, '.claude', '.insights-lock');
 const HOOK_EFFECTIVENESS_PATH = path.join(LOGS_DIR, 'hook-effectiveness.jsonl');

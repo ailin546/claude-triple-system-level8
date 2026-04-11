@@ -15,7 +15,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const PROJECT_ROOT = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
+const { getProjectRoot } = require('./project-root');
+const PROJECT_ROOT = getProjectRoot();
 const LOG_PATH = path.join(PROJECT_ROOT, '.claude', 'logs', 'hook-effectiveness.jsonl');
 const MAX_LINES = 2000;
 
