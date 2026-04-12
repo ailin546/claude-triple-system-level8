@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "permissions": {
     "allow": [
       "Bash",
@@ -96,6 +99,16 @@
             "type": "command",
             "command": "node ~/.claude/scripts/hooks/suggest-compact.js",
             "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/scripts/hooks/auto-model.js",
+            "timeout": 3000
           }
         ]
       }
@@ -270,9 +283,6 @@
   },
   "enabledPlugins": {
     "discord@claude-plugins-official": true,
-    "telegram@claude-plugins-official": true
-  },
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+    "telegram@claude-plugins-official": false
   }
 }
