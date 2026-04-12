@@ -745,21 +745,27 @@ function updateGlobalIndex() {
     }
 
     if (!content.includes('| Project |')) {
-      // Create new index with header
-      content = `# Global Memory Index\n\n| Project | Path | Last Active | Has .memory/ |\n|---------|------|-------------|-------------|\n`;
+      // Create new index with header (5-column format with Host)
+      content = `# Global Memory Index\n\n| Project | Host | Path | Last Active | Has .memory/ |\n|---------|------|------|-------------|-------------|\n`;
     }
 
-    // Check if project already has a row — update it
+    const hostname = require('os').hostname();
+
+    // Match any row containing this exact path in ANY column position
     const escapedPath = PROJECT_ROOT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const rowRegex = new RegExp(`^\\|[^|]*\\|\\s*${escapedPath}\\s*\\|.*$`, 'm');
+    const rowRegex = new RegExp(`^\\|.*\\|\\s*${escapedPath}\\s*\\|.*$`, 'gm');
 
-    const newRow = `| ${projectName} | ${PROJECT_ROOT} | ${now} | ${hasMemory} |`;
+    const newRow = `| ${projectName} | ${hostname} | ${PROJECT_ROOT} | ${now} | ${hasMemory} |`;
 
-    if (rowRegex.test(content)) {
-      content = content.replace(rowRegex, newRow);
-    } else {
-      content = content.trimEnd() + '\n' + newRow + '\n';
+    // Remove ALL existing rows for this path (handles duplicates from schema change)
+    const matches = content.match(rowRegex);
+    if (matches && matches.length > 0) {
+      for (const m of matches) {
+        content = content.replace(m + '\n', '');
+      }
     }
+    // Append the single updated row
+    content = content.trimEnd() + '\n' + newRow + '\n';
 
     fs.writeFileSync(GLOBAL_INDEX_FILE, content, 'utf8');
     log(`[StopSummary] Global index updated: ${projectName}`);
@@ -795,9 +801,19 @@ function promoteLessons() {
       if (!fs.existsSync(file)) continue;
       const content = fs.readFileSync(file, 'utf8');
       const lines = content.split('\n');
+      // Section-scoped scanning: only count lessons under **Lessons:** headers
+      let inLessonsSection = false;
       for (const line of lines) {
+        const trimmed = line.trim();
+        // Detect section headers (same strict rules as transcript scanning)
+        if (/^\*{2}Lessons:?\*{2}$/.test(trimmed)) { inLessonsSection = true; continue; }
+        // Any other section header or non-bullet/non-blank line ends the section
+        if (/^\*{2}\w+:?\*{2}$/.test(trimmed) || /^#{1,4}\s+/.test(trimmed)) { inLessonsSection = false; continue; }
+        if (inLessonsSection && trimmed !== '' && !/^[-*]\s/.test(trimmed)) { inLessonsSection = false; }
+
+        if (!inLessonsSection) continue;
         // Match lines with → pattern (error → fix format)
-        const match = line.match(/^-\s+(.+(?:→|-{1,2}>).+)$/);
+        const match = trimmed.match(/^[-*]\s+(.+(?:→|-{1,2}>).+)$/);
         if (match) {
           const cleaned = cleanLesson(match[1]);
           // Skip already-promoted lessons and very short ones
@@ -854,7 +870,11 @@ function promoteLessons() {
     }
 
     // Append to both CLAUDE.md files
-    const entries = newLessons.map(l => `- [${today}] ${l} ${PROMOTE_MARKER}`).join('\n');
+    // Strip existing date prefix before re-adding (avoid "[2026-04-12] [2026-04-12] ...")
+    const entries = newLessons.map(l => {
+      const stripped = l.replace(/^\[[\d-]+\]\s*/, '');
+      return `- [${today}] ${stripped} ${PROMOTE_MARKER}`;
+    }).join('\n');
     const marker = '<!-- 新错误追加在此行下方 -->';
 
     for (const file of claudeMdFiles) {
