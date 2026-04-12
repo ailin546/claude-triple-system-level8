@@ -107,17 +107,32 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型：
 ```
 ~/.memory/                          ← 全局（跨项目）
 ├── index.md                        ← 项目索引（hook 自动维护）
-├── today.md                        ← 跨项目当日日志
-└── long-term.md                    ← 跨项目永久知识
+├── today.md                        ← 跨项目当日（仅 lessons + decisions）
+├── weekly.md                       ← 近 2 周归档
+└── long-term.md                    ← 永久知识（自动沉淀 Lessons + Decisions）
 
 PROJECT/.memory/                    ← 项目级（各项目独立）
-├── RULES.md                        ← 使用规则
 ├── today.md / weekly.md / long-term.md
 ```
 
-- **读取**：SessionStart 先读全局再读项目级，缺失时静默跳过
-- **写入**：项目工作写 `PROJECT/.memory/today.md`，跨项目洞察写 `~/.memory/today.md`
-- **每日轮转**：today.md 日期非今日时自动归档到 weekly.md
+**自动采集（stop-summary.js Stop hook）：**
+- 从 transcript JSONL 提取 `**Lessons:**` section 下的 `→` / `->` 教训
+- 从 git log 提取 session 期间的 commits（fix 类型含 body）
+- 门控：无 commits + 无 lessons + 无 decisions → 不记录（零噪音）
+- 去重：`seen-lessons.json` 持久化已提取的 lesson keys（7 天 TTL）
+
+**三级流转（全自动）：**
+- today.md →[次日]→ weekly.md →[2周后]→ long-term.md（仅 Lessons + Decisions）
+- 流水账自动丢弃，只有教训和决策沉淀到永久知识库
+- `promoteLessons()` 将出现 2+ 次的教训推广到 CLAUDE.md
+
+**Claude 写教训的格式**（便于 Stop hook 自动提取）：
+```markdown
+**Lessons:**
+- 问题描述 → 正确做法
+```
+
+**详细设计文档**见 `~/.claude/rules/common/workflow.md` 的"记忆系统"段。
 
 ## 一致性原则
 

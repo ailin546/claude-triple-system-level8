@@ -371,6 +371,20 @@ async function main() {
     log(`[SessionStart] Rules loader error: ${err.message}`);
   }
 
+  // Record session start time for stop-summary.js
+  try {
+    const sessionStateDir = path.join(getProjectRoot(), '.claude', '.session-state');
+    ensureDir(sessionStateDir);
+    fs.writeFileSync(
+      path.join(sessionStateDir, 'stop-summary.json'),
+      JSON.stringify({ sessionStartTime: new Date().toISOString() }),
+      'utf8'
+    );
+    log('[SessionStart] Session start time recorded');
+  } catch (err) {
+    log(`[SessionStart] Failed to record session start time: ${err.message}`);
+  }
+
   // Detect and report package manager
   const pm = getPackageManager();
   log(`[SessionStart] Package manager: ${pm.name} (${pm.source})`);
