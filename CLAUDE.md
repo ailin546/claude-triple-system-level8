@@ -74,7 +74,7 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型：
 | worker（doc-updater, refactor-cleaner, e2e-runner...） | haiku | sonnet | sonnet |
 
 查询：`node .claude/scripts/hooks/get-model.js <agent-name>`
-映射逻辑：`scripts/lib/model-map.js`
+映射逻辑：`.claude/scripts/lib/model-map.js`
 覆盖：`MODEL_MAP_OVERRIDE=planner:sonnet,doc-updater:opus`
 
 ## 风险控制

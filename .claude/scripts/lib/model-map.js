@@ -98,16 +98,20 @@ const MODE_INDEX = { fast: 0, standard: 1, heavy: 2 };
  * Format: "agent:model,agent:model"
  * @returns {Record<string, string>}
  */
+let _overridesCache = null;
+
 function parseOverrides() {
+  if (_overridesCache !== null) return _overridesCache;
   const raw = process.env.MODEL_MAP_OVERRIDE || '';
-  if (!raw.trim()) return {};
-  const overrides = {};
+  if (!raw.trim()) { _overridesCache = Object.create(null); return _overridesCache; }
+  const overrides = Object.create(null);
   for (const pair of raw.split(',')) {
     const [agent, model] = pair.split(':').map(s => s.trim().toLowerCase());
     if (agent && model && ['haiku', 'sonnet', 'opus'].includes(model)) {
       overrides[agent] = model;
     }
   }
+  _overridesCache = overrides;
   return overrides;
 }
 
@@ -151,13 +155,9 @@ function getAllModelAssignments(opts = {}) {
   const mode = opts.mode || getCurrentMode();
   const modeIdx = MODE_INDEX[mode] ?? 0;
   const overrides = parseOverrides();
-  const seen = new Set();
   const result = [];
 
   for (const [agent, category] of Object.entries(AGENT_CATEGORY)) {
-    if (seen.has(agent)) continue;
-    seen.add(agent);
-
     let model;
     if (overrides[agent]) {
       model = overrides[agent];
@@ -179,8 +179,9 @@ function getAllModelAssignments(opts = {}) {
  * @returns {string}
  */
 function getModelSummary(opts = {}) {
-  const mode = opts.mode || getCurrentMode();
-  const modeIdx = MODE_INDEX[mode] ?? 0;
+  const rawMode = opts.mode || getCurrentMode();
+  const mode = MODE_INDEX[rawMode] !== undefined ? rawMode : 'fast';
+  const modeIdx = MODE_INDEX[mode];
   const lines = [`Model assignments (mode: ${mode}):`];
 
   for (const [category, models] of Object.entries(CATEGORY_MODELS)) {

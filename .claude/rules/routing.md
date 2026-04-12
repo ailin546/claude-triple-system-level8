@@ -114,7 +114,7 @@ node .claude/scripts/hooks/get-model.js --summary       # 分类汇总
 3. 模式升档后（set-mode / pre-tool-escalate），后续 agent spawn 自动使用更高模型
 4. 用户可通过 `MODEL_MAP_OVERRIDE` 环境变量覆盖特定 agent 的模型
 
-**映射逻辑**：`scripts/lib/model-map.js`
+**映射逻辑**：`.claude/scripts/lib/model-map.js`
 
 ## 禁止行为
 

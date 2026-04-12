@@ -20,7 +20,15 @@
 'use strict';
 
 const { getCurrentMode, setMode, MODE_LEVELS, appendModeTrace, clearEscalationState } = require('../lib/mode-check');
-const { getModelSummary } = require('../lib/model-map');
+
+function safeGetModelSummary(opts) {
+  try {
+    const { getModelSummary } = require('../lib/model-map');
+    return safeGetModelSummary(opts);
+  } catch {
+    return '';
+  }
+}
 
 const VALID_MODES = Object.keys(MODE_LEVELS);
 const args = process.argv.slice(2).map(a => a.toLowerCase());
@@ -42,7 +50,7 @@ if (isReset) {
     overridden_by_user: true
   });
   console.error(`[SetMode] Reset: ${prevMode} → fast (new task boundary, escalation state cleared)`);
-  console.error(`[SetMode] ${getModelSummary({ mode: 'fast' })}`);
+  console.error(`[SetMode] ${safeGetModelSummary({ mode: 'fast' })}`);
 
   if (!modeArg) {
     process.exit(0);
@@ -86,5 +94,5 @@ appendModeTrace({
   overridden_by_user: true
 });
 console.error(`[SetMode] Mode escalated: ${currentMode} → ${modeArg}`);
-console.error(`[SetMode] ${getModelSummary({ mode: modeArg })}`);
+console.error(`[SetMode] ${safeGetModelSummary({ mode: modeArg })}`);
 process.exit(0);
