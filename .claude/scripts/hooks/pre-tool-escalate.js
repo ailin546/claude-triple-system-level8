@@ -154,6 +154,10 @@ process.stdin.on('end', () => {
           overridden_by_user: false
         });
         console.error(`[PreToolEscalate] Task boundary detected (idle ${Math.round((now - escState.lastToolUseAt) / 60000)}min). Mode reset: ${prevMode} → fast`);
+        try {
+          const { getModelSummary } = require('../lib/model-map');
+          console.error(`[PreToolEscalate] ${getModelSummary({ mode: 'fast' })}`);
+        } catch { /* model-map not available */ }
         currentMode = 'fast';
       }
       // Clear file tracking for new task
@@ -211,6 +215,10 @@ process.stdin.on('end', () => {
           overridden_by_user: false
         });
         console.error(`[PreToolEscalate] Mode escalated: ${currentMode} → ${targetMode} (${targetReason})`);
+        try {
+          const { getModelSummary } = require('../lib/model-map');
+          console.error(`[PreToolEscalate] ${getModelSummary({ mode: targetMode })}`);
+        } catch { /* model-map not available */ }
       }
     }
 

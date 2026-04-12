@@ -61,6 +61,22 @@ User Request
 | DB optimization | `engineering-database-optimizer` | Git workflow | `engineering-git-workflow-master` |
 | Technical docs | `engineering-technical-writer` | Performance | `testing-performance-benchmarker` |
 
+## 模型自动选择
+
+Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型：
+
+| Agent 类别 | Fast | Standard | Heavy |
+|-----------|------|----------|-------|
+| critical-reasoning（planner, architect） | opus | opus | opus |
+| orchestrator | sonnet | opus | opus |
+| review（code-reviewer, security-*） | sonnet | opus | opus |
+| development（tdd-guide, build-*, frontend, backend...） | sonnet | sonnet | opus |
+| worker（doc-updater, refactor-cleaner, e2e-runner...） | haiku | sonnet | sonnet |
+
+查询：`node .claude/scripts/hooks/get-model.js <agent-name>`
+映射逻辑：`.claude/scripts/lib/model-map.js`
+覆盖：`MODEL_MAP_OVERRIDE=planner:sonnet,doc-updater:opus`
+
 ## 风险控制
 
 全权限 + hook 守卫模式：

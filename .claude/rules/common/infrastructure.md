@@ -112,22 +112,32 @@ State stored in `.claude/.drift-state/{session-id}.json`. Resets per session.
 
 ## Performance Optimization
 
-### Model Selection Strategy
+### Model Selection Strategy — 模式联动自动化
 
-**Haiku 4.5** (90% of Sonnet capability, 3x cost savings):
-- Lightweight agents with frequent invocation
-- Pair programming and code generation
-- Worker agents in multi-agent systems
+模型选择已与系统模式（Fast/Standard/Heavy）自动联动。
 
-**Sonnet 4.6** (Best coding model):
-- Main development work
-- Orchestrating multi-agent workflows
-- Complex coding tasks
+**映射表**（`scripts/lib/model-map.js`）：
 
-**Opus 4.6** (Deepest reasoning):
-- Complex architectural decisions
-- Maximum reasoning requirements
-- Research and analysis tasks
+| Agent 类别 | Fast | Standard | Heavy |
+|-----------|------|----------|-------|
+| critical-reasoning（planner, architect） | opus | opus | opus |
+| orchestrator | sonnet | opus | opus |
+| review（code-reviewer, security-*） | sonnet | opus | opus |
+| development（tdd-guide, build-*, frontend, backend） | sonnet | sonnet | opus |
+| worker（doc-updater, refactor-cleaner, e2e-runner） | haiku | sonnet | sonnet |
+
+**触发点**：
+- `task-router.js`（SessionStart）— 输出 Fast 模式默认模型分配
+- `set-mode.js`（手动升档）— 升档后输出新模型分配
+- `pre-tool-escalate.js`（自动升档）— 升档后输出新模型分配
+
+**查询**：`node .claude/scripts/hooks/get-model.js <agent-name>`
+**覆盖**：`MODEL_MAP_OVERRIDE=planner:sonnet,doc-updater:opus`
+
+**模型能力参考**：
+- **Haiku 4.5**：90% Sonnet 能力，3x 成本节省，适合高频轻量 worker
+- **Sonnet 4.6**：最佳编码模型，适合主力开发和编排
+- **Opus 4.6**：最深推理，适合架构决策和复杂审查
 
 ### Context Window Management
 

@@ -65,6 +65,15 @@ function main() {
     // mode-check not available — continue without trace
   }
 
+  // Build model hint
+  let modelHint = '';
+  try {
+    const { getModelSummary } = require('../lib/model-map');
+    modelHint = '\n' + getModelSummary({ mode: 'fast' }) +
+      '\nWhen spawning agents, pass the `model` parameter matching the current mode. ' +
+      'Query: node .claude/scripts/hooks/get-model.js <agent-name>';
+  } catch { /* model-map not available */ }
+
   // Output routing instructions into Claude's context
   output([
     '[TaskRouter] Mode: Fast (default)',
@@ -77,6 +86,7 @@ function main() {
     'If Standard or Heavy, run: node .claude/scripts/hooks/set-mode.js <mode>',
     'Auto-escalation via pre-tool-escalate.js is also active as a safety net.',
     'Task boundary auto-reset: 5min idle gap resets mode to fast.',
+    modelHint,
   ].join('\n'));
 
   log('[TaskRouter] Initialized mode: fast, escalation state cleared, trace truncated');
