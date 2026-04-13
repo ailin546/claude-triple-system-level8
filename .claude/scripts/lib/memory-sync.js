@@ -21,6 +21,7 @@ const { execFileSync } = require('child_process');
 const { getProjectRoot } = require('./project-root');
 const PROJECT_ROOT = getProjectRoot();
 const MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
+const GLOBAL_MEMORY_DIR = path.join(require('os').homedir(), '.memory');
 const REMOTE_FILE = path.join(PROJECT_ROOT, '.claude', '.memory-remote');
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [2000, 4000, 8000]; // exponential backoff
@@ -56,13 +57,13 @@ function isMemoryGitRepo() {
 }
 
 /**
- * Run a git command in the .memory/ directory.
+ * Run a git command in a given directory.
  * Returns { ok, stdout, stderr }.
  */
-function gitInMemory(args, opts = {}) {
+function gitInDir(dir, args, opts = {}) {
   try {
     const stdout = execFileSync('git', args, {
-      cwd: MEMORY_DIR,
+      cwd: dir,
       encoding: 'utf8',
       timeout: opts.timeout || 15000,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -76,6 +77,13 @@ function gitInMemory(args, opts = {}) {
       error: err.message,
     };
   }
+}
+
+/**
+ * Run a git command in the project .memory/ directory.
+ */
+function gitInMemory(args, opts = {}) {
+  return gitInDir(MEMORY_DIR, args, opts);
 }
 
 /**
@@ -230,7 +238,7 @@ function pull() {
     );
 
     if (result.ok) {
-      log('[MemorySync] Pull successful');
+      log('[MemorySync] Pull successful (project)');
     } else {
       // Rebase conflict — try merge instead
       gitInMemory(['rebase', '--abort']);
@@ -238,11 +246,44 @@ function pull() {
       if (mergeResult.ok) {
         log('[MemorySync] Pull (merge) successful after rebase conflict');
       } else {
-        log(`[MemorySync] Pull failed: ${mergeResult.error || mergeResult.stderr}`);
+        log(`[MemorySync] Pull failed (project): ${mergeResult.error || mergeResult.stderr}`);
       }
     }
   } catch (err) {
-    log(`[MemorySync] Pull error (non-blocking): ${err.message}`);
+    log(`[MemorySync] Pull error (project, non-blocking): ${err.message}`);
+  }
+
+  // Also pull global ~/.memory/ if it's a separate git repo
+  pullGlobalMemory();
+}
+
+/**
+ * Pull global ~/.memory/ from its own remote (if it's an independent git repo).
+ * Skipped if global dir === project dir (already pulled above).
+ */
+function pullGlobalMemory() {
+  try {
+    if (path.resolve(GLOBAL_MEMORY_DIR) === path.resolve(MEMORY_DIR)) return;
+    if (!fs.existsSync(path.join(GLOBAL_MEMORY_DIR, '.git'))) return;
+
+    const result = withRetry(
+      () => gitInDir(GLOBAL_MEMORY_DIR, ['pull', '--rebase', 'origin', 'main'], { timeout: 20000 }),
+      'global git pull'
+    );
+
+    if (result.ok) {
+      log('[MemorySync] Pull successful (global ~/.memory/)');
+    } else {
+      gitInDir(GLOBAL_MEMORY_DIR, ['rebase', '--abort']);
+      const mergeResult = gitInDir(GLOBAL_MEMORY_DIR, ['pull', 'origin', 'main'], { timeout: 20000 });
+      if (mergeResult.ok) {
+        log('[MemorySync] Pull (merge) successful (global) after rebase conflict');
+      } else {
+        log(`[MemorySync] Pull failed (global): ${mergeResult.error || mergeResult.stderr}`);
+      }
+    }
+  } catch (err) {
+    log(`[MemorySync] Global pull error (non-blocking): ${err.message}`);
   }
 }
 
@@ -295,12 +336,60 @@ function push() {
     );
 
     if (result.ok) {
-      log('[MemorySync] Push successful');
+      log('[MemorySync] Push successful (project)');
     } else {
-      log(`[MemorySync] Push failed: ${result.error || result.stderr}`);
+      log(`[MemorySync] Push failed (project): ${result.error || result.stderr}`);
     }
   } catch (err) {
-    log(`[MemorySync] Push error (non-blocking): ${err.message}`);
+    log(`[MemorySync] Push error (project, non-blocking): ${err.message}`);
+  }
+
+  // Also sync global ~/.memory/ if it's a separate git repo
+  pushGlobalMemory();
+}
+
+/**
+ * Push global ~/.memory/ to its own remote (if it's an independent git repo).
+ * Skipped if global dir === project dir (already synced above).
+ */
+function pushGlobalMemory() {
+  try {
+    // Skip if global is same as project (already handled)
+    if (path.resolve(GLOBAL_MEMORY_DIR) === path.resolve(MEMORY_DIR)) return;
+
+    // Only sync if global .memory/ is its own git repo
+    if (!fs.existsSync(path.join(GLOBAL_MEMORY_DIR, '.git'))) return;
+
+    // Check for changes
+    const status = gitInDir(GLOBAL_MEMORY_DIR, ['status', '--porcelain']);
+    if (!status.stdout) return;
+
+    // Stage, commit, push
+    gitInDir(GLOBAL_MEMORY_DIR, ['add', '-A']);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const tool = process.env.CLAUDE_TOOL_NAME || 'Claude Code';
+    const host = require('os').hostname();
+    gitInDir(GLOBAL_MEMORY_DIR, ['commit', '-m', `memory: ${today} [${tool}@${host}]`]);
+
+    const pullResult = gitInDir(GLOBAL_MEMORY_DIR, ['pull', '--rebase', 'origin', 'main'], { timeout: 20000 });
+    if (!pullResult.ok) {
+      gitInDir(GLOBAL_MEMORY_DIR, ['rebase', '--abort']);
+      gitInDir(GLOBAL_MEMORY_DIR, ['pull', 'origin', 'main'], { timeout: 20000 });
+    }
+
+    const result = withRetry(
+      () => gitInDir(GLOBAL_MEMORY_DIR, ['push', 'origin', 'main'], { timeout: 20000 }),
+      'global git push'
+    );
+
+    if (result.ok) {
+      log('[MemorySync] Push successful (global ~/.memory/)');
+    } else {
+      log(`[MemorySync] Push failed (global): ${result.error || result.stderr}`);
+    }
+  } catch (err) {
+    log(`[MemorySync] Global push error (non-blocking): ${err.message}`);
   }
 }
 

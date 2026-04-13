@@ -19,6 +19,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { isGitRepo, getGitModifiedFiles, readFile, log, getProjectRoot, getGlobalMemoryDir, ensureDir } = require('../lib/utils');
+const lessonLib = require('../lib/extract-lessons');
 
 const PROJECT_ROOT = getProjectRoot();
 const MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
@@ -51,28 +52,9 @@ function getLocalDateString() {
 }
 
 
-/**
- * Clean a lesson string: strip markdown formatting, normalize whitespace.
- * "**Claude 不写** → stop-summary.js 已修复" → "Claude 不写 → stop-summary.js 已修复"
- */
-function cleanLesson(raw) {
-  return raw
-    .replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1')  // strip bold/italic
-    .replace(/`([^`]+)`/g, '$1')                // strip inline code
-    .replace(/\s+/g, ' ')                        // normalize whitespace
-    .trim();
-}
-
-/**
- * Extract dedup key from lesson: the LEFT side of → (problem description).
- * "全局 today.md 不轮转 → fix A" and "全局 today.md 不轮转 → fix B" are the same lesson.
- */
-function lessonKey(cleaned) {
-  // Support both → and -> / -->
-  const match = cleaned.match(/^(.+?)(?:→|-{1,2}>)/);
-  if (!match) return cleaned.toLowerCase();
-  return match[1].trim().toLowerCase();
-}
+// Shared helpers — canonical implementations in lib/extract-lessons.js
+const cleanLesson = lessonLib.cleanLesson;
+const lessonKey = lessonLib.lessonKey;
 
 // ── Session state file ───────────────────────────────────────
 const SESSION_STATE_DIR = path.join(PROJECT_ROOT, '.claude', '.session-state');
@@ -93,50 +75,9 @@ function getSessionStartTime() {
   return null;
 }
 
-/**
- * Load previously extracted lesson keys from disk.
- * Persists across today.md rotations — the real anti-circulation mechanism.
- */
-function loadSeenLessonKeys() {
-  try {
-    if (fs.existsSync(SEEN_LESSONS_FILE)) {
-      const data = JSON.parse(fs.readFileSync(SEEN_LESSONS_FILE, 'utf8'));
-      // Expire entries older than 7 days
-      const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-      const valid = (data.entries || []).filter(e => (e.ts || 0) > cutoff);
-      return new Set(valid.map(e => e.key));
-    }
-  } catch { /* ignore */ }
-  return new Set();
-}
-
-/**
- * Save extracted lesson keys to disk.
- */
-function saveSeenLessonKeys(keys) {
-  try {
-    ensureDir(SESSION_STATE_DIR);
-    const now = Date.now();
-    // Merge with existing
-    let existing = [];
-    if (fs.existsSync(SEEN_LESSONS_FILE)) {
-      try {
-        const data = JSON.parse(fs.readFileSync(SEEN_LESSONS_FILE, 'utf8'));
-        existing = data.entries || [];
-      } catch { /* ignore */ }
-    }
-    const cutoff = now - 7 * 24 * 60 * 60 * 1000;
-    const merged = new Map();
-    for (const e of existing) {
-      if ((e.ts || 0) > cutoff) merged.set(e.key, e.ts);
-    }
-    for (const k of keys) {
-      merged.set(k, now);
-    }
-    const entries = [...merged.entries()].map(([key, ts]) => ({ key, ts }));
-    fs.writeFileSync(SEEN_LESSONS_FILE, JSON.stringify({ entries }), 'utf8');
-  } catch { /* ignore */ }
-}
+// Delegate to shared module with session-state dir
+function loadSeenLessonKeys() { return lessonLib.loadSeenLessonKeys(SESSION_STATE_DIR); }
+function saveSeenLessonKeys(keys) { lessonLib.saveSeenLessonKeys(SESSION_STATE_DIR, keys); }
 
 
 /**
@@ -620,13 +561,13 @@ function promoteWeeklyToLongTerm(memDir, label) {
         }
 
         if (inLessons && /^[-*]\s+/.test(trimmed)) {
-          const item = cleanLesson(trimmed.replace(/^[-*]\s+/, ''));
+          const item = cleanLesson(trimmed.replace(/^[-*]\s+/, '')).replace(/^\[[\d-]+\]\s*/, '');
           if (item.length >= 10) {
             newLessons.push(`- [${date}] ${item}`);
           }
         }
         if (inDecisions && /^[-*]\s+/.test(trimmed)) {
-          const item = cleanLesson(trimmed.replace(/^[-*]\s+/, ''));
+          const item = cleanLesson(trimmed.replace(/^[-*]\s+/, '')).replace(/^\[[\d-]+\]\s*/, '');
           if (item.length >= 10) {
             newDecisions.push(`- [${date}] ${item}`);
           }
@@ -807,8 +748,8 @@ function promoteLessons() {
         const trimmed = line.trim();
         // Detect section headers (same strict rules as transcript scanning)
         if (/^\*{2}Lessons:?\*{2}$/.test(trimmed)) { inLessonsSection = true; continue; }
-        // Any other section header or non-bullet/non-blank line ends the section
-        if (/^\*{2}\w+:?\*{2}$/.test(trimmed) || /^#{1,4}\s+/.test(trimmed)) { inLessonsSection = false; continue; }
+        // Any other bold header (including Chinese like **决策:**) or markdown heading ends the section
+        if (/^\*{2}[^*]+:?\*{2}$/.test(trimmed) || /^#{1,4}\s+/.test(trimmed)) { inLessonsSection = false; continue; }
         if (inLessonsSection && trimmed !== '' && !/^[-*]\s/.test(trimmed)) { inLessonsSection = false; }
 
         if (!inLessonsSection) continue;

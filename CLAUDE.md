@@ -115,11 +115,13 @@ PROJECT/.memory/                    ← 项目级（各项目独立）
 ├── today.md / weekly.md / long-term.md
 ```
 
-**自动采集（stop-summary.js Stop hook）：**
+**自动采集（双触发点，共享 extract-lessons.js）：**
+- **PreCompact hook**（pre-compact.js）— compact 前提取，防止长会话教训丢失（标记 `[compact]`）
+- **Stop hook**（stop-summary.js）— 会话结束时提取，兜底保障（标记 `[auto]`）
 - 从 transcript JSONL 提取 `**Lessons:**` section 下的 `→` / `->` 教训
 - 从 git log 提取 session 期间的 commits（fix 类型含 body）
 - 门控：无 commits + 无 lessons + 无 decisions → 不记录（零噪音）
-- 去重：`seen-lessons.json` 持久化已提取的 lesson keys（7 天 TTL）
+- 去重：`seen-lessons.json` 持久化已提取的 lesson keys（7 天 TTL），compact 已提取的 Stop 时自动跳过
 
 **三级流转（全自动）：**
 - today.md →[次日]→ weekly.md →[2周后]→ long-term.md（仅 Lessons + Decisions）

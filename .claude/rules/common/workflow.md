@@ -98,12 +98,19 @@ When creating PRs:
     ├─ Claude 在对话中输出 **Lessons:** / **Decisions:** 段
     │  （自然表达即可，不需要"记得写记忆"）
     │
+    ├─► Context Compact → pre-compact.js (PreCompact hook)
+    │   ├─ 提取 transcript 中的 lessons/decisions（共享 extract-lessons.js）
+    │   ├─ 收集 git commits
+    │   ├─ 写入 today.md（标记 [compact]，与 Stop 的 [auto] 区分）
+    │   └─ 更新 seen-lessons.json（Stop 时自动跳过已提取的）
+    │
     ▼
 会话结束 → stop-summary.js (Stop hook, 100% 可靠)
     │
     ├─ 读 transcript JSONL（从 stdin JSON 的 transcript_path 获取）
     │   └─ 严格匹配 **Lessons:** section 下的 → 格式教训
     │   └─ 严格匹配 **Decisions:** section 下的条目
+    │   └─ 跳过 seen-lessons.json 中已有的 keys（compact 已提取的不重复）
     │
     ├─ 读 git log（session 期间的 commits）
     │   └─ fix/perf/hotfix 类型提取 commit body 作为上下文
@@ -119,7 +126,7 @@ When creating PRs:
     ├─ 沉淀：weekly.md 超过 2 周的内容 → Lessons/Decisions 提取到 long-term.md
     │   └─ 流水账自动丢弃，只保留有长期价值的内容
     │
-    ├─ 推广：promoteLessons() 扫描 .memory/ 中出现 2+ 次的教训 → 写入 CLAUDE.md
+    ├─ 推广：promoteLessons() 扫描 **Lessons:** section 下出现 2+ 次的教训 → 写入 CLAUDE.md
     │
     └─ 更新 ~/.memory/index.md（全局项目索引）
 ```
