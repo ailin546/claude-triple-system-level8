@@ -321,17 +321,21 @@ function push() {
     const host = require('os').hostname();
     gitInMemory(['commit', '-m', `memory: ${today} [${tool}@${host}]`]);
 
+    // Detect current branch (supports project repos on non-main branches)
+    const branchResult = gitInMemory(['rev-parse', '--abbrev-ref', 'HEAD']);
+    const branch = (branchResult.ok && branchResult.stdout.trim()) || 'main';
+
     // Pull before push to avoid conflicts
-    const pullResult = gitInMemory(['pull', '--rebase', 'origin', 'main'], { timeout: 20000 });
+    const pullResult = gitInMemory(['pull', '--rebase', 'origin', branch], { timeout: 20000 });
     if (!pullResult.ok) {
       // Rebase conflict — abort and try merge
       gitInMemory(['rebase', '--abort']);
-      gitInMemory(['pull', 'origin', 'main'], { timeout: 20000 });
+      gitInMemory(['pull', 'origin', branch], { timeout: 20000 });
     }
 
     // Push with retry
     const result = withRetry(
-      () => gitInMemory(['push', 'origin', 'main'], { timeout: 20000 }),
+      () => gitInMemory(['push', 'origin', branch], { timeout: 20000 }),
       'git push'
     );
 

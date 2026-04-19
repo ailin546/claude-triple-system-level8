@@ -13,10 +13,11 @@ This command invokes the **planner** agent to create a comprehensive implementat
 
 ## What This Command Does
 
+0. **Check Specify** - 如果 `.claude/specify.md` 存在，引用其任务宪法作为约束；如果不存在且任务涉及多模块，建议先跑 `/specify`
 1. **Restate Requirements** - Clarify what needs to be built (What & Why)
 2. **Identify Risks** - Surface potential issues and blockers
-3. **Create Step Plan** - Break down implementation into phases
-4. **Define Acceptance Criteria** - Concrete, verifiable conditions for "done"
+3. **Create Step Plan** - Break down implementation into atomic steps, each with `→ verify:` check
+4. **Define Acceptance Criteria** - 强制输出，每个 plan 必须有 AC 段（MUST + SHOULD）
 5. **Wait for Confirmation** - MUST receive user approval before proceeding
 
 ## When to Use

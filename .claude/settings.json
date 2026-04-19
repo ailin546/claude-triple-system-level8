@@ -15,6 +15,20 @@
       "Agent",
       "NotebookEdit",
       "Skill",
+      "Monitor",
+      "SendMessage",
+      "TaskCreate",
+      "TaskUpdate",
+      "TaskList",
+      "TaskGet",
+      "TaskOutput",
+      "TaskStop",
+      "AskUserQuestion",
+      "PushNotification",
+      "EnterPlanMode",
+      "ExitPlanMode",
+      "ScheduleWakeup",
+      "ToolSearch",
       "mcp__*"
     ],
     "deny": [
@@ -26,7 +40,8 @@
       "TeamDelete",
       "EnterWorktree",
       "ExitWorktree"
-    ]
+    ],
+    "defaultMode": "bypassPermissions"
   },
   "hooks": {
     "SessionStart": [
@@ -65,6 +80,11 @@
       {
         "matcher": "Bash",
         "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/scripts/hooks/evaluation-gate.js",
+            "timeout": 3000
+          },
           {
             "type": "command",
             "command": "node ~/.claude/scripts/hooks/careful-guard.js",
@@ -283,6 +303,16 @@
   },
   "enabledPlugins": {
     "discord@claude-plugins-official": true,
-    "telegram@claude-plugins-official": false
-  }
+    "telegram@claude-plugins-official": true,
+    "design@knowledge-work-plugins": true
+  },
+  "extraKnownMarketplaces": {
+    "knowledge-work-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/knowledge-work-plugins"
+      }
+    }
+  },
+  "skipDangerousModePermissionPrompt": true
 }

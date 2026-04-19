@@ -98,6 +98,23 @@ function detectEscalation(input) {
     for (const dir of STANDARD_DIR_NAMES) {
       if (pathContainsDir(filePath, dir)) return { mode: 'standard', signal: `path: ${filePath}` };
     }
+
+    // Content-level: data source SSOT check (invariant #1)
+    // Editing frontend files that introduce exchange proxy or direct API calls
+    // → auto-escalate to Standard (triggers /plan recommendation)
+    if (/\.(ts|tsx|js|jsx)$/.test(filePath)) {
+      const content = toolInput.new_string || toolInput.content || '';
+      const SSOT_PATTERNS = [
+        /\/proxy-(binance|okx|bybit|gate|bitget|mexc|kucoin|coinex|hyperliquid)/,
+        /api\.binance\.com|fapi\.binance\.com|www\.okx\.com|api\.bybit\.com/,
+        /api\.bitget\.com|api\.gateio\.ws|api\.huobi\.pro/,
+      ];
+      for (const pat of SSOT_PATTERNS) {
+        if (pat.test(content)) {
+          return { mode: 'standard', signal: `SSOT: exchange data source in ${filePath.split('/').pop()}` };
+        }
+      }
+    }
   }
 
   return null;

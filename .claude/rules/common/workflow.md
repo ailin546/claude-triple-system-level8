@@ -51,7 +51,9 @@
 
 5. **Verify** (`/verify pre-pr`)
    - Build + types + lint + tests + security scan
-   - Heavy 模式下，若 `/plan` 定义了 Acceptance Criteria → 触发 `evaluation-loop`（独立 Evaluator 评估）
+   - **一致性不变量检查**（所有模式）：对照项目 CLAUDE.md §八½ 的 5 条不变量逐条确认
+   - **Standard+ 模式**：若 `.claude/specify.md` 存在 → 对照验收条件逐条检查（MUST 全过才算通过）
+   - **Heavy 模式**：若 `/plan` 定义了 Acceptance Criteria → 触发 `evaluation-loop`（独立 Evaluator 评估）
    - 评分标准见 `~/.claude/on-demand/evaluation-rubric.md`（按需加载，evaluation-loop skill 启动时引入）
 
 6. **Commit & Push** — 见下方 Git Workflow 段

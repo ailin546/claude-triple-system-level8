@@ -854,6 +854,21 @@ function main(conversationText) {
   // Auto-promote repeated error lessons to CLAUDE.md (daily)
   promoteLessons();
 
+  // 2026-04-19: structured Proof of Work row for each Stop event.
+  // Machine-readable audit of what this session did; future sessions /
+  // dashboards / evaluation tools can grep ~/.claude/state/proof-of-work.jsonl
+  // without LLM interpretation. See scripts/lib/proof-of-work.js for schema.
+  try {
+    const pow = require('../lib/proof-of-work');
+    pow.append({
+      projectRoot: PROJECT_ROOT,
+      stdinJson: conversationText,
+      truncated: conversationText && conversationText.length >= 1024 * 1024,
+    });
+  } catch (err) {
+    log(`[StopSummary] Proof-of-work append skipped: ${err.message}`);
+  }
+
   // Push shared memory to remote (if configured)
   try {
     const memorySync = require('../lib/memory-sync');

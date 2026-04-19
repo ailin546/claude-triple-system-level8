@@ -59,21 +59,64 @@ Generator 完成功能
                  ▼
 ┌─────────────────────────────────────────┐
 │ Step 4: 现实性检查（独立 Agent）          │
-│  → 调用 Reality Checker Agent            │
+│  → 根据项目类型选择 Reality Checker:     │
+│    - 存在 Cargo.toml / go.mod / CMake   │
+│      且不存在 index.html / resources/    │
+│      views/  → `Reality Checker          │
+│      (Systems)` agent                    │
+│      (testing-reality-checker-systems)   │
+│    - 否则(web/UI 项目) → `Reality        │
+│      Checker` agent                       │
+│      (testing-reality-checker)           │
 │  → 输入：Step 1-3 的结果 + /plan 验收标准│
 │  → 逐条对照 acceptance criteria          │
 │  → 默认态度：NEEDS WORK                  │
+│  → 背景: Web 版的 Reality Checker 会在   │
+│    Rust 项目上对空目录 grep/Playwright  │
+│    截图 → 无证据自动 PASS → 静默失效    │
+│    (2026-04-19 独立审查抓到的 Gap #1)   │
 └────────────────┬────────────────────────┘
                  │
                  ▼
 ┌─────────────────────────────────────────┐
 │ Step 5: 判定                             │
 │  ├ 硬验证通过 + Reality Checker 通过     │
-│  │  → ✅ 接受，进入 /verify full         │
+│  │  → ✅ 接受                            │
+│  │     写 pass marker(见 Step 5.5)      │
+│  │     进入 /verify full                │
 │  ├ 硬验证失败                            │
 │  │  → ❌ 必须修复（附具体错误）           │
 │  └ 软验证不过                            │
 │     → ⚠️ 反馈给 Generator，进入下一轮    │
+└────────────────┬────────────────────────┘
+                 │ Accepted
+                 ▼
+┌─────────────────────────────────────────┐
+│ Step 5.5: Evaluation-Gate 写 marker    │
+│  Claude 用 Write tool 写:               │
+│    ~/.claude/state/evaluation-gate/     │
+│        last-pass.json                   │
+│  必填 schema(缺字段 hook 会 block):      │
+│  {                                      │
+│    "ts": <Date.now()>,                  │
+│    "git_head": "<git rev-parse --short  │
+│                 HEAD 的输出>",            │
+│    "mode": "heavy",                     │
+│    "round": <N>,                        │
+│    "evaluator_agent_id": "<Task tool   │
+│      spawn 的 Reality Checker agent     │
+│      id,从 completion notification     │
+│      读取>",                             │
+│    "verdict_summary": "<Reality         │
+│      Checker 返回原文中 ACCEPTED 的      │
+│      一行摘要,至少 10 字符>"              │
+│  }                                      │
+│  作用: 解除 evaluation-gate hook 的     │
+│        commit/push 阻断。2h TTL +       │
+│        git_head 校验(代码一旦变化        │
+│        marker 立即失效)。                │
+│  反作弊: 跳过 Step 5.5 或伪造空 marker  │
+│          会在 commit 时被 hook 拦住。    │
 └────────────────┬────────────────────────┘
                  │ 不达标
                  ▼
