@@ -1,7 +1,13 @@
-Cross-AI code review via OpenAI's official **codex-plugin-cc** Claude Code plugin.
+---
+description: Cross-AI code review via OpenAI's official codex-plugin-cc Claude Code plugin.
+mode: Standard / Heavy
+when: 关键 PR 合并前、Claude 自审后想要独立第二意见、对抗性审查
+not_when: 纯文档改动、配置微调、Fast 模式小修复
+---
 
-> 本系统不再直接调用 `codex` CLI。所有 Codex 交互统一通过官方插件提供的 `/codex:*` 斜杠命令完成。
-> 插件仓库：<https://github.com/openai/codex-plugin-cc>
+# /codex — codex-plugin-cc 入口
+
+本系统不再直接调用 `codex` CLI。所有 Codex 交互统一通过官方插件 [codex-plugin-cc](https://github.com/openai/codex-plugin-cc) 提供的 `/codex:*` 斜杠命令完成。
 
 ## 一次性安装
 
@@ -22,6 +28,8 @@ Cross-AI code review via OpenAI's official **codex-plugin-cc** Claude Code plugi
 | `/codex challenge` | `/codex:adversarial-review` | 对抗性挑战式审查 |
 | `/codex consult <q>` | `/codex:rescue` | 委派任务给 Codex 调查/修复 |
 | — | `/codex:status` / `/codex:result` / `/codex:cancel` | 后台任务管理 |
+
+详细流程见 skill：`.claude/skills/codex-review/SKILL.md`。
 
 ## Gate 机制（沿用）
 
