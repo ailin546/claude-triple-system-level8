@@ -1,114 +1,98 @@
 ---
-description: Cross-AI code review using OpenAI Codex CLI (OAuth, no API key needed)
+description: Cross-AI code review using the official codex-plugin-cc Claude Code plugin (no direct codex CLI calls)
 triggers:
   - before merging critical PRs
   - after code review for second opinion
   - on demand for adversarial analysis
 ---
 
-# Codex Cross-AI Review
+# Codex Cross-AI Review (via codex-plugin-cc)
 
-Use OpenAI's Codex CLI as an independent "second pair of eyes" to review code,
-eliminating Claude's self-review blind spots.
+Use OpenAI 官方 Claude Code 插件 [codex-plugin-cc](https://github.com/openai/codex-plugin-cc) 作为独立"第二双眼"，消除 Claude 自审盲区。
 
-Inspired by gstack's /codex mechanism.
+> **本 skill 不再调用 `codex` CLI**。所有交互通过插件提供的 `/codex:*` 斜杠命令完成；这样可复用插件的会话管理、后台任务、认证与 token 计费逻辑。
 
 ## Prerequisites
 
-```bash
-# Install Codex CLI
-npm install -g @openai/codex
-
-# Login with OAuth (free tier, no API key needed)
-codex login
+```text
+/plugin marketplace add openai/codex-plugin-cc
+/plugin install codex@openai-codex
+/reload-plugins
+/codex:setup
 ```
+
+`/codex:setup` 会自动检测/安装 Codex CLI 并完成登录（OAuth Free 档或 API key）。Node.js ≥ 18.18。
 
 ## Three Modes
 
-### 1. Standard Review (`/codex review`)
+### 1. Standard Review
 
-Standard code review against the base branch:
+针对 base 分支的标准只读审查：
 
-```bash
-# Detect base branch
-BASE=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo "main")
-
-# Run Codex review
-codex review --base "origin/$BASE" \
-  -c 'model_reasoning_effort="high"' \
-  --enable web_search_cached
+```text
+/codex:review
 ```
 
-**Gate verdict:**
-- Output contains `[P1]` markers → **FAIL** (critical findings, must fix)
-- Only `[P2]` or no findings → **PASS**
+**Gate verdict：**
+- 输出含 `[P1]` → **FAIL**（关键发现，必须修复）
+- 仅 `[P2]` 或无发现 → **PASS**
 
-### 2. Adversarial Challenge (`/codex challenge`)
+### 2. Adversarial Challenge
 
-Stress-test code for production failure modes:
+压力测试代码的生产失败模式：
 
-```bash
-codex exec "Your job is to find ways this code will fail in production. \
-Think like an attacker and chaos engineer. Examine the diff against $BASE. \
-Find edge cases, race conditions, security holes, resource leaks, \
-failure modes, and silent data corruption paths. \
-Mark critical findings as [P1] and informational as [P2]." \
-  -s read-only \
-  -c 'model_reasoning_effort="xhigh"' \
-  --enable web_search_cached \
-  --json
+```text
+/codex:adversarial-review
 ```
 
-Parse JSONL output for reasoning traces:
-- `[codex thinking]` — intermediate reasoning
-- `[codex ran]` — tool invocations
-- Present full output verbatim (no summarization)
+让 Codex 像攻击者和混沌工程师一样寻找 race conditions、security holes、resource leaks、silent data corruption。把 critical 标 `[P1]`，informational 标 `[P2]`。
 
-### 3. Consult Mode (`/codex consult <question>`)
+如需要更细粒度的 prompt，可在调用时附加自然语言指令，例如：
 
-Ask Codex for advice with session continuity:
-
-```bash
-# First call
-codex exec "<question>" -s read-only \
-  -c 'model_reasoning_effort="high"' \
-  --enable web_search_cached \
-  --json
-
-# Save session ID from output
-echo "$SESSION_ID" > .context/codex-session-id
-
-# Subsequent calls resume session
-codex exec resume "$(cat .context/codex-session-id)"
+```text
+/codex:adversarial-review focus on auth + payment paths in the diff
 ```
+
+### 3. Consult / Rescue Mode
+
+委派调查或修复任务：
+
+```text
+/codex:rescue <question or task>
+```
+
+后台任务管理：
+
+```text
+/codex:status     # 查看进行中的任务
+/codex:result     # 查看完成任务输出
+/codex:cancel     # 取消任务
+```
+
+会话连续性由插件自身处理，**不需要**再手工保存 session id。
 
 ## Output Format
 
 ```
 ## Codex Review Results
 
-Mode: review | challenge | consult
+Mode: review | adversarial-review | rescue
 Gate: PASS | FAIL (N critical findings)
-Tokens: 14,331 | Est. cost: ~$0.12
 
 ### Findings
 [P1] SQL injection in user input handler (src/routes/users.ts:42)
 [P2] Missing error boundary in React component (src/App.tsx:15)
-
-### Reasoning Trace (challenge mode only)
-[codex thinking] Checking for race conditions in the payment flow...
-[codex ran] grep -r "async.*payment" src/
-[codex thinking] Found potential double-charge scenario...
 ```
 
 ## Integration
 
-- **After `/code-review`**: Optional second opinion step
-- **Before `/ship`**: challenge mode as final gate for critical releases
-- **Results logged**: Written to review log for `/learn` to extract patterns
+- **After `/code-review`**：可选第二意见
+- **Before `/ship`**：关键发布走 `/codex:adversarial-review` 作为终极 gate
+- **结果记录**：插件输出可被 `/learn` 提取模式
 
 ## Important Notes
 
-- Codex runs in **read-only sandbox** — it cannot modify your code
-- Free tier has rate limits; use judiciously on critical reviews
-- If Codex CLI is not installed, skip gracefully with a note
+- 插件 sandbox 默认只读；修改类任务通过 `/codex:rescue` 显式委派
+- Free 档有速率限制；只在关键审查时使用
+- 如插件未安装，`skill` 输出安装指引并优雅跳过；**禁止 fallback 到直接 `codex` CLI 调用**
+- 若旧脚本/agent 仍在 spawn `codex` 子进程，应改写为提示用户运行对应 `/codex:*` 命令

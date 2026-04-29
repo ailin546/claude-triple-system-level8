@@ -152,7 +152,7 @@ bash .claude-system/install.sh --update
 |------|------|---------|
 | `/design-consultation` | 多角度设计咨询（UI + UX + 无障碍） | Standard+ |
 | `/design-review` | 实现完成后的设计审查 | Standard+ |
-| `/codex` | 使用 OpenAI Codex 进行跨 AI 代码审查 | Standard+ |
+| `/codex:review` / `/codex:adversarial-review` / `/codex:rescue` | 通过官方 [codex-plugin-cc](https://github.com/openai/codex-plugin-cc) 插件进行跨 AI 代码审查与任务委派（首次使用 `/codex:setup`） | Standard+ |
 | `/e2e` | 生成并运行 Playwright E2E 测试 | Standard+ |
 
 #### 推荐工作流
@@ -362,7 +362,7 @@ These commands are invoked via `/command-name` within a Claude Code conversation
 |---------|-------------|------|
 | `/design-consultation` | Multi-perspective design consultation (UI + UX + a11y) | Standard+ |
 | `/design-review` | Post-implementation design review | Standard+ |
-| `/codex` | Cross-AI code review using OpenAI Codex | Standard+ |
+| `/codex:review` / `/codex:adversarial-review` / `/codex:rescue` | Cross-AI code review and task delegation via the official [codex-plugin-cc](https://github.com/openai/codex-plugin-cc) plugin (first-time: `/codex:setup`) | Standard+ |
 | `/e2e` | Generate and run Playwright E2E tests | Standard+ |
 
 #### Recommended Workflows
