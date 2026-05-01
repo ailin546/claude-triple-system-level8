@@ -74,6 +74,16 @@
             "timeout": 5000
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/scripts/hooks/codex-plugin-check.js",
+            "timeout": 2000
+          }
+        ]
       }
     ],
     "PreToolUse": [

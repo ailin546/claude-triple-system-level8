@@ -20,6 +20,8 @@ not_when: 纯文档改动、配置微调、Fast 模式小修复
 
 `/codex:setup` 会引导完成 Codex CLI 安装与登录（如缺失会提示 `npm install -g @openai/codex` 与 `codex login`）。
 
+> 新 session 启动时 `codex-plugin-check` SessionStart hook 会自动检测：未安装则在上下文中显示上述 4 行命令；已安装则保持沉默。`codex login`（OAuth）必须在浏览器人工完成，无法跳过。
+
 ## 推荐用法
 
 | 旧用法 | 新用法（插件） | 用途 |
