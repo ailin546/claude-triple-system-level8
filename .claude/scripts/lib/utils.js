@@ -17,24 +17,32 @@ const { execFileSync } = require('child_process');
 
 /**
  * Return the project root via CLAUDE_PROJECT_ROOT or git.
- * Falls back to process.cwd(). Guards against ~/.claude nesting —
- * see scripts/lib/project-root.js for rationale.
+ * Falls back to process.cwd(). Guards against two nesting traps:
+ *   - ~/.claude (collapse to HOME)
+ *   - any `.memory/` (walk up to first non-`.memory` ancestor)
+ * See scripts/lib/project-root.js for rationale.
  */
 function getProjectRoot() {
-  const { isInsideHomeClaude, HOME_CLAUDE_DIR } = require('./project-root');
+  const {
+    isInsideHomeClaude, HOME_CLAUDE_DIR,
+    isInsideMemoryRepo, escapeMemoryRepo,
+  } = require('./project-root');
+  const collapse = (p) => {
+    if (isInsideHomeClaude(p)) return HOME_CLAUDE_DIR;
+    if (isInsideMemoryRepo(p)) return escapeMemoryRepo(p);
+    return p;
+  };
   if (process.env.CLAUDE_PROJECT_ROOT) {
-    const explicit = process.env.CLAUDE_PROJECT_ROOT;
-    return isInsideHomeClaude(explicit) ? HOME_CLAUDE_DIR : explicit;
+    return collapse(process.env.CLAUDE_PROJECT_ROOT);
   }
   try {
     const gitRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
-    return isInsideHomeClaude(gitRoot) ? HOME_CLAUDE_DIR : gitRoot;
+    return collapse(gitRoot);
   } catch {
-    const cwd = process.cwd();
-    return isInsideHomeClaude(cwd) ? HOME_CLAUDE_DIR : cwd;
+    return collapse(process.cwd());
   }
 }
 
