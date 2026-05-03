@@ -49,33 +49,65 @@ User Request
 - Standard：`/specify` → `/plan` → 实施 → `/verify`（对照 specify 验收条件检查）
 - Heavy：`/specify` → `/plan` → `/tdd` → 实施 → `evaluation-loop` → `/code-review` → `/verify`
 
-## Agent 路由
+## Agent 路由（专长 agent，capital 名）
+
+> Spawn 用 frontmatter 的 canonical name（Capital Phrase 风格）。基础设施 agent（lowercase: `planner`、`tdd-guide` 等）见 `~/.claude/rules/common/agents.md`。
 
 | Task | Agent | Task | Agent |
 |------|-------|------|-------|
-| React/Vue/CSS | `engineering-frontend-developer` | Security audit | `engineering-security-engineer` |
-| API/Database | `engineering-backend-architect` | CI/CD/Docker | `engineering-devops-automator` |
-| AI/ML | `engineering-ai-engineer` | Code review | `engineering-code-reviewer` |
-| Architecture | `engineering-software-architect` | Full project | `agents-orchestrator` |
-| Prototype | `engineering-rapid-prototyper` | Tests | `testing-api-tester` |
-| DB optimization | `engineering-database-optimizer` | Git workflow | `engineering-git-workflow-master` |
-| Technical docs | `engineering-technical-writer` | Performance | `testing-performance-benchmarker` |
+| React/Vue/CSS | `Frontend Developer` | Security audit | `Security Engineer` |
+| API/Database | `Backend Architect` | CI/CD/Docker | `DevOps Automator` |
+| AI/ML | `AI Engineer` | Code review | `Code Reviewer` |
+| Architecture | `Software Architect` | Full project | `Agents Orchestrator` |
+| Prototype | `Rapid Prototyper` | Tests | `API Tester` |
+| DB optimization | `Database Optimizer` | Git workflow | `Git Workflow Master` |
+| Technical docs | `Technical Writer` | Performance | `Performance Benchmarker` |
+| Rust | `Rust Engineer` | Reality check | `Reality Checker` / `Systems Reality Checker` |
+
+## Codex 调用规则（强制）
+
+> 任何形式的 Codex / GPT-5.4 调用（rescue、review、adversarial-review、second opinion、深度诊断、复杂代码任务委派）**必须**走 `openai-codex` 插件的 skill/agent 链，不允许绕开。
+
+### 调用矩阵
+
+| 用户意图 | 入口 | 链路 |
+|---------|------|------|
+| 卡住/二次实现/深度根因/委派复杂改动 | `Agent(subagent_type="codex:codex-rescue")` 或 `/codex:rescue` | rescue agent → `codex-cli-runtime` skill → `codex-companion.mjs task` |
+| 代码审查（Codex 视角） | `/codex:review` | helper `review` 子命令 |
+| 对抗性审查 | `/codex:adversarial-review` | helper `adversarial-review` 子命令 |
+| 检查/安装/认证 Codex | `/codex:setup` | helper `setup` 子命令 |
+| 查询、取回、取消运行 | `/codex:status` `/codex:result` `/codex:cancel` | helper 对应子命令 |
+
+### 强制约束
+
+1. **唯一执行入口**：所有 Codex `task` 调用必须由 `codex:codex-rescue` 子 agent 通过 `codex-companion.mjs task` 转发；主 agent **不得**直接 `Bash` 执行 `codex` CLI、`codex-companion.mjs`、或手写 `git`/`gh` 拼接 Codex prompt。
+2. **Prompt 写作**：rescue 子 agent 在调用前撰写/重写 Codex prompt 时**必须**应用 `codex:gpt-5-4-prompting` skill（XML block 结构、单任务、明确 done 标准）。这是唯一允许的 Claude 侧加工。
+3. **结果呈现**：拿到 helper stdout 后**必须**应用 `codex:codex-result-handling` skill（保留 verdict/findings/severity 顺序、不自动应用 review 修复、失败不补刀重写）。
+4. **Forwarder 纪律**：rescue agent 是转发器**不是**编排器 — 一次 `task` 调用，原样返回 stdout，禁止自己改代码、做独立分析、或在 task 失败时切换到 Claude 侧实现。
+5. **不重新发明**：不要写新 hook/script 去包装 Codex；插件 helper 已经处理 runtime、auth、session 复用。
+
+### 反模式（禁止）
+
+- 主 agent 直接 `Bash: codex exec "..."` 或 `Bash: node codex-companion.mjs task ...` — 应该 spawn `codex:codex-rescue` agent
+- 不读 `gpt-5-4-prompting` 就把用户原文塞给 Codex
+- Codex 返回 review findings 后不等用户确认，自动开始修 — `codex-result-handling` 明令禁止
+- Codex 调用失败后退化为"那我自己来" — 必须报告失败并停止
+- 在 `codex:codex-rescue` 之外的 agent/skill 里调用 `task` helper
+
+### 可发现性
+
+- 系统级 skill list（SessionStart 自动加载）已包含 `codex:rescue` `codex:setup` `codex:codex-cli-runtime` `codex:gpt-5-4-prompting` `codex:codex-result-handling`
+- 系统级 agent list 已包含 `codex:codex-rescue`
+- 本节是 SSOT，项目级 CLAUDE.md 不复制，只单向引用 `~/.claude/CLAUDE.md §Codex 调用规则`
 
 ## 模型自动选择
 
-Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型：
+Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型 — 5 类 agent × 3 档模式映射 haiku/sonnet/opus。
 
-| Agent 类别 | Fast | Standard | Heavy |
-|-----------|------|----------|-------|
-| critical-reasoning（planner, architect） | opus | opus | opus |
-| orchestrator | sonnet | opus | opus |
-| review（code-reviewer, security-*） | sonnet | opus | opus |
-| development（tdd-guide, build-*, frontend, backend...） | sonnet | sonnet | opus |
-| worker（doc-updater, refactor-cleaner, e2e-runner...） | haiku | sonnet | sonnet |
+**完整映射表 + 使用规则**详见 `~/.claude/rules/routing.md` §模型自动选择（SSOT）。
+**触发点 + 模型能力参考**详见 `~/.claude/rules/common/infrastructure.md` §Model Selection Strategy。
 
 查询：`node .claude/scripts/hooks/get-model.js <agent-name>`
-映射逻辑：`.claude/scripts/lib/model-map.js`
-覆盖：`MODEL_MAP_OVERRIDE=planner:sonnet,doc-updater:opus`
 
 ## 风险控制
 
@@ -85,9 +117,34 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型：
 - `freeze-guard` — 编辑范围锁
 - `pre-tool-escalate` — 高风险操作自动升档
 - `evaluation-gate` — Heavy 模式下 `git commit/push` 必须先有 evaluation-loop pass marker(2h TTL),否则 exit 2 block
-- `stop-summary` 的 Proof of Work 扩展 — 每次 Stop 追加一行 JSON 到 `~/.claude/state/proof-of-work.jsonl`(session audit schema 见 `scripts/lib/proof-of-work.js`)
+- `user-prompt-classify` — fix/bug 关键词自动升 standard + 首条 prompt 注入深度评估提示
+- `fix-depth-check` — fix-only commit 缺根因解释 → stderr 软警告
+- `set-mode.js --reset` 加固 — 必须 `--reason` + cooldown + 可疑词阻断（防 evaluation-gate 零摩擦逃生）
+- `stop-summary` Proof of Work 扩展 — 每次 Stop 追加 JSON audit 到 `~/.claude/state/proof-of-work.jsonl`
+- `lib/project-root.js` `.memory/` 嵌套守卫 — `getProjectRoot()` 检测 cwd / git toplevel 落在 `.memory/` 内时自动 walk-up 到第一个非 `.memory` 祖先，防止 hook 在 `.memory/` 内创建 `.memory/.memory/` 嵌套副本（2026-05-03 新增，背景：项目级 8 处 + 全局 1 处嵌套副本）
+
+完整 hook 行为表 + 模式升档机制见 `~/.claude/rules/common/infrastructure.md` §Hooks System / §模式升档机制。
 
 降级策略：Hook 失败时 Always-on 记 warning 继续，Standard+ 降为 Fast，Heavy 降为 Standard。
+
+### Long-term correctness 守卫机制（2026-05-01 新增）
+
+> **背景**: 2026-04-30 用户元反思发现 Claude 长期默认"快速能用"而非"长期正确"，三大结构性原因：① task-router 默认 fast；② evaluation-gate 阻断时 `set-mode.js --reset` 是零摩擦逃生通道；③ "精准改动"规则压过"根因优先"规则；④ 没有任何 hook 检测"症状修复 vs 根因修复"。本节是反向力。
+
+| 机制 | 守什么 | 怎么守 |
+|------|--------|--------|
+| CLAUDE.md §编码行为准则 重排 | 价值观默认 | 根因优先放第一条（fix/bug 任务），精准改动放第二条（仅非 fix 任务），过度设计自检放第三条 |
+| user-prompt-classify hook | session 起点 / 用户意图 | 首条 prompt 注入深度评估提示；fix/bug 关键词自动升 standard |
+| fix-depth-check hook | commit 时 | fix-only 消息 → 软警告补根因 |
+| set-mode --reset 加固 | 模式逃生通道 | reason 强制 + cooldown + 可疑词阻断 |
+| 错误教训日志 [2026-05-01] | 历史回放 | 见本文件末尾 |
+
+**反模式（一旦触发应立刻自我警觉）**：
+- 自己说出禁止的"症状级措辞"（详见 §编码行为准则·1 末段清单）
+- 被 evaluation-gate 阻断时第一反应是 `--reset` 而不是 `/evaluation-loop`
+- bug 报告先想"如何最小修复"而不是"为什么这个 bug 可能"
+- 修了 schema 漂移类问题但不查"为什么没被任何检查抓到"
+- 把任务切碎成"做一段 → 报告 → 等批准"的小循环（Discord 格式陷阱）
 
 ## Quick Commands
 
@@ -102,6 +159,9 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型：
 | `/save-session` / `/resume-session` | 保存/恢复会话 | Standard+ |
 | `/careful` | 危险命令守卫开关 | 所有模式 |
 | `/freeze` / `/unfreeze` | 编辑范围锁 | 所有模式 |
+| `/codex:rescue` | 委派复杂任务/根因/二次实现给 Codex（详见 §Codex 调用规则） | 所有模式 |
+| `/codex:review` `/codex:adversarial-review` | Codex 视角代码/对抗审查 | Standard+ |
+| `/codex:setup` `/codex:status` `/codex:result` `/codex:cancel` | Codex 运行时管理 | 所有模式 |
 
 全部命令见 `~/.claude/commands/` 和 `~/.claude/skills/`。
 
@@ -118,7 +178,8 @@ PROJECT/.memory/                    ← 项目级（各项目独立）
 ├── today.md / weekly.md / long-term.md
 ```
 
-**自动采集（双触发点，共享 extract-lessons.js）：**
+**自动采集（三触发点，共享 extract-lessons.js）：**
+- **Periodic hook**（periodic-memory.js）— 每 30 分钟从 transcript 提取，保障长期不关闭的 channel 会话（标记 `[periodic]`）
 - **PreCompact hook**（pre-compact.js）— compact 前提取，防止长会话教训丢失（标记 `[compact]`）
 - **Stop hook**（stop-summary.js）— 会话结束时提取，兜底保障（标记 `[auto]`）
 - 从 transcript JSONL 提取 `**Lessons:**` section 下的 `→` / `->` 教训
@@ -141,7 +202,61 @@ PROJECT/.memory/                    ← 项目级（各项目独立）
 
 ## 编码行为准则
 
-### 精准改动（Surgical Changes）
+> **顺序约定**：以下三条规则按**优先级**排列。修 bug / 处理事故 / 改进架构时，**根因优先**压过其余两条。新功能开发时，**精准改动 + 过度设计自检**主导。判定不清 → 默认走根因优先。
+
+### 动手前自查（防多 session 重复发明）
+
+> 2026-05-01 教训：我在本 session 写 `tools/git-hooks/pre-commit` 时，另一并行 session 刚好也在写同一个 hook，1 分钟差距，**字节级一致**。若我动手前 `git log` 一下，至少省 5 分钟编辑 + 一次 commit。
+
+**触发条件**（任一为真，必须先跑 git log）：
+- 准备新增系统级文件（hooks / scripts / agents / commands / rules）
+- 准备做"这个应该存在但好像还没有"的假设
+- 准备建议某个 missing 防御机制 / CI / hook
+- 长 session（>30 分钟）后第一次切换到新任务（state 可能过期）
+
+**最小检查**（5 秒）：
+```bash
+git log --since="30 minutes ago" --all --oneline    # 别的 session 提交了啥
+git status                                          # 当前未提交状态
+```
+
+**如果发现重叠**：读它的 commit/diff，决定是 ① 接受现成方案 ② 我的方案有补充价值 → 沟通后再写。**禁止**："不知道有"就直接开写。
+
+适用于所有任务模式，不仅 fix。
+
+### 1. 根因优先，不走捷径（最高优先；适用于所有 fix / bug / 事故 / 异常 / 测试失败）
+
+修复 bug 和改进架构时，**禁止**追求"最小改动"或"最快修复"：
+
+| 反模式（病态乐观）| 根因做法 |
+|----|----|
+| "最小修复是 X" | "根因是 Y，彻底解决方案是 Z" |
+| 看到症状就打补丁 | 加日志/复现/读数据流先证伪假设 |
+| 在上层绕过架构问题 | 直接改架构，不留 workaround |
+| 为不破坏现有调用而保留错误行为 | 同步改所有调用点，一次到位 |
+| "应该没问题" / "理论上 OK" | 跑测试 + 看输出 + 用证据说话 |
+| "等用户问起再修周边" | 同根因引发的同类问题一并修 |
+
+强制三步法（来自 quant-deploy/CLAUDE.md §十一）：
+- **Step 1 根因分析**（禁止跳过）：用诊断日志 + state 追踪定位组件；画完整数据流；判定**设计问题**还是**实现 bug**
+- **Step 2 方案评审**（禁止跳过）：自问 4 件事 — ① 这是消除根因还是绕过症状？② 修复是否引入新的阻塞/竞态？③ 对延迟预算/live trading 影响？④ 有更简单方案吗？
+- **Step 3 验证**（禁止跳过）：≥3 分钟持续性测试，不只是瞬时检查
+
+**修完要能回答**：同类问题不会再发生。如果还能发生 → 没修完。
+
+**禁止的"症状级措辞"**（一旦说出，立刻自我警觉是不是在走捷径）：
+- "10 分钟小改" / "顺手就修了" / "minimal fix" / "quick patch"
+- "先这样，后面再优化" / "暂时绕过"
+- "应该没问题" / "理论上 OK"
+
+如果你必须做症状修复（罕见，例如 hotfix 救火），**必须**：
+- 显式说"这是症状修复，根因 = X，根因修复 issue 在 Y"
+- 同时 commit 一个 TODO 文件或 issue 跟踪根因修复
+- 不允许"症状修了就 close"
+
+### 2. 精准改动（Surgical Changes；适用于**非 fix** 任务）
+
+> 此规则只在做新功能、改进、refactor 等**非修 bug**任务时主导。处理 bug/异常时被规则 1 覆盖。
 
 每一行改动必须直接追溯到用户请求：
 - **不顺手重构**周边代码、注释、格式
@@ -152,24 +267,15 @@ PROJECT/.memory/                    ← 项目级（各项目独立）
 
 **自检**：diff 中每一行能否直接指向用户请求？不能 → 删掉那行。
 
-### 过度设计自检（仅适用于新功能开发）
+**注意**：当任务是 fix bug 时，规则 1 的"宁可多改几个文件"压过本规则。修同类型 bug 时同步修兄弟文件**不算**精准改动违规。
+
+### 3. 过度设计自检（仅适用于新功能开发）
 
 写完代码后问自己：**"一个高级工程师会说这太复杂了吗？"**
 - 如果 200 行能用 50 行解决 → 重写
 - 单次使用不要写抽象类/策略模式/工厂
 - 不加没要求的灵活性、可配置性、泛型参数
 - 不为不可能的场景写防御代码
-
-### 修复问题时：根因优先，不走捷径
-
-**此规则优先级高于"精准改动"和"过度设计自检"。**
-
-修复 bug 和改进架构时，不追求"最小改动"或"最快修复"：
-- **先理解根因**，不要看到症状就打补丁
-- **修根因而非症状** — 如果根因是架构设计问题，就改架构，不在上层绕过
-- **不提议"快速修复"** — 不说"最小修复是..."，而说"根因是...，彻底解决方案是..."
-- **宁可多改几个文件，也不留技术债** — 一次改到位比三轮补丁好
-- **修完要能回答：同类问题不会再发生** — 如果还能发生，就没修完
 
 | ❌ 过度设计 | ✅ 正确做法 |
 |------------|-----------|
@@ -201,6 +307,18 @@ PROJECT/.memory/                    ← 项目级（各项目独立）
 ```
 
 明确的成功标准让 agent 可以独立循环验证，模糊标准（"让它工作"）需要反复澄清。
+
+## Skill 组织标准
+
+> 2026-05-01 全量优化所遵循的规则，新增/编辑 user-level skill 必须遵守。
+
+1. **Frontmatter 仅 name + description** — 删除 origin/version/triggers/tools/mode/max_rounds 等非标准字段
+2. **name = 目录名** — 包括 ecc-* 前缀（与 plugin 同名 skill 显式区分）
+3. **Description = "Use when..." 触发条件** — 不总结 workflow，不写第二人称命令式
+4. **重叠 skill 显式互引** — description 末尾加 "For X use other-skill"
+5. **>500 词的 SKILL.md 必须拆分** — overview ≤ 500 词 + 子文档（每个 ≤ 800 词）
+6. **拆分时逐字保留代码块/JSON/表格** — 不能只剩骨架（codex 双审捕到的反模式）
+7. **索引** — 全部 40 个 skill 列在 `~/.claude/skills/INDEX.md`，按场景分类
 
 ## 一致性原则
 
@@ -298,3 +416,8 @@ PROJECT/.memory/                    ← 项目级（各项目独立）
 - [2026-04-19] 改 hook/skill/agent 却不同步 CLAUDE.md → 新 session 不知道 → 规则被遗忘/重复发明 → 必须遵守"Triple-System 自演进铁律",改系统级资源后同步多层文档
 - [2026-04-19] Heavy 任务绕过 evaluation-loop 自证 PASS → 正是文章警告的"病态乐观"反模式 → Heavy 模式下的 4+ 文件改动必须 `/specify → /plan → evaluation-loop`,不允许 inline 自证;2026-04-19 晚补 `evaluation-gate.js` hook 在 commit 时硬阻断
 - [2026-04-19] 独立 Reality Checker 审查抓到 evaluation-gate marker 可被 Claude 伪造 + Reality Checker agent 对 Rust 项目不适用(STEP 1 全是 Web 命令)→ marker schema 加 `git_head`/`evaluator_agent_id`/`verdict_summary(≥10字符)` 强制校验,evaluation-gate hook 检查 marker.git_head == current HEAD 自动失效;新增 `testing-reality-checker-systems.md` agent(Rust/backend 版),evaluation-loop Step 4 按项目类型路由
+- [2026-05-01] Claude 长期默认"快速能用"而非"长期正确"，元反思识别 5 类系统级偏差：① task-router 默认 fast；② evaluation-gate 阻断时 `set-mode --reset` 是零摩擦逃生通道；③ "精准改动"压过"根因优先"；④ 没有 hook 检测症状-vs-根因；⑤ Discord 对话格式正向激励碎片化 → 一次性改 5 处反向力：① CLAUDE.md §编码行为准则 重排（根因优先放第一条）② `set-mode --reset` 加 reason+1h cooldown+可疑词阻断 ③ 新增 `user-prompt-classify.js` hook（fix 关键词自动 fast→standard，session 首条 prompt 注入深度评估）④ 新增 `fix-depth-check.js` hook（fix 提交无根因解释 → 软警告）⑤ 文档化反模式短语清单（"10 分钟小改"等）。所有改动详见 §风险控制 §Long-term correctness 守卫机制
+- [2026-05-01] 实战首次校准：cooldown 1h 实测在单 session 多任务边界场景下太紧（3+ 边界/h 是常态）→ 缩到 20min；bypass 词表移除 "commit"（太通用，误伤合法 doc/refactor commit reason）。**教训：守卫摩擦设计要先做小回环测试再固化参数，不能凭直觉**
+- [2026-05-01] 多 session 并行写同一个 pre-commit hook（1 分钟差距，字节级一致）→ 重复发明 → 加 §编码行为准则·动手前自查 纪律：系统级新增 / "应该存在但没有"假设 / 长 session 任务切换前必须跑 `git log --since="30 minutes ago" --all`
+- [2026-05-02] `~/.memory/long-term.md` 累积 101 条重复 entry → 根因 `stop-summary.js:promoteWeeklyToLongTerm()` 缺 intra-list dedup（同一 lesson 跨多个 weekly sub-section 出现时 push 多份），且 existingKeys/filteredLessons/filteredDecisions 三处 normalize 不一致 → 修复：dedupBatch helper 统一走 `lessonKey()`；同步修 `memory-consolidate.js` 的同类架构空洞；写 `/tmp/dedup-long-term.js` 一次性清理 221→120 行。**教训**：每个写入 long-term 类聚合文件的路径必须在 write 前用 SSOT key 函数（`lessonKey()`）做 (existing ∪ batch) 双重去重，三处 normalize 函数不能复制粘贴各自实现
+- [2026-05-03] `.memory/` 嵌套+污染累积事故 → 根因双层：① `lib/utils.js:getProjectRoot()` 用 `git rev-parse --show-toplevel` 找 project root，但 `.memory/` 自身就是独立 git repo（设计如此，跨设备同步用），结果在 `.memory/` 内启动 hook 时 `getProjectRoot()` 返回 `.memory/` 自身 → hook 把 `.memory/` 当 project root → 在内部又创建 `.memory/.memory/`（观测到 3 层嵌套 + 8 个子项目副本：celue-main/.memory、quant_base-main/.memory、web/.memory、web/src/.memory 等）；② `.memory/` repo 没有 `.gitignore`，所以 `git add -A` 把 `.claude/.task-mode`、`.escalation-state.json`、`.promote-lock` 等运行时状态文件全 commit 进 memory repo → 209+915 commit 几乎全是 .task-mode flapping 噪音；③ memory-sync.js 的 `isEnabled()` 看 `.claude/.memory-remote` 文件，但用户从未创建过 → push 永远 silent no-op → 209+915 commit 全卡本地，跨设备同步从未真的工作。修复:① `lib/project-root.js` 加 `isInsideMemoryRepo` + `escapeMemoryRepo`，`getProjectRoot()` 落 `.memory/` 时 walk-up 到第一个非 `.memory` 祖先（test 10/10 pass）② Strategy Z 重建两个 repo,加 `.gitignore` 排除 .claude/.json/.lock，仅追踪 *.md ③ 创建 `~/.claude/.memory-remote` 让 isEnabled=true。**教训**：① 任何"独立 git repo 嵌入主 repo"的设计必须配 `.gitignore` 守卫,否则父级 hook 会把运行时状态污染进它 ② "git toplevel = project root"的假设在嵌套 git repo 场景下错误,project root 判定要避开已知子 repo 类型 ③ "isEnabled-based no-op"的同步设计要在 hook log 输出"sync disabled, set X to enable",否则用户以为在跑实际没跑

@@ -1,21 +1,23 @@
 #!/usr/bin/env node
 /**
- * PreToolUse(Agent) Hook — Auto Model Selection
+ * PreToolUse(Agent) Hook — Auto Model Enforcement
  *
- * Intercepts Agent tool calls, checks if the model parameter matches
- * the recommended model for the current mode, and outputs a correction
- * hint to stdout (injected into Claude's context).
+ * Intercepts Agent tool calls and enforces the correct model parameter
+ * based on the current mode (Fast/Standard/Heavy) and agent category.
  *
- * If model is already correct or agent is unknown, passes through silently.
+ * Behavior:
+ *   - Agent not in model-map (unknown): pass through silently (exit 0)
+ *   - Model correct: pass through silently (exit 0)
+ *   - Model missing or wrong: BLOCK (exit 2) with correction message
  *
  * stdin: JSON { tool_name, tool_input: { subagent_type, model, name, ... } }
- * stdout: hint message (if model needs correction) or passthrough
- * exit 0: always allow (never blocks)
+ * stdout: error message on block
+ * exit 0: allow | exit 2: block
  */
 
 'use strict';
 
-const { getModelForAgent } = require('../lib/model-map');
+const { getModelForAgent, AGENT_CATEGORY } = require('../lib/model-map');
 const { getCurrentMode } = require('../lib/mode-check');
 
 const MAX_STDIN = 64 * 1024;
@@ -34,7 +36,12 @@ process.stdin.on('end', () => {
     // Extract agent name from subagent_type or name
     const agentName = (toolInput.subagent_type || toolInput.name || '').toLowerCase().trim();
     if (!agentName) {
-      process.stdout.write(stdinData);
+      // No agent name — pass through (generic agent)
+      process.exit(0);
+    }
+
+    // Unknown agent (not in model-map) — pass through, don't block
+    if (!AGENT_CATEGORY[agentName]) {
       process.exit(0);
     }
 
@@ -42,21 +49,26 @@ process.stdin.on('end', () => {
     const recommended = getModelForAgent(agentName);
     const current = (toolInput.model || '').toLowerCase().trim();
 
-    if (!current) {
-      // No model specified — output hint
-      process.stderr.write(`[AutoModel] ${agentName} → ${recommended} (mode: ${mode})\n`);
-      process.stdout.write(`[AutoModel] Agent "${agentName}" has no model set. Recommended: model="${recommended}" (mode: ${mode}). Set the model parameter.\n`);
-    } else if (current !== recommended) {
-      // Model specified but doesn't match recommendation
-      process.stderr.write(`[AutoModel] ${agentName}: ${current} → ${recommended} (mode: ${mode})\n`);
-      process.stdout.write(`[AutoModel] Agent "${agentName}" model="${current}" doesn't match recommendation "${recommended}" for ${mode} mode. Consider using model="${recommended}".\n`);
-    } else {
-      // Model is correct, pass through silently
-      process.stdout.write(stdinData);
+    if (current === recommended) {
+      // Model is correct — pass through silently
+      process.exit(0);
     }
-  } catch {
-    // Parse error — pass through
-    process.stdout.write(stdinData);
+
+    // Model missing or wrong — BLOCK with correction
+    const reason = !current
+      ? `no model set`
+      : `model="${current}" doesn't match`;
+
+    process.stderr.write(`[AutoModel] BLOCK: ${agentName} ${reason}, need "${recommended}" (mode: ${mode})\n`);
+    process.stdout.write(
+      `[AutoModel] BLOCKED: Agent "${agentName}" ${reason}.\n` +
+      `Required: model="${recommended}" (mode: ${mode}).\n` +
+      `Re-invoke the Agent tool with model="${recommended}".\n`
+    );
+    process.exit(2);
+  } catch (err) {
+    // Parse error — pass through (don't block on hook failure)
+    process.stderr.write(`[AutoModel] hook error: ${err.message}\n`);
+    process.exit(0);
   }
-  process.exit(0);
 });

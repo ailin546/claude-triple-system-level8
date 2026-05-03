@@ -486,11 +486,11 @@ function promoteWeeklyToLongTerm(memDir, label) {
   if (!fs.existsSync(weeklyFile)) return;
 
   try {
-    // Weekly throttle: run at most once per week
+    // Daily throttle: cutoff moves daily, so check once per day
     if (fs.existsSync(lockFile)) {
-      const lockWeek = fs.readFileSync(lockFile, 'utf8').trim();
-      const currentWeek = getISOWeek();
-      if (lockWeek === currentWeek) return;
+      const lockDate = fs.readFileSync(lockFile, 'utf8').trim();
+      const today = getLocalDateString();
+      if (lockDate === today) return;
     }
 
     const content = fs.readFileSync(weeklyFile, 'utf8');
@@ -534,7 +534,7 @@ function promoteWeeklyToLongTerm(memDir, label) {
     }
 
     if (toPromote.length === 0) {
-      fs.writeFileSync(lockFile, getISOWeek(), 'utf8');
+      fs.writeFileSync(lockFile, getLocalDateString(), 'utf8');
       return;
     }
 
@@ -578,7 +578,7 @@ function promoteWeeklyToLongTerm(memDir, label) {
     if (newLessons.length === 0 && newDecisions.length === 0) {
       // Nothing to promote, but still trim weekly
       fs.writeFileSync(weeklyFile, toKeep.join('\n'), 'utf8');
-      fs.writeFileSync(lockFile, getISOWeek(), 'utf8');
+      fs.writeFileSync(lockFile, getLocalDateString(), 'utf8');
       log(`[StopSummary] ${label} weekly trimmed (${toPromote.length} old sections removed, nothing to promote)`);
       return;
     }
@@ -593,29 +593,29 @@ function promoteWeeklyToLongTerm(memDir, label) {
       ltContent = '# Long-Term Memory\n\n> 从 weekly.md 自动沉淀的经验教训和架构决策。\n\n## Lessons Learned\n\n## Architecture Decisions\n';
     }
 
-    // Dedup against existing long-term content
+    // Dedup against existing long-term content (use shared lessonKey for consistency)
     const existingKeys = new Set();
     for (const line of ltContent.split('\n')) {
       const m = line.match(/^-\s+\[[\d-]+\]\s+(.+)/);
-      if (m) {
-        const key = m[1].match(/(.+?)(?:→|-{1,2}>)/) ? m[1].match(/(.+?)(?:→|-{1,2}>)/)[1].trim().toLowerCase() : m[1].trim().toLowerCase();
-        existingKeys.add(key);
-      }
+      if (m) existingKeys.add(lessonKey(m[1]));
     }
 
-    const filteredLessons = newLessons.filter(l => {
-      const m = l.match(/^-\s+\[[\d-]+\]\s+(.+)/);
-      if (!m) return true;
-      const key = lessonKey(m[1]);
-      return !existingKeys.has(key);
-    });
+    // Intra-batch dedup: same lesson written across multiple weekly sub-sections
+    // would otherwise be appended N times in a single promotion run.
+    const dedupBatch = (items) => {
+      const seen = new Set();
+      return items.filter(item => {
+        const m = item.match(/^-\s+\[[\d-]+\]\s+(.+)/);
+        if (!m) return true;
+        const key = lessonKey(m[1]);
+        if (existingKeys.has(key) || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
 
-    const filteredDecisions = newDecisions.filter(d => {
-      const m = d.match(/^-\s+\[[\d-]+\]\s+(.+)/);
-      if (!m) return true;
-      const key = m[1].trim().toLowerCase();
-      return !existingKeys.has(key);
-    });
+    const filteredLessons = dedupBatch(newLessons);
+    const filteredDecisions = dedupBatch(newDecisions);
 
     // Append to long-term.md
     if (filteredLessons.length > 0) {
@@ -644,7 +644,7 @@ function promoteWeeklyToLongTerm(memDir, label) {
 
     // Trim weekly.md
     fs.writeFileSync(weeklyFile, toKeep.join('\n'), 'utf8');
-    fs.writeFileSync(lockFile, getISOWeek(), 'utf8');
+    fs.writeFileSync(lockFile, getLocalDateString(), 'utf8');
 
     log(`[StopSummary] ${label} weekly→long-term: ${filteredLessons.length} lessons, ${filteredDecisions.length} decisions promoted, ${toPromote.length} old sections trimmed`);
   } catch (err) {

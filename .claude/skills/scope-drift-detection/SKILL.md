@@ -1,9 +1,6 @@
 ---
-description: Detect scope drift in PRs by comparing actual changes against stated intent
-triggers:
-  - before code review
-  - before creating PR
-  - when reviewing branch changes
+name: scope-drift-detection
+description: Use before code review or PR creation to detect scope drift — compares actual git diff against the original task intent and flags unrelated changes.
 ---
 
 # Scope Drift Detection

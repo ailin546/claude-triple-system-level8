@@ -1,9 +1,7 @@
 ---
-name: cost-aware-llm-pipeline
-description: Cost optimization patterns for LLM API usage — model routing by task complexity, budget tracking, retry logic, and prompt caching.
-origin: ECC
+name: ecc-cost-aware-llm-pipeline
+description: Use when building LLM-powered apps and need cost optimization — model routing by complexity, budget tracking, retry logic, prompt caching strategies.
 ---
-
 # Cost-Aware LLM Pipeline
 
 Patterns for controlling LLM API costs while maintaining quality. Combines model routing, budget tracking, retry logic, and prompt caching into a composable pipeline.

@@ -12,6 +12,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const { lessonKey } = require('../lib/extract-lessons');
 
 // ── Mode gate: Heavy only ────────────────────────────────────
 try {
@@ -215,6 +216,14 @@ function main() {
   const toMarkWithEntries = [];
   const toMarkEmpty = [];
 
+  // Seed dedup keys from existing long-term content + carry intra-batch
+  // (same lesson appearing in multiple sprints would otherwise be appended N times).
+  const seenKeys = new Set();
+  for (const line of longTerm.split('\n')) {
+    const m = line.match(/^-\s+(.+?)(?:\s*\*\(.*?\)\*)?\s*$/);
+    if (m) seenKeys.add(lessonKey(m[1].replace(/^\[[\d-]+\]\s*/, '')));
+  }
+
   for (const file of expiredFiles) {
     const filePath = path.join(MEMORY_DIR, file);
     const content = fs.readFileSync(filePath, 'utf8');
@@ -229,9 +238,20 @@ function main() {
         const targetSection = SECTION_MAP[section];
         // Include source section name when it differs from target to preserve context
         const sourceTag = section !== targetSection ? `[${section}] ` : '';
-        const tagged = entries.map(e => `${e} *(${sourceTag}from ${file})*`);
-        longTerm = appendToSection(longTerm, targetSection, tagged);
-        hasEntries = true;
+        const tagged = entries
+          .map(e => `${e} *(${sourceTag}from ${file})*`)
+          .filter(t => {
+            const m = t.match(/^-\s+(.+?)\s*\*\(.*?\)\*\s*$/);
+            const core = m ? m[1].replace(/^\[[\d-]+\]\s*/, '') : t;
+            const key = lessonKey(core);
+            if (seenKeys.has(key)) return false;
+            seenKeys.add(key);
+            return true;
+          });
+        if (tagged.length > 0) {
+          longTerm = appendToSection(longTerm, targetSection, tagged);
+          hasEntries = true;
+        }
       }
     }
 

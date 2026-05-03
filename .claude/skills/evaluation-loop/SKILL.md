@@ -1,11 +1,6 @@
 ---
 name: evaluation-loop
-description: GAN 式 Generator-Evaluator 反馈循环——编排现有验证工具，将生成与评估分离，防止自我表扬
-triggers:
-  - 功能实现完成后、/verify 之前
-  - 用户显式调用
-mode: Standard / Heavy
-max_rounds: 3
+description: Use after Heavy-mode feature implementation, before /verify — runs an independent Generator-Evaluator (GAN-style) loop that separates generation from evaluation to prevent self-approval bias.
 ---
 
 # Evaluation Loop

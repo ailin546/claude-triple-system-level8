@@ -1,7 +1,6 @@
 ---
-name: postgres-patterns
-description: PostgreSQL database patterns for query optimization, schema design, indexing, and security. Based on Supabase best practices.
-origin: ECC
+name: ecc-postgres-patterns
+description: Use when writing PostgreSQL queries, designing schemas, choosing indexes, or troubleshooting query performance — based on Supabase best practices. For migration mechanics use ecc-database-migrations.
 ---
 
 # PostgreSQL Patterns

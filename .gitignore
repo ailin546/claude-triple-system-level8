@@ -50,3 +50,50 @@ github-hunter/workdir/
 .memory/weekly.md
 .memory/long-term.md
 .memory/.git/
+
+# ═══════════════════════════════════════════
+# ECC runtime locks/state (added 2026-05-03 cleanup)
+# ═══════════════════════════════════════════
+.claude/.promote-lock
+.claude/.consolidate-lock
+.claude/.weekly-promote-lock
+.claude/.task-mode
+.claude/.escalation-state*
+.claude/.session-state/
+.claude/.memory-remote
+.claude/state/
+.claude/cache/
+.claude/logs/
+.claude/skills/.verify/
+.claude/skills/:cursor_id
+.claude/skills/seen-lessons*
+
+# Skills with project-specific learned patterns (per-machine)
+.claude/learned-skills/
+
+# Per-machine runtime data (transcripts, plugins, channels — heavy + private)
+.claude/projects/
+.claude/sessions/
+.claude/backups/
+.claude/file-history/
+.claude/paste-cache/
+.claude/channels/
+.claude/session-env/
+.claude/shell-snapshots/
+.claude/strategies/
+.claude/tasks/
+.claude/teams/
+.claude/telemetry/
+.claude/metrics/
+.claude/plans/
+.claude/plugins/
+.claude/remote/
+.claude/homunculus/
+.claude/ide/
+.claude/history.jsonl
+.claude/.credentials.json
+.claude/mcp-needs-auth-cache.json
+.claude/skills.backup-*
+
+# Memory (own repo, never commit content here)
+.memory/

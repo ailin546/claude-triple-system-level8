@@ -1,9 +1,6 @@
 ---
-description: Compute a quantitative health score (0-100) for the codebase
-triggers:
-  - after /verify
-  - before PR creation
-  - on demand for quality tracking
+name: qa-health-score
+description: Use after /verify or before PR creation to compute a quantitative 0-100 codebase health score from build/test/lint/security signals.
 ---
 
 # QA Health Score

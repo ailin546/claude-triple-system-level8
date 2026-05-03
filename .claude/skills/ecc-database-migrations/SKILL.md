@@ -1,7 +1,6 @@
 ---
-name: database-migrations
-description: Database migration best practices for schema changes, data migrations, rollbacks, and zero-downtime deployments across PostgreSQL, MySQL, and common ORMs (Prisma, Drizzle, Django, TypeORM, golang-migrate).
-origin: ECC
+name: ecc-database-migrations
+description: Use when writing database migrations — schema changes, data backfills, rollbacks, zero-downtime patterns. Covers PostgreSQL, MySQL, and ORMs (Prisma, Drizzle, Django, TypeORM, golang-migrate). For PostgreSQL query/index design use ecc-postgres-patterns.
 ---
 
 # Database Migration Patterns

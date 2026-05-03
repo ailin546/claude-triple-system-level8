@@ -100,6 +100,11 @@ When creating PRs:
     ├─ Claude 在对话中输出 **Lessons:** / **Decisions:** 段
     │  （自然表达即可，不需要"记得写记忆"）
     │
+    ├─► 每 30 分钟 → periodic-memory.js (PostToolUse hook, 时间门控)
+    │   ├─ 提取 transcript 中的 lessons/decisions（共享 extract-lessons.js）
+    │   ├─ 写入 today.md（标记 [periodic]）
+    │   └─ 保障长期不关闭的 channel 会话（Telegram/Discord）
+    │
     ├─► Context Compact → pre-compact.js (PreCompact hook)
     │   ├─ 提取 transcript 中的 lessons/decisions（共享 extract-lessons.js）
     │   ├─ 收集 git commits

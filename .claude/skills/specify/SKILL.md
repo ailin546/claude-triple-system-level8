@@ -1,6 +1,6 @@
 ---
 name: specify
-description: "定义任务宪法：不可违反原则 + 范围边界 + 验收条件。/plan 之前执行，锁定'做什么'和'怎样算完成'。"
+description: "Use before /plan in Standard+ mode to lock down task constitution — inviolable principles, scope boundaries, and acceptance criteria. Defines what 'done' means before planning starts."
 ---
 
 # Specify — 任务宪法

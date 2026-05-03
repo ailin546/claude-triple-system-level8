@@ -1,9 +1,6 @@
 ---
-description: Post-implementation design review validating UI against design standards and accessibility
-triggers:
-  - after implementing UI components
-  - before PR with visual changes
-  - on demand for design quality audit
+name: design-review
+description: Use when UI components or styles in your own codebase have just been implemented and need quality audit before PR — validates design tokens, accessibility, responsive behavior, and visual consistency against the project's design system. For critiquing standalone Figma mockups use design:design-critique; for WCAG-only audits use design:accessibility-review.
 ---
 
 # Design Review

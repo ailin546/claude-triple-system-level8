@@ -1,7 +1,6 @@
 ---
-name: e2e-testing
-description: Playwright E2E testing patterns, Page Object Model, configuration, CI/CD integration, artifact management, and flaky test strategies.
-origin: ECC
+name: ecc-e2e-testing
+description: Use when writing or maintaining Playwright E2E tests — Page Object Model, CI integration, artifact management (screenshots/videos/traces), and flaky test mitigation.
 ---
 
 # E2E Testing Patterns

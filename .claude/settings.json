@@ -89,6 +89,11 @@
             "type": "command",
             "command": "node ~/.claude/scripts/hooks/careful-guard.js",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/scripts/hooks/fix-depth-check.js",
+            "timeout": 3000
           }
         ]
       },
@@ -183,6 +188,28 @@
             "type": "command",
             "command": "node ~/.claude/scripts/hooks/fault-hint.js",
             "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/scripts/hooks/periodic-memory.js",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/scripts/hooks/user-prompt-classify.js",
+            "timeout": 3000
           }
         ]
       }
@@ -304,7 +331,8 @@
   "enabledPlugins": {
     "discord@claude-plugins-official": true,
     "telegram@claude-plugins-official": true,
-    "design@knowledge-work-plugins": true
+    "design@knowledge-work-plugins": true,
+    "codex@openai-codex": true
   },
   "extraKnownMarketplaces": {
     "knowledge-work-plugins": {
@@ -312,7 +340,14 @@
         "source": "github",
         "repo": "anthropics/knowledge-work-plugins"
       }
+    },
+    "openai-codex": {
+      "source": {
+        "source": "github",
+        "repo": "openai/codex-plugin-cc"
+      }
     }
   },
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "agentPushNotifEnabled": true
 }

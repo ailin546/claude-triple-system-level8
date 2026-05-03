@@ -1,6 +1,8 @@
 # Agent Orchestration
 
-## Available Agents
+> 本文件覆盖**基础设施 agent**（流程纪律：planner/tdd-guide/code-reviewer 等，lowercase frontmatter 名）。**专长 agent**（领域知识：Frontend Developer/Backend Architect 等，Capital Phrase 名）见 `~/.claude/CLAUDE.md` §Agent 路由。spawn 时一律用 frontmatter `name` 字段值。
+
+## Available Agents (基础设施)
 
 Located in `~/.claude/agents/`:
 
@@ -15,6 +17,7 @@ Located in `~/.claude/agents/`:
 | e2e-runner | E2E testing | Critical user flows |
 | refactor-cleaner | Dead code cleanup | Code maintenance |
 | doc-updater | Documentation | Updating docs |
+| database-reviewer | DB query/schema review | When writing SQL/migrations |
 
 ## Immediate Agent Usage
 

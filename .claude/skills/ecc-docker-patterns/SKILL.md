@@ -1,7 +1,6 @@
 ---
-name: docker-patterns
-description: Docker and Docker Compose patterns for local development, container security, networking, volume strategies, and multi-service orchestration.
-origin: ECC
+name: ecc-docker-patterns
+description: Use when writing Docker / Docker Compose for local dev, container security, networking, volumes, or multi-service orchestration. For deployment workflow use ecc-deployment-patterns.
 ---
 
 # Docker Patterns

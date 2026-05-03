@@ -1,7 +1,6 @@
 ---
-name: search-first
-description: Research-before-coding workflow. Search for existing tools, libraries, and patterns before writing custom code. Invokes the researcher agent.
-origin: ECC
+name: ecc-search-first
+description: Use before writing custom code for any non-trivial feature — searches GitHub/npm/PyPI for existing tools, libraries, and reusable implementations to adopt instead of building from scratch.
 ---
 
 # /search-first — Research Before You Code

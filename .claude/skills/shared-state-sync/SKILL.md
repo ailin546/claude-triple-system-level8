@@ -1,7 +1,6 @@
 ---
 name: shared-state-sync
-description: "Multi-agent shared state coordination — read/write board.json, append decisions.log, manage artifacts for cross-agent communication."
-origin: custom
+description: Use when multiple agents need to coordinate via shared state — read/write board.json, append decisions.log, manage cross-agent artifacts.
 ---
 
 # Shared State Sync Skill

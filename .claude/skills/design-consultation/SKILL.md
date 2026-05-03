@@ -1,9 +1,6 @@
 ---
-description: Multi-perspective design consultation combining UI, UX, brand, and accessibility experts
-triggers:
-  - before starting UI/UX work
-  - when making design decisions
-  - when planning new pages, components, or user flows
+name: design-consultation
+description: Use before implementation when planning new pages, components, or user flows — runs UI/UX/brand/accessibility experts in parallel to surface design risks early. This is meta-orchestration of multiple expert perspectives; for individual design tasks (research, copy, critique, handoff) use the corresponding design:* plugin skills.
 ---
 
 # Design Consultation
