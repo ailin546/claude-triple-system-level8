@@ -95,6 +95,63 @@ function isCommitOrPush(cmd) {
   return /(^|[\s;&|])git\s+(commit|push)\b/.test(cmd);
 }
 
+/**
+ * Heuristically detect a cross-repo push.
+ *
+ * Returns true when the command contains a `cd` that takes cwd OUTSIDE
+ * projectRoot before running git — at which point the projectRoot's
+ * evaluation-loop marker does not apply and the gate should pass through.
+ *
+ * Rationale (2026-05-03):
+ *   `pre-tool-escalate` auto-escalates any `git push` to heavy. If the
+ *   actual push targets a different repo (e.g. `cd /tmp/x && git push`),
+ *   this gate would block it using the wrong repo's marker. The heuristic
+ *   below handles the common scripted forms:
+ *     - `cd /abs/path && git push`           — literal absolute path
+ *     - `cd $VAR && git push`                — shell variable; can't
+ *                                              statically resolve, treat
+ *                                              as cross-repo (be lenient)
+ *     - `cd ~/foo && git push`               — home-relative
+ *     - cd may appear after newlines or `;` separators in multi-line
+ *       scripts, not just at command start.
+ *
+ *   Relative paths (`cd subdir`) are *not* treated as cross-repo, since
+ *   they typically still resolve inside projectRoot.
+ *
+ *   Sub-shells `(cd /x && git push)` are not detected — rare enough to
+ *   accept as an edge case; user can split into two Bash calls.
+ *
+ * @param {string} cmd shell command text
+ * @param {string} projectRoot absolute path to project root
+ * @returns {boolean} true → exempt from gate (cross-repo push)
+ */
+function isCrossRepoPush(cmd, projectRoot) {
+  if (typeof cmd !== 'string') return false;
+  // Find first 'cd X' after start / newline / ; / && / ||
+  const m = cmd.match(/(?:^|[\n;]|&&|\|\|)\s*cd\s+(\S+)/);
+  if (!m) return false;
+  let target = m[1];
+  // Strip surrounding quotes
+  target = target.replace(/^["']|["']$/g, '');
+  // Shell variable / command substitution → assume cross-repo
+  if (target.startsWith('$') || target.startsWith('`') || target.includes('$(')) {
+    return true;
+  }
+  // Home-relative
+  if (target.startsWith('~')) {
+    target = target.replace(/^~/, os.homedir());
+  }
+  // Relative path → assume same repo
+  if (!target.startsWith('/')) return false;
+  // Absolute path → compare
+  try {
+    const resolved = path.resolve(target);
+    return !resolved.startsWith(projectRoot);
+  } catch {
+    return false;
+  }
+}
+
 function readLastPass() {
   try {
     const raw = fs.readFileSync(LAST_PASS_FILE, 'utf8');
@@ -116,6 +173,14 @@ function main() {
   }
 
   const projectRoot = getProjectRoot(payload);
+
+  // Cross-repo push exemption (2026-05-03):
+  // If the command cd's outside projectRoot before pushing, the push
+  // targets a different git repo. projectRoot's marker doesn't apply.
+  if (isCrossRepoPush(cmd, projectRoot)) {
+    process.exit(0);
+  }
+
   const mode = readTaskMode(projectRoot);
   if (mode !== 'heavy') {
     process.exit(0);
