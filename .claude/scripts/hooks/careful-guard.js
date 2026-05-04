@@ -15,10 +15,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
-const { getProjectRoot } = require('../lib/project-root');
-const PROJECT_ROOT = getProjectRoot();
-const STATE_FILE = path.join(PROJECT_ROOT, '.claude', '.careful-enabled');
+// careful guard is user-level (single toggle for the whole machine,
+// not per-project). STATE_FILE lives under ~/.claude/ so that the
+// /careful slash command (which has unreliable CLAUDE_PROJECT_ROOT
+// in its bash context) and this hook agree on a single canonical path.
+const STATE_FILE = path.join(os.homedir(), '.claude', '.careful-enabled');
 
 /**
  * Dangerous command patterns with descriptions.

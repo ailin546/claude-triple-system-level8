@@ -35,7 +35,12 @@ explanation.
 Check current state and toggle:
 
 ```bash
-STATE_FILE="${CLAUDE_PROJECT_ROOT}/.claude/.careful-enabled"
+# careful guard is user-level (single toggle for the whole machine).
+# STATE_FILE lives in ~/.claude/ to match careful-guard.js. The slash
+# command's $CLAUDE_PROJECT_ROOT is unreliable, so we use $HOME with
+# a fallback and ensure the directory exists before writing.
+STATE_FILE="${HOME:-/home/$(whoami)}/.claude/.careful-enabled"
+mkdir -p "$(dirname "$STATE_FILE")"
 
 if [ "$ARGUMENTS" = "off" ]; then
   echo "off" > "$STATE_FILE"
@@ -51,6 +56,7 @@ else
     echo "Careful guard is currently ENABLED."
   fi
   echo ""
+  echo "State file: $STATE_FILE"
   echo "Usage: /careful on | /careful off"
 fi
 ```
