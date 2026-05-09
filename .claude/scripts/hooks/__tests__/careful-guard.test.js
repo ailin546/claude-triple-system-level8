@@ -1,0 +1,266 @@
+#!/usr/bin/env node
+/**
+ * Unit tests for careful-guard.js v2 (2026-05-09 rewrite).
+ *
+ * Covers the three classification groups (DENY / CONTEXTUAL / ALLOWLIST)
+ * + chain-detection + working-tree-clean integration with `git reset --hard`.
+ *
+ * Run: node ~/.claude/scripts/hooks/__tests__/careful-guard.test.js
+ * Exit 0 = all pass, exit 1 = any failure.
+ */
+
+'use strict';
+
+const assert = require('assert');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const { execSync } = require('child_process');
+
+const {
+  classifyCommand,
+  isAllowlisted,
+  isSimpleInvocation,
+  stripQuotes,
+} = require(path.join(__dirname, '..', 'careful-guard.js'));
+
+let passed = 0;
+let failed = 0;
+const failures = [];
+
+function test(name, fn) {
+  try {
+    fn();
+    passed++;
+    process.stdout.write(`  ok ${name}\n`);
+  } catch (err) {
+    failed++;
+    failures.push({ name, err });
+    process.stdout.write(`  FAIL ${name}: ${err.message}\n`);
+  }
+}
+
+// ─── Setup tmp git repos for tree-aware tests ─────────────────────────
+
+const tmpClean = fs.mkdtempSync(path.join(os.tmpdir(), 'careful-clean-'));
+const tmpDirty = fs.mkdtempSync(path.join(os.tmpdir(), 'careful-dirty-'));
+
+function cleanup() {
+  for (const dir of [tmpClean, tmpDirty]) {
+    if (dir && fs.existsSync(dir)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+}
+process.on('exit', cleanup);
+process.on('SIGINT', () => { cleanup(); process.exit(1); });
+
+for (const dir of [tmpClean, tmpDirty]) {
+  execSync('git init -q', { cwd: dir });
+  execSync('git config user.email t@t', { cwd: dir });
+  execSync('git config user.name t', { cwd: dir });
+  fs.writeFileSync(path.join(dir, 'a'), 'x');
+  execSync('git add a', { cwd: dir });
+  execSync('git commit -q -m init', { cwd: dir });
+}
+// Dirty: leave an unstaged change
+fs.writeFileSync(path.join(tmpDirty, 'a'), 'y');
+
+// ─── Pure helpers ────────────────────────────────────────────────────
+
+test('stripQuotes removes double-quoted strings', () => {
+  assert.strictEqual(stripQuotes('echo "rm -rf /"'), 'echo ""');
+});
+
+test('stripQuotes removes single-quoted strings', () => {
+  assert.strictEqual(stripQuotes("echo 'rm -rf /'"), "echo ''");
+});
+
+test('isSimpleInvocation detects chain operators', () => {
+  assert.strictEqual(isSimpleInvocation('git pull && rm -rf'), false);
+  assert.strictEqual(isSimpleInvocation('git pull; rm -rf'), false);
+  assert.strictEqual(isSimpleInvocation('git pull | grep'), false);
+  assert.strictEqual(isSimpleInvocation('git pull'), true);
+});
+
+test('isSimpleInvocation flags command substitution', () => {
+  assert.strictEqual(isSimpleInvocation('rm -rf $(pwd)'), false);
+  assert.strictEqual(isSimpleInvocation('rm -rf `pwd`'), false);
+});
+
+// ─── Allowlist ───────────────────────────────────────────────────────
+
+test('allowlist: git pull passes', () => {
+  assert.strictEqual(isAllowlisted('git pull'), true);
+});
+
+test('allowlist: git pull --rebase passes', () => {
+  assert.strictEqual(isAllowlisted('git pull --rebase'), true);
+});
+
+test('allowlist: ./scripts/pull-all.sh passes', () => {
+  assert.strictEqual(isAllowlisted('./scripts/pull-all.sh'), true);
+});
+
+test('allowlist: ./restart.sh worker passes', () => {
+  assert.strictEqual(isAllowlisted('./restart.sh worker'), true);
+});
+
+test('allowlist: cargo build passes', () => {
+  assert.strictEqual(isAllowlisted('cargo build --release'), true);
+});
+
+test('allowlist: chained command does not pass', () => {
+  assert.strictEqual(isAllowlisted('git pull && rm -rf /'), false);
+});
+
+// ─── DENY group ──────────────────────────────────────────────────────
+
+test('DENY: fork bomb is blocked', () => {
+  const r = classifyCommand(':(){ :|:& };:');
+  assert.strictEqual(r.decision, 'block');
+});
+
+test('DENY: mkfs is blocked', () => {
+  const r = classifyCommand('mkfs.ext4 /dev/sdb1');
+  assert.strictEqual(r.decision, 'block');
+});
+
+test('DENY: dd to /dev/sda is blocked', () => {
+  const r = classifyCommand('dd if=/dev/zero of=/dev/sda bs=1M');
+  assert.strictEqual(r.decision, 'block');
+});
+
+test('DENY: rm -rf / is blocked', () => {
+  const r = classifyCommand('rm -rf /');
+  assert.strictEqual(r.decision, 'block');
+});
+
+// ─── CONTEXTUAL: git reset --hard ──────────────────────────────────
+
+test('CONTEXTUAL git reset --hard: ambiguous target HEAD~5 blocked', () => {
+  const r = classifyCommand('git reset --hard HEAD~5', { cwd: tmpClean });
+  assert.strictEqual(r.decision, 'block');
+  assert.match(r.reason, /not `origin\/<branch>` form/);
+});
+
+test('CONTEXTUAL git reset --hard: sha target blocked', () => {
+  const r = classifyCommand('git reset --hard abc123', { cwd: tmpClean });
+  assert.strictEqual(r.decision, 'block');
+});
+
+test('CONTEXTUAL git reset --hard: no target blocked', () => {
+  const r = classifyCommand('git reset --hard', { cwd: tmpClean });
+  assert.strictEqual(r.decision, 'block');
+});
+
+test('CONTEXTUAL git reset --hard origin/main: clean tree ALLOWED ★', () => {
+  const r = classifyCommand('git reset --hard origin/main', { cwd: tmpClean });
+  assert.strictEqual(r.decision, 'allow', `expected allow, got: ${r.reason}`);
+});
+
+test('CONTEXTUAL git reset --hard origin/main: dirty tree blocked', () => {
+  const r = classifyCommand('git reset --hard origin/main', { cwd: tmpDirty });
+  assert.strictEqual(r.decision, 'block');
+  assert.match(r.reason, /uncommitted changes/);
+});
+
+test('CONTEXTUAL git reset --hard origin/dev/branch: nested branch on clean ALLOWED', () => {
+  const r = classifyCommand('git reset --hard origin/dev/session-2', { cwd: tmpClean });
+  assert.strictEqual(r.decision, 'allow');
+});
+
+// ─── CONTEXTUAL: other patterns ────────────────────────────────────
+
+test('CONTEXTUAL: git push --force is blocked', () => {
+  const r = classifyCommand('git push origin main --force');
+  assert.strictEqual(r.decision, 'block');
+});
+
+test('CONTEXTUAL: git push --force-with-lease is allowed', () => {
+  const r = classifyCommand('git push --force-with-lease origin main');
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('CONTEXTUAL: git restore . on clean tree allowed (no-op)', () => {
+  const r = classifyCommand('git restore .', { cwd: tmpClean });
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('CONTEXTUAL: git restore . on dirty tree blocked', () => {
+  const r = classifyCommand('git restore .', { cwd: tmpDirty });
+  assert.strictEqual(r.decision, 'block');
+});
+
+test('CONTEXTUAL: rm -rf /tmp/foo is allowed (safe target)', () => {
+  const r = classifyCommand('rm -rf /tmp/foo');
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('CONTEXTUAL: rm -rf target/ is allowed (build artifact)', () => {
+  const r = classifyCommand('rm -rf target/');
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('CONTEXTUAL: rm -rf node_modules is allowed', () => {
+  const r = classifyCommand('rm -rf node_modules/');
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('CONTEXTUAL: rm -rf /etc/foo is blocked', () => {
+  const r = classifyCommand('rm -rf /etc/foo');
+  assert.strictEqual(r.decision, 'block');
+});
+
+test('CONTEXTUAL: bare DROP TABLE blocked', () => {
+  const r = classifyCommand('psql < script.sql && DROP TABLE users');
+  assert.strictEqual(r.decision, 'block');
+});
+
+// ─── ALLOWLIST integration ──────────────────────────────────────────
+
+test('top-level: git pull is allowed', () => {
+  const r = classifyCommand('git pull origin main');
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('top-level: ./scripts/pull-all.sh is allowed', () => {
+  const r = classifyCommand('./scripts/pull-all.sh');
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('top-level: ./restart.sh worker is allowed', () => {
+  const r = classifyCommand('./restart.sh worker');
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('top-level: chained "git pull && rm -rf /" is blocked', () => {
+  const r = classifyCommand('git pull && rm -rf /');
+  assert.strictEqual(r.decision, 'block');
+});
+
+// ─── Empty / safe commands ────────────────────────────────────────
+
+test('empty command allowed', () => {
+  const r = classifyCommand('');
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('ls is allowed', () => {
+  const r = classifyCommand('ls -la');
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('echo is allowed', () => {
+  const r = classifyCommand('echo hello');
+  assert.strictEqual(r.decision, 'allow');
+});
+
+// ─── Result ────────────────────────────────────────────────────────
+
+console.log(`\n${passed} passed, ${failed} failed`);
+if (failed > 0) {
+  console.log('\nFailures:');
+  for (const f of failures) console.log(`  - ${f.name}: ${f.err.stack}`);
+  process.exit(1);
+}
