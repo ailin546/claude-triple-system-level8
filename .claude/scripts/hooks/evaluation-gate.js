@@ -96,6 +96,38 @@ function isCommitOrPush(cmd) {
 }
 
 /**
+ * Strict path containment check using `path.relative`.
+ *
+ * Returns true iff `cdTarget` is a path strictly INSIDE `projectRoot`
+ * (i.e. a descendant directory). Same-path returns false; the caller
+ * combines with an explicit equality check when "same-or-inside" is
+ * desired (see isCrossRepoPush below).
+ *
+ * Bug history (2026-05-06): the previous implementation used
+ *   resolved.startsWith(projectRoot)
+ * which is a string-prefix check — `/Users/hi/quant-deploy-s2`
+ * literally starts with `/Users/hi/quant-deploy`, so a sibling worktree
+ * was treated as inside the main repo. Result: the main worktree's
+ * evaluation-loop marker was applied to s2 commits, blocking them.
+ *
+ * The fix uses `path.relative(root, target)`:
+ *   - rel === ''               → same path
+ *   - rel.startsWith('..')     → target is outside root
+ *   - path.isAbsolute(rel)     → different drive (Windows) — treat outside
+ *   - else                     → strictly inside
+ *
+ * @param {string} cdTarget    absolute or relative path
+ * @param {string} projectRoot absolute path
+ * @returns {boolean} true iff cdTarget is strictly inside projectRoot
+ */
+function isInsideProjectRoot(cdTarget, projectRoot) {
+  const resolvedTarget = path.resolve(cdTarget);
+  const resolvedRoot = path.resolve(projectRoot);
+  const rel = path.relative(resolvedRoot, resolvedTarget);
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+/**
  * Heuristically detect a cross-repo push.
  *
  * Returns true when the command contains a `cd` that takes cwd OUTSIDE
@@ -143,10 +175,16 @@ function isCrossRepoPush(cmd, projectRoot) {
   }
   // Relative path → assume same repo
   if (!target.startsWith('/')) return false;
-  // Absolute path → compare
+  // Absolute path → strict containment check
   try {
-    const resolved = path.resolve(target);
-    return !resolved.startsWith(projectRoot);
+    const resolvedTarget = path.resolve(target);
+    const resolvedRoot = path.resolve(projectRoot);
+    // Same-path → same repo, NOT cross-repo
+    if (resolvedTarget === resolvedRoot) return false;
+    // Strictly inside → same repo
+    if (isInsideProjectRoot(target, projectRoot)) return false;
+    // Sibling, parent, or unrelated path → cross-repo
+    return true;
   } catch {
     return false;
   }
@@ -237,11 +275,21 @@ function main() {
   process.exit(0);
 }
 
-try {
-  main();
-} catch (err) {
-  process.stderr.write(
-    `[evaluation-gate] non-fatal error: ${err && err.message ? err.message : err}\n`
-  );
-  process.exit(0); // never block on hook bug
+// Exports for unit tests (loaded via require()).
+module.exports = {
+  isInsideProjectRoot,
+  isCrossRepoPush,
+  isCommitOrPush,
+};
+
+// Only run main() when invoked directly as a hook, not when require()'d.
+if (require.main === module) {
+  try {
+    main();
+  } catch (err) {
+    process.stderr.write(
+      `[evaluation-gate] non-fatal error: ${err && err.message ? err.message : err}\n`
+    );
+    process.exit(0); // never block on hook bug
+  }
 }

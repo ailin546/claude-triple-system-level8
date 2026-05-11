@@ -58,7 +58,7 @@ For each issue found, report:
 - For project-level: check `.claude/skills/<skill-name>/SKILL.md` exists
 
 ### "Rules not working"
-- Rules are flat files, not in subdirectories: `$TARGET/rules/coding-style.md` (correct) vs `$TARGET/rules/common/coding-style.md` (incorrect for flat install)
+- Rules are flat files, not in subdirectories: `$TARGET/rules/agents.md` (correct) vs `$TARGET/rules/common/agents.md` (incorrect for flat install)
 - Restart Claude Code after installing rules
 
 ### "Path reference errors after project-level install"
