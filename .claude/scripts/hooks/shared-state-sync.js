@@ -15,10 +15,13 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
-// ── Mode gate: Heavy only ────────────────────────────────────
+// ── Mode gate: Standard+ ─────────────────────────────────────
+// 2026-05-20: 从 Heavy-only → Standard+。Codex N2 指出 Standard 已能
+// 跨 3-5 文件触发, 状态漂移风险存在; 2026-05-01 多 session 字节级一致
+// 重复发明事故正是 Standard 场景下的同步缺失。
 try {
   const { requireMode } = require('../lib/mode-check');
-  if (!requireMode('heavy')) {
+  if (!requireMode('standard')) {
     let d = '';
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', c => { d += c; });

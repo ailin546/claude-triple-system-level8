@@ -7,8 +7,9 @@
  * passing verdict.
  *
  * Rationale (2026-04-19 元反思):
- *   - Rule layer (CLAUDE.md §50, workflow.md §56, verify.md §69) already
- *     says Heavy tasks should route through evaluation-loop before ship.
+ *   - Rule layer (~/.claude/CLAUDE.md §任务模式路由 + workflow.md
+ *     §Feature Implementation Workflow + commands/verify.md) already says
+ *     Heavy tasks should route through evaluation-loop before ship.
  *   - But rule-layer is Claude self-discipline, and Claude skips it.
  *   - Today's 4-batch Heavy session went live with zero Reality Checker
  *     calls and full self-certification.
@@ -265,7 +266,7 @@ function main() {
       `                "evaluator_agent_id": "<Task agent id>",\n` +
       `                "verdict_summary": "<Reality Checker's one-line ACCEPTED reason, >=10 chars>"}\n` +
       `    3. Retry the git commit\n` +
-      `  Rationale: CLAUDE.md §50 Heavy chain requires evaluation-loop\n` +
+      `  Rationale: ~/.claude/CLAUDE.md §任务模式路由 Heavy chain requires evaluation-loop\n` +
       `             before ship. This hook enforces that at commit time.\n` +
       `             git_head pin ensures marker invalidates on any code change.\n`;
     process.stderr.write(msg);

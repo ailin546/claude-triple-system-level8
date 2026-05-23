@@ -80,6 +80,59 @@ description: "Use before /plan in Standard+ mode to lock down task constitution 
 - 单文件改动
 - 需求完全无歧义（如"修复这个 typo"）
 
+## CONTEXT.md 域词汇表（锁定后顺手维护）
+
+specify 完成、用户确认后，自检一次：**此次澄清是否引入新的项目术语或修正了既有术语？**
+
+是 → 同步追加/修正到 `PROJECT/CONTEXT.md`（不存在则创建）。
+
+CONTEXT.md 只是**领域词汇表**：
+- ✅ 记：术语 → 一句话定义；术语 → 同义词/反义词；术语 → 涵盖与不涵盖
+- ❌ 不记：实现细节、spec、计划、API schema、临时决策
+- 格式：每条 1-3 行，按字母/拼音排序，方便 Claude grep
+
+示例：
+```markdown
+## 物化级联 (Materialization Cascade)
+section 内 lesson 被标记 real 时，自动给文件系统位置的连锁过程。
+- 覆盖：lesson 文件创建、section 目录补全、index 重建
+- 不覆盖：lesson 内容生成（那是 lesson-generator 的事）
+```
+
+理由：长期项目里术语漂移成本极高（Claude 每次会话重新发明同义词）。本机制是 grill-with-docs (mattpocock/skills) 的本地化吸收。
+
+## ADR 触发判定（严格门槛）
+
+specify 过程中如果出现**真实架构权衡**，判定是否落 ADR (`docs/adr/NNNN-*.md`)：
+
+**三条件必须全满足**：
+1. **难逆** — 改回去成本 ≥ 1 天工作
+2. **无上下文会困惑** — 半年后看代码的人会问"为什么这么做？"
+3. **真实权衡** — 存在过 ≥2 个合理替代方案，选当前方案有具体理由
+
+任一不满足 → 不写 ADR（不要为了"留痕"而 ADR）。
+
+ADR 格式（最小）：
+```markdown
+# NNNN — 标题
+
+## Status
+Accepted | Superseded by NNNN
+
+## Context
+触发决策的约束/问题。
+
+## Decision
+选了什么。
+
+## Alternatives Considered
+- 方案 B：为什么不选
+- 方案 C：为什么不选
+
+## Consequences
+正面/负面后果。
+```
+
 ## 反模式
 
 - ❌ 写成技术方案（那是 /plan 的事）

@@ -1,6 +1,6 @@
 # User-Level Skills Index
 
-> 40 skills @ ~/.claude/skills/. Last optimized 2026-05-01.
+> 41 skills @ ~/.claude/skills/. Last optimized 2026-05-20 (+caveman).
 > All frontmatter validated (name + description only). Reference skills (1500+w) split to overview + subdocs.
 
 ## Process & Workflow
@@ -23,6 +23,7 @@
 - [qa-health-score](qa-health-score/SKILL.md) — Use after /verify or before PR creation to compute a quantitative 0-100 codebase health score
 - [evaluation-loop](evaluation-loop/SKILL.md) — Use after Heavy-mode feature implementation, before /verify — Generator-Evaluator loop
 - [ecc-coding-standards](ecc-coding-standards/SKILL.md) — Use when writing or reviewing TypeScript/JavaScript code — universal style/quality rules
+- [codex-review](codex-review/SKILL.md) — Cross-AI code review via OpenAI Codex CLI for independent second-opinion before merging
 
 ## Frontend / UI
 
@@ -70,6 +71,10 @@
 - [ecc-blueprint](ecc-blueprint/SKILL.md) — Use when planning a complex multi-PR or multi-session engineering project
 - [dispatching-parallel-agents](dispatching-parallel-agents/SKILL.md) — Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies
 - [subagent-driven-development](subagent-driven-development/SKILL.md) — Use when executing implementation plans with independent tasks in the current session
+
+## Output Control
+
+- [caveman](caveman/SKILL.md) — Use when user invokes /caveman or asks for less tokens — compresses output ~75%, auto-disabled in structured-output contexts (evaluation-loop / code-review / verify / safety)
 
 ## Misc
 

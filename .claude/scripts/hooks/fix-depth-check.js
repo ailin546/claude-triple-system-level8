@@ -75,7 +75,7 @@ function main() {
   // Warn but don't block.
   console.error(
     `[FixDepthCheck] WARNING: commit message advertises a fix but contains no root-cause explanation.\n` +
-    `[FixDepthCheck] Symptom-only fixes are a regression toward "quick-and-working" mode (CLAUDE.md §编码行为准则 Rule 1).\n` +
+    `[FixDepthCheck] Symptom-only fixes are a regression toward "quick-and-working" mode (~/.claude/CLAUDE.md §编码行为准则 Rule 1).\n` +
     `[FixDepthCheck] Before this commit, ensure your message body answers:\n` +
     `[FixDepthCheck]   1. What was the root cause? (not just "what changed" — "why was the bug possible?")\n` +
     `[FixDepthCheck]   2. Will the same class of bug recur? If yes, this is symptom mode.\n` +
@@ -87,8 +87,19 @@ function main() {
   process.exit(0); // soft warn, not block
 }
 
-try {
-  main();
-} catch {
-  process.exit(0);
+// Export internals for unit tests (per M4 hook test 标杆 protocol).
+module.exports = {
+  FIX_INDICATORS,
+  FIX_INDICATORS_CN,
+  ROOT_CAUSE_INDICATORS,
+  extractCommitMessage,
+};
+
+// Only run as hook when invoked directly (not when require()-d by tests)
+if (require.main === module) {
+  try {
+    main();
+  } catch {
+    process.exit(0);
+  }
 }

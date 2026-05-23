@@ -49,12 +49,10 @@ const AGENT_CATEGORY = {
 
   // orchestrator
   'agents-orchestrator':        'orchestrator',
-  'agents orchestrator':        'orchestrator',
 
   // review
   'code-reviewer':              'review',
   'superpowers-code-reviewer':  'review',
-  'engineering-code-reviewer':  'review',
   'security-reviewer':          'review',
   'ecc-security-reviewer':      'review',
   'engineering-security-engineer': 'review',

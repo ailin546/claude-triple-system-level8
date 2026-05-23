@@ -715,6 +715,51 @@ function updateGlobalIndex() {
   }
 }
 
+// ── Architecture Rescue Counter ──────────────────────────────
+// Every N Heavy-mode stops, nudge user to run a periodic architecture review.
+// Inspired by mattpocock/skills `improve-codebase-architecture` — adapted as
+// a passive reminder (not a new skill entry) so it doesn't compete with /audit.
+
+const ARCH_RESCUE_STATE_DIR = path.join(require('os').homedir(), '.claude', 'state');
+const ARCH_RESCUE_STATE_FILE = path.join(ARCH_RESCUE_STATE_DIR, 'architecture-rescue.json');
+const ARCH_RESCUE_THRESHOLD = 5;      // Heavy stops between reminders
+const ARCH_RESCUE_COOLDOWN_MS = 24 * 60 * 60 * 1000;  // 24h between nudges
+
+function checkArchitectureRescue() {
+  try {
+    const modeFile = path.join(PROJECT_ROOT, '.claude', '.task-mode');
+    if (!fs.existsSync(modeFile)) return;
+    const mode = fs.readFileSync(modeFile, 'utf8').trim();
+    if (mode !== 'heavy') return;
+
+    ensureDir(ARCH_RESCUE_STATE_DIR);
+    let state = { byProject: {} };
+    if (fs.existsSync(ARCH_RESCUE_STATE_FILE)) {
+      try { state = JSON.parse(fs.readFileSync(ARCH_RESCUE_STATE_FILE, 'utf8')); }
+      catch { state = { byProject: {} }; }
+    }
+    if (!state.byProject) state.byProject = {};
+    const key = PROJECT_ROOT;
+    const entry = state.byProject[key] || { heavyCount: 0, lastRemindedAt: 0 };
+    entry.heavyCount = (entry.heavyCount || 0) + 1;
+
+    const now = Date.now();
+    const sinceLast = now - (entry.lastRemindedAt || 0);
+    if (entry.heavyCount >= ARCH_RESCUE_THRESHOLD && sinceLast >= ARCH_RESCUE_COOLDOWN_MS) {
+      process.stderr.write(
+        `\n[architecture-rescue] ${entry.heavyCount} Heavy tasks in ${path.basename(key)} since last review. ` +
+        `Consider /audit or spawning architect agent for a deepening pass.\n`
+      );
+      entry.lastRemindedAt = now;
+      entry.heavyCount = 0;
+    }
+    state.byProject[key] = entry;
+    fs.writeFileSync(ARCH_RESCUE_STATE_FILE, JSON.stringify(state, null, 2));
+  } catch (err) {
+    log(`[StopSummary] architecture-rescue check skipped: ${err.message}`);
+  }
+}
+
 // ── Error Lessons Auto-Promote ───────────────────────────────
 
 const PROMOTE_LOCK = path.join(PROJECT_ROOT, '.claude', '.promote-lock');
@@ -853,6 +898,9 @@ function main(conversationText) {
 
   // Auto-promote repeated error lessons to CLAUDE.md (daily)
   promoteLessons();
+
+  // Architecture rescue nudge after N Heavy-mode stops per project
+  checkArchitectureRescue();
 
   // 2026-04-19: structured Proof of Work row for each Stop event.
   // Machine-readable audit of what this session did; future sessions /

@@ -74,6 +74,37 @@ Generator 完成功能
                  │
                  ▼
 ┌─────────────────────────────────────────┐
+│ Step 4.5: 运行期 deploy 验证(可选,P1)    │
+│  Wave 15 R3 (2026-05-21)— 来源:         │
+│    Wave 14 P1 chain Codex round 0       │
+│    静态 review 全 PASS 但实跑炸          │
+│    (commit ba7756e → revert 80ada6f)。 │
+│  适用:Heavy 模式有 dev/staging 环境的    │
+│    项目(CCHFT 的 Mac dev 9100 端口、    │
+│    Linux prod 等)。Pure-types/纯文档    │
+│    任务跳过。                            │
+│  步骤:                                   │
+│  ① Generator 在 dev/staging 启动服务:    │
+│     CCHFT 类项目:`./restart.sh master+   │
+│       worker` + `./restart.sh hedge`    │
+│     Web 类项目:`npm run dev` 或 docker  │
+│  ② 监听 30s 实时日志,grep:               │
+│     - ERROR / FATAL / PANIC / unwrap   │
+│     - 已知 fatal 关键词(如 "no Venue    │
+│       Config","engine refuses to       │
+│       spawn","auth dropped during      │
+│       send_order")                      │
+│     - 跨进程 mismatch(master 警告 vs    │
+│       worker 拒绝)                      │
+│  ③ 若发现 ERROR → 报告 + 触发 Step 6     │
+│     反馈循环;否则继续 Step 5。          │
+│  注意: 仅检测 30s 窗口内的明显 ERROR;   │
+│    长时 soak (>10min) / 24h 验证 仍属  │
+│    /verify 阶段后的独立任务。           │
+└────────────────┬────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────┐
 │ Step 5: 判定                             │
 │  ├ 硬验证通过 + Reality Checker 通过     │
 │  │  → ✅ 接受                            │

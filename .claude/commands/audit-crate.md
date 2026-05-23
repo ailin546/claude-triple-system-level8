@@ -94,7 +94,7 @@ Downgrade to UNVERIFIED if evidence insufficient. Never accept HIGH+ verdicts wi
 
 Spawn ONE more teammate:
 
-**adversarial-reviewer** (subagent_type: `Code Reviewer`)
+**adversarial-reviewer** (subagent_type: `code-reviewer`)
 - Scope: challenge each Phase 3 verified finding with verdict (CONFIRMED/OVERSTATED/REFUTED/STALE) + adjusted severity + 1-2 sentence justification
 - Also look for adjacent bugs in the specific files that other teammates touched
 - Allow up to 3 new findings

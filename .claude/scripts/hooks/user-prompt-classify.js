@@ -4,7 +4,7 @@
  *
  * Two responsibilities:
  *   1. Auto-escalate fast → standard when prompt contains bug-fix / problem-report keywords.
- *      Rationale: bug-fix tasks demand root-cause analysis (CLAUDE.md §编码行为准则 Rule 1).
+ *      Rationale: bug-fix tasks demand root-cause analysis (~/.claude/CLAUDE.md §编码行为准则 Rule 1).
  *      Letting them stay in Fast mode trains Claude to default to "symptom fix" reflex.
  *      Escalating to Standard surfaces /plan / /tdd / evaluation prompts the user can ignore
  *      but is a constant reminder that this isn't a "single-file small edit".
@@ -65,6 +65,36 @@ const FIX_KEYWORDS = [
   /没起作用/,
   /回归/,
   /复现/,
+];
+
+// 2026-05-21: Phrases that suggest the user wants Claude to execute a
+// pre-specified implementation (KNOWN_ISSUES M-X / Wave-N / Phase-X / spec
+// document / backlog item / TODO list reference). Without reflection,
+// Claude tends to accept the spec's stated size verbatim and skip
+// "is this still needed?" / "已部分修过?" / "胶水覆盖?" pre-flight check.
+//
+// Match precision: bare keywords like "实施" alone are too noisy. We
+// require co-occurrence with a spec reference token (M-NN / Wave-X /
+// 实施 + Phase / backlog) or explicit "do this large task" framing.
+const IMPLEMENTATION_INTENT_PATTERNS = [
+  // Spec-reference tokens (KNOWN_ISSUES, OPTIMIZATION_BACKLOG, ADR, Wave, Phase)
+  /\bM-\d{1,3}\b/,             // M-27, M-31, M-87
+  /\bWave\s*\d+\b/i,            // Wave 4, Wave14
+  /\bPhase\s*[1-9A-Z]\b/i,      // Phase 1, Phase D, Phase 2-lite
+  /\bT[1-9]\d?\b/,              // T6, T7, T8 (OPTIMIZATION_BACKLOG tasks)
+  /\bLEGACY-M\d{1,3}\b/,        // LEGACY-M27 etc
+  // Imperative implementation framing
+  /实施(?!细节|计划)/,            // 实施 but not 实施细节 / 实施计划 (discussion)
+  /开始(?:做|实施|实现)/,
+  /开干|动手做/,
+  /做这[个件项]/,
+  /按.{0,5}计划/,
+  /按.{0,5}spec/i,
+  /按.{0,5}backlog/i,
+  /\bimplement(?:s|ed|ing)?\b/i,
+  /\bexecute\s+the\s+plan\b/i,
+  /\bproceed\s+with\b/i,
+  /\bgo\s+ahead\b/i,
 ];
 
 // Phrases that strongly suggest the user wants a SYMPTOM fix (and Claude
@@ -134,6 +164,14 @@ function detectShortcutRequest(prompt) {
   return null;
 }
 
+function detectImplementationIntent(prompt) {
+  for (const re of IMPLEMENTATION_INTENT_PATTERNS) {
+    const m = prompt.match(re);
+    if (m) return m[0];
+  }
+  return null;
+}
+
 function main() {
   let parsed = null;
   try {
@@ -151,6 +189,7 @@ function main() {
 
   const fixHit = detectFixIntent(prompt);
   const shortcutHit = detectShortcutRequest(prompt);
+  const implHit = detectImplementationIntent(prompt);
 
   // Auto-escalate fast → standard on fix intent.
   if (fixHit) {
@@ -199,13 +238,52 @@ function main() {
     lines.push(
       `[Fix-Intent Detected — matched "${fixHit}"]`,
       '',
-      'This task involves fixing a problem. Apply the 3-step protocol from project CLAUDE.md §十一:',
+      'This task involves fixing a problem. Apply the 3-step protocol from ~/.claude/CLAUDE.md §编码行为准则 Rule 1:',
       '  Step 1 — Root cause analysis: trace the bug to component + memory + data flow.',
       '            Decide: design problem (architecture change) or implementation bug (minimal fix)?',
       '  Step 2 — Solution review: is this eliminating root cause or bypassing symptom? Will it introduce new races/blocking? Latency impact? Live-trading impact? Simpler option?',
       '  Step 3 — Verification: ≥3 minute soak test, not instantaneous check.',
       '',
+      'For complex fixes or when root cause is unclear, load ~/.claude/on-demand/coding-discipline.md for full anti-pattern table + 4-question solution review + symptom-phrase checklist.',
+      '',
       'If you find yourself adding error handling / fallbacks / fixture fields without asking "why was this allowed in the first place" — STOP. That is symptom mode.',
+      ''
+    );
+  }
+
+  if (implHit) {
+    lines.push(
+      `[Scope-Reflection Required — matched "${implHit}"]`,
+      '',
+      'This prompt references a pre-specified implementation (KNOWN_ISSUES entry,',
+      'Wave/Phase task, BACKLOG item, ADR plan). Before estimating work, run',
+      'the 4-question size/timing/scope challenge — KNOWN_ISSUES specs are',
+      'historical snapshots, not current truth:',
+      '',
+      '  ① **Is the issue recurrent or one-shot?** Read the entry — does it say',
+      '     "single trade", "once", "已复现一次"? One-shot may not need ~150 LOC.',
+      '',
+      '  ② **Has the root cause been partially fixed already?** Grep commit log',
+      '     for the M-X reference, related symbol names, or invariant numbers.',
+      '     Wave-N entries often have round-K patches landed after the spec',
+      '     was drafted — check "已修" / "✅" status in the source row.',
+      '',
+      '  ③ **Is the stated LOC / day estimate still accurate?** Specs written',
+      '     N weeks ago may reflect outdated assumptions (deleted modules,',
+      '     refactored APIs, type changes). Grep target symbols to verify.',
+      '',
+      '  ④ **Can a glue / single-point check at a downstream SSOT cover the same',
+      '     intent for 1/5–1/100 the LOC?** Especially: persistence-boundary,',
+      '     channel-boundary, or invariant-enforcement points often subsume',
+      '     "rewrite parser to Result<T, E>" class refactors.',
+      '',
+      'Report your answers BEFORE estimating work or writing code. If user did',
+      'NOT ask for this reflection, share findings + cheaper alternative + ROI',
+      'comparison, then ask for confirmation.',
+      '',
+      'Reference: M-27/M-30 case (2026-05-21) — original spec deferred ~150 LOC',
+      'type refactor; reflection found 30 LOC glue at db.rs persistence boundary',
+      'covered all venues with ROI ~25-100×.',
       ''
     );
   }

@@ -303,7 +303,6 @@ The following agents are available in `.claude/agents/` for orchestration:
 - **engineering-ai-engineer**: ML model development, AI integration, data pipelines
 - **engineering-devops-automator**: Infrastructure automation, CI/CD, Docker
 - **engineering-rapid-prototyper**: Ultra-fast proof-of-concept and MVP creation
-- **engineering-code-reviewer**: Code review with professional checklists
 - **engineering-security-engineer**: Security audit, threat modeling
 - **engineering-database-optimizer**: Query optimization, schema design, indexing
 - **engineering-git-workflow-master**: Git workflows, branching strategies

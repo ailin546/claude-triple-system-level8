@@ -92,7 +92,7 @@ function run(rawInput) {
       if (found.length > 0) {
         log(`⚠️ [PostEditLight] 检测到直接调用外部交易所 API: ${found.join(', ')}`);
         log(`   底层 Engine 已实时接收行情数据。请确认是否可以复用 SharedState / Dashboard API。`);
-        log(`   参见 CLAUDE.md §3.5 数据获取规则 + docs/FEATURE_STATUS.md §1 数据源 SSOT 表。`);
+        log(`   参见 PROJECT/CLAUDE.md §3.5 数据获取规则 + docs/FEATURE_STATUS.md §1 数据源 SSOT 表。`);
       }
     }
 
@@ -108,7 +108,7 @@ function run(rawInput) {
       if (found.length > 0) {
         log(`⚠️ [PostEditLight] 检测到通过 vite proxy 调用交易所 API: ${found.join(', ')}`);
         log(`   底层 Engine 已实时接收行情数据。请确认是否可以复用 Master API / SharedState。`);
-        log(`   参见 CLAUDE.md §八½ 不变量 #1: 每个数据字段只有一个源头。`);
+        log(`   参见 PROJECT/CLAUDE.md §八½ 不变量 #1: 每个数据字段只有一个源头。`);
       }
     }
 
@@ -123,7 +123,7 @@ function run(rawInput) {
       const ffMatches = fireForgetPatterns.filter(p => p.test(content));
       if (ffMatches.length > 0) {
         log(`⚠️ [PostEditLight] 检测到可能的 fire-and-forget 模式（${filePath}）`);
-        log(`   层间调用必须有响应路径。参见 CLAUDE.md §八½ 不变量 #2。`);
+        log(`   层间调用必须有响应路径。参见 PROJECT/CLAUDE.md §八½ 不变量 #2。`);
       }
     }
 
@@ -137,7 +137,7 @@ function run(rawInput) {
       for (const { pattern, msg } of unsafeDefaults) {
         if (pattern.test(content)) {
           log(`⚠️ [PostEditLight] 检测到硬编码默认值: ${msg}（${filePath}）`);
-          log(`   默认值必须安全。参见 CLAUDE.md §八½ 不变量 #3。`);
+          log(`   默认值必须安全。参见 PROJECT/CLAUDE.md §八½ 不变量 #3。`);
         }
       }
     }
@@ -147,7 +147,7 @@ function run(rawInput) {
     if (content && /\.(ts|tsx)$/.test(filePath)) {
       if (/EXCHANGE_NAMES\s*=\s*\[/.test(content) || /const\s+EXCHANGES\s*=\s*\[/.test(content)) {
         log(`⚠️ [PostEditLight] 检测到硬编码交易所列表（${filePath}）`);
-        log(`   交易所列表应从 API 动态获取。参见 CLAUDE.md §八½ 不变量 #4。`);
+        log(`   交易所列表应从 API 动态获取。参见 PROJECT/CLAUDE.md §八½ 不变量 #4。`);
       }
     }
 
