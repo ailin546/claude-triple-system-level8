@@ -188,6 +188,11 @@
             "type": "command",
             "command": "node ~/.claude/scripts/hooks/fault-hint.js",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/scripts/hooks/lesson-nudge.js",
+            "timeout": 8000
           }
         ]
       },
