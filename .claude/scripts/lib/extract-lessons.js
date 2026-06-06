@@ -173,9 +173,53 @@ function extractFromTranscript(transcriptPath, seenKeys) {
   return { lessons, decisions };
 }
 
+// ── Commit dedup ────────────────────────────────────────────
+
+/**
+ * Filter out commits whose short-hash already appears in today.md.
+ *
+ * Root cause this fixes: stop-summary.js (autoRecordSessionFacts) and
+ * periodic-memory.js both run `git log --since=session_start` (the FULL
+ * session window) on EVERY trigger. Stop fires multiple times per session
+ * and periodic fires every 30min, so the same commits were appended N times
+ * → today.md bloats → rotation carries the dupes into weekly.md (observed
+ * 86% redundancy, weekly.md 129KB with only 172 unique lines).
+ *
+ * Lessons already had seen-lessons.json dedup; commits had no equivalent.
+ * This is that equivalent: dedup against what's already in today.md.
+ *
+ * @param {string[]} commits - commit lines, each "hash subject ..."
+ * @param {string} todayFilePath - absolute path to the relevant today.md
+ * @returns {string[]} only commits whose hash is not already recorded today
+ */
+function filterNewCommits(commits, todayFilePath) {
+  if (!Array.isArray(commits) || commits.length === 0) return commits;
+  let existing = '';
+  try {
+    if (fs.existsSync(todayFilePath)) {
+      existing = fs.readFileSync(todayFilePath, 'utf8');
+    }
+  } catch { return commits; }
+  if (!existing) return commits;
+
+  // Existing commit/fix lines look like:  - `abc1234 subject`
+  // Anchor on the bullet + backtick so we don't match inline code in lessons.
+  const existingHashes = new Set();
+  for (const m of existing.matchAll(/^\s*-\s+`([0-9a-f]{7,40})\s/gm)) {
+    existingHashes.add(m[1]);
+  }
+  if (existingHashes.size === 0) return commits;
+
+  return commits.filter(c => {
+    const hash = String(c).split(/\s/)[0];
+    return !existingHashes.has(hash);
+  });
+}
+
 module.exports = {
   cleanLesson,
   lessonKey,
+  filterNewCommits,
   loadSeenLessonKeys,
   saveSeenLessonKeys,
   extractFromTranscript,

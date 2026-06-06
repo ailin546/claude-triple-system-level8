@@ -40,6 +40,7 @@ const ACKED_HOOK_GROUPS = {
   'PreToolUse:Bash':             'guard chain: evaluation-gate / careful-guard / fix-depth-check',
   'PreToolUse:*':                'orthogonal: pre-tool-escalate (mode) + suggest-compact (context)',
   'PostToolUse:*':               'orthogonal: drift-detector (state) + periodic-memory (lessons)',
+  'PostToolUse:Bash':            'orthogonal: fault-hint (fault tips) + lesson-nudge (lessons reminder, 2026-06-05)',
 };
 // Cross-layer name collisions that are intentional entrypoint patterns.
 // command + skill same name = "command is invocation, skill is the capability"

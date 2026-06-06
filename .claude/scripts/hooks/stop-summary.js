@@ -125,6 +125,12 @@ function autoRecordSessionFacts(stdinJson) {
     } catch { /* ignore */ }
   }
 
+  // Anti-duplication: drop commits already recorded in today.md.
+  // Stop fires multiple times per session and each run uses the full
+  // `git log --since=session_start` window, so without this filter the
+  // same commits get appended on every trigger (see filterNewCommits).
+  commits = lessonLib.filterNewCommits(commits, TODAY_FILE);
+
   // ── 3. Extract lessons and decisions from transcript ──
   const lessons = [];
   const decisions = [];

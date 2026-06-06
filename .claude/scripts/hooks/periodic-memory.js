@@ -148,6 +148,11 @@ function run(stdinJson) {
     } catch { /* ignore */ }
   }
 
+  // Anti-duplication: drop commits already recorded in today.md. Without this,
+  // periodic (every 30min) + Stop ([auto]) both append the same session-window
+  // commits under different markers (see extract-lessons filterNewCommits).
+  commits = extractLib.filterNewCommits(commits, path.join(memDir, 'today.md'));
+
   const hasCommits = commits.length > 0;
   const hasLessons = lessons.length > 0;
   const hasDecisions = decisions.length > 0;

@@ -182,9 +182,10 @@ Claude 只需在分析问题时自然地使用以下格式，Stop hook 会自动
 | `seen-lessons.json` | 持久化已提取的 lesson keys（7天TTL），防止 transcript 中同一教训反复提取 | `.claude/.session-state/` |
 | `lessonKey()` | 取箭头左侧文本做语义去重，"X → A" 和 "X → B" 算同一教训 | 内存中 |
 | `cleanLesson()` | 去 markdown 格式（`**bold**` → `bold`），normalize 空白 | 内存中 |
-| 时间戳+项目名 | `[auto] HH:MM — 项目名` 防止同一 session 重复写入 | today.md 文件中 |
+| 时间戳+项目名 | `[auto] HH:MM — 项目名` marker 防同一**分钟+marker**重复写入。**仅防同 marker**——跨触发点/跨 marker（`[auto]` vs `[periodic]`）的 commit 不防，见下行 | today.md 文件中 |
+| `filterNewCommits()` | commit 按 short-hash 去重，剔除 today.md 已记录的。防多次 Stop / periodic 触发用 `git log --since=session_start` 全量窗口重复 append（2026-06-05 修：commit 路径此前无去重——lessons 有 seen-lessons 但 commits 无等价机制——weekly 曾 86% 冗余 / 129KB） | `lib/extract-lessons.js` |
 
-**关键设计：反循环不依赖 today.md 内容**。因为 today.md 会被清空/轮转，依赖它做去重会导致教训被重新提取。改用独立的 `seen-lessons.json` 文件。
+**关键设计：反循环不依赖 today.md 内容**。因为 today.md 会被清空/轮转，依赖它做去重会导致教训被重新提取。改用独立的 `seen-lessons.json` 文件。**commit 去重例外**：commit 去重恰恰**读** today.md 已有 hash（filterNewCommits），因为 commit 无 seen-lessons 式独立状态，且 today.md 内的 commit 列表在轮转前就是权威来源。
 
 ### 三级流转
 
