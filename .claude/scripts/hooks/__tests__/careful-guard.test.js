@@ -182,6 +182,36 @@ test('CONTEXTUAL: git push --force-with-lease is allowed', () => {
   assert.strictEqual(r.decision, 'allow');
 });
 
+test('CONTEXTUAL: git push -f (short flag) is blocked', () => {
+  const r = classifyCommand('git push -f origin main');
+  assert.strictEqual(r.decision, 'block');
+});
+
+// ─── Root cause C (2026-06-06): git branch -f must not be read as push -f ──
+
+test('git branch -f main <sha> is allowed (moves local ref, safe) ★', () => {
+  const r = classifyCommand('git branch -f main abc1234');
+  assert.strictEqual(r.decision, 'allow', `expected allow, got: ${r.reason}`);
+});
+
+test('git push && git branch -f does NOT cross-associate the -f flag ★', () => {
+  // The reported false positive: `-f` belongs to `git branch`, not the push.
+  const r = classifyCommand('git push origin main && git branch -f backup HEAD');
+  assert.strictEqual(r.decision, 'allow', `expected allow, got: ${r.reason}`);
+});
+
+test('git push --force-with-lease && git branch -f is still allowed', () => {
+  const r = classifyCommand('git push --force-with-lease origin main && git branch -f mirror HEAD');
+  assert.strictEqual(r.decision, 'allow', `expected allow, got: ${r.reason}`);
+});
+
+test('a real force-push in a later segment is still caught', () => {
+  // Defense-in-depth: the fix must not let a genuine `git push -f` slip by
+  // when it follows another command.
+  const r = classifyCommand('git fetch origin && git push --force origin main');
+  assert.strictEqual(r.decision, 'block');
+});
+
 test('CONTEXTUAL: git restore . on clean tree allowed (no-op)', () => {
   const r = classifyCommand('git restore .', { cwd: tmpClean });
   assert.strictEqual(r.decision, 'allow');

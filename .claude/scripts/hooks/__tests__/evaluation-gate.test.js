@@ -16,10 +16,11 @@
 const assert = require('assert');
 const path = require('path');
 const os = require('os');
+const fs = require('fs');
+const { execFileSync } = require('child_process');
 
-const { isInsideProjectRoot, isCrossRepoPush, isCommitOrPush } = require(
-  path.join(__dirname, '..', 'evaluation-gate.js')
-);
+const HOOK_PATH = path.join(__dirname, '..', 'evaluation-gate.js');
+const { isInsideProjectRoot, isCrossRepoPush, isCommitOrPush } = require(HOOK_PATH);
 
 let passed = 0;
 let failed = 0;
@@ -217,6 +218,82 @@ test('does not match git status / log / diff', () => {
 test('does not match unrelated commands', () => {
   assert.strictEqual(isCommitOrPush('echo "git commit"'), false);
   assert.strictEqual(isCommitOrPush('npm install'), false);
+});
+
+// ─── isCommitOrPush: deadlock cases (2026-06-06) ──────────────────────
+
+test('git push/commit MENTIONED in a quoted --reason is NOT a commit/push', () => {
+  // The [2026-05-20] deadlock: resetting the mode must not look like a push.
+  assert.strictEqual(
+    isCommitOrPush('node set-mode.js --reset standard --reason "unblock git push deadlock"'),
+    false
+  );
+  assert.strictEqual(
+    isCommitOrPush('node set-mode.js --reset standard --reason "stop the git commit loop"'),
+    false
+  );
+});
+
+test('git push/commit inside a commit MESSAGE still counts (it IS a commit)', () => {
+  // The outer command really is a commit; the message text is incidental.
+  assert.strictEqual(isCommitOrPush('git commit -m "mention git push in body"'), true);
+});
+
+test('git as an argument is not a commit/push', () => {
+  assert.strictEqual(isCommitOrPush('echo git push'), false);
+});
+
+// ─── Integration: gate blocks/allows via subprocess (hermetic HOME) ───
+// os.homedir() honors $HOME, so we run the real hook with a throwaway HOME
+// (no marker file) and a throwaway projectRoot whose .task-mode = heavy.
+// This NEVER touches the real ~/.claude/state marker.
+
+process.stdout.write('\ngate integration (subprocess):\n');
+
+const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'evalgate-home-'));
+const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'evalgate-proj-'));
+fs.mkdirSync(path.join(tmpProject, '.claude'), { recursive: true });
+fs.writeFileSync(path.join(tmpProject, '.claude', '.task-mode'), 'heavy');
+
+function cleanupGateTmp() {
+  for (const d of [tmpHome, tmpProject]) {
+    if (d && fs.existsSync(d)) fs.rmSync(d, { recursive: true, force: true });
+  }
+}
+process.on('exit', cleanupGateTmp);
+process.on('SIGINT', () => { cleanupGateTmp(); process.exit(1); });
+
+/** Run the hook with command `cmd`; returns exit code (2 = blocked). */
+function runGate(cmd) {
+  const payload = JSON.stringify({ tool_name: 'Bash', tool_input: { command: cmd }, cwd: tmpProject });
+  try {
+    execFileSync('node', [HOOK_PATH], {
+      input: payload,
+      env: { ...process.env, HOME: tmpHome },
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return 0;
+  } catch (err) {
+    return err.status;
+  }
+}
+
+test('heavy + no marker + real git push → BLOCKED (exit 2)', () => {
+  assert.strictEqual(runGate('git push origin main'), 2);
+});
+
+test('heavy + no marker + real git commit → BLOCKED (exit 2)', () => {
+  assert.strictEqual(runGate('git commit -m "wip"'), 2);
+});
+
+test('heavy + set-mode --reason "git push" → NOT blocked (exit 0)', () => {
+  // The reset command must pass even though its reason text says "git push".
+  assert.strictEqual(runGate('node set-mode.js --reset standard --reason "unblock git push"'), 0);
+});
+
+test('heavy + non-commit command → NOT blocked (exit 0)', () => {
+  assert.strictEqual(runGate('git status'), 0);
 });
 
 // ─── Summary ──────────────────────────────────────────────────────────

@@ -45,6 +45,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
+const { splitSegments, gitSubcommand } = require('../lib/command-scan');
 
 const HOME = os.homedir();
 const STATE_DIR = path.join(HOME, '.claude', 'state', 'evaluation-gate');
@@ -91,9 +92,26 @@ function readTaskMode(projectRoot) {
   }
 }
 
+/**
+ * True iff the command actually runs `git commit` or `git push` at a command
+ * HEAD — not merely mentions it inside a quoted string or flag value.
+ *
+ * Bug history (2026-05-20): the previous regex `(^|[\s;&|])git\s+(commit|push)`
+ * matched the substring anywhere, so a commit message or a `set-mode --reason
+ * "...git push..."` text was read as a real push. In Heavy mode that BLOCKED
+ * the de-escalation command itself — a core part of the escalation deadlock.
+ *
+ * The fix strips quoted strings and splits into segments, then checks the git
+ * subcommand at each segment's head (see ../lib/command-scan.js). Quoted
+ * `--reason`/`-m` values can no longer trip the gate; `cd x && git push` and
+ * plain `git commit` still do.
+ */
 function isCommitOrPush(cmd) {
   if (typeof cmd !== 'string') return false;
-  return /(^|[\s;&|])git\s+(commit|push)\b/.test(cmd);
+  return splitSegments(cmd).some((seg) => {
+    const sub = gitSubcommand(seg);
+    return sub === 'commit' || sub === 'push';
+  });
 }
 
 /**

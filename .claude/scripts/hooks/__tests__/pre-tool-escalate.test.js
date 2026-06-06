@@ -111,8 +111,10 @@ t('migrate → heavy', () => {
   assert.strictEqual(detectEscalation(bash('npm run migrate')).mode, 'heavy');
 });
 
-t('secret rotation (keyword+verb, single segment) → heavy', () => {
-  assert.strictEqual(detectEscalation(bash('aws secretsmanager update-secret --secret-id x')).mode, 'heavy');
+t('secret set (keyword+verb, single segment) → heavy', () => {
+  // HEAVY pattern is (keyword).*(verb) — order-sensitive, keyword before verb.
+  // `gh secret set NAME` is the canonical real command this guards.
+  assert.strictEqual(detectEscalation(bash('gh secret set MY_TOKEN abc')).mode, 'heavy');
 });
 
 t('npm install → standard', () => {

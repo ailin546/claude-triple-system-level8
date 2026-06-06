@@ -16,13 +16,17 @@
 
 **单纯纯函数 utility（无 stdin/stderr 副作用）可豁免**，但应在文件顶部注释说明"无副作用"。
 
-## 标杆文件（现有 3 个）
+## 标杆文件
 
 | 文件 | 覆盖类别 | 测试数 |
 |---|---|---|
-| [careful-guard.test.js](./careful-guard.test.js) | 阻断 + 解析配置 + 改 context | 36 |
-| [evaluation-gate.test.js](./evaluation-gate.test.js) | state file + mode gate + 阻断 | 22 |
+| [careful-guard.test.js](./careful-guard.test.js) | 阻断 + 解析配置 + 改 context | 41 |
+| [evaluation-gate.test.js](./evaluation-gate.test.js) | state file + mode gate + 阻断 + hermetic subprocess 集成 | 29 |
 | [fix-depth-check.test.js](./fix-depth-check.test.js) | 解析配置 + 改 context | 31 |
+| [pre-tool-escalate.test.js](./pre-tool-escalate.test.js) | 解析配置（命令分段匹配）+ mode 升档 | 22 |
+| [command-scan.test.js](./command-scan.test.js) | 纯函数解析库（strip-quote / segment / git-head）| 20 |
+
+> 2026-06-06：`command-scan.js` 是 `lib/` 下的纯函数解析库（无副作用，README §17 本可豁免），但因它支撑两个阻断 hook（evaluation-gate exit 2 + pre-tool-escalate mode），仍配单测。`evaluation-gate.test.js` 新增 subprocess 集成测试演示如何用 throwaway `HOME` hermetic 跑真实 hook 的 exit-code，不碰真实 marker。
 
 ## 零依赖测试模式
 
