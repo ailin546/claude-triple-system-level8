@@ -11,9 +11,27 @@
  *
  * Non-blocking: pass-through on error, never blocks tool execution.
  * Cross-platform (Windows, macOS, Linux).
+ *
+ * ── Command matching (2026-06-06 root-cause rewrite) ──────────────────
+ * Bash risk patterns are matched against each command SEGMENT independently,
+ * with quoted strings stripped (see ../lib/command-scan.js). This fixes a
+ * deadlock with evaluation-gate:
+ *   • `git push` / `git commit` / `git add` were removed as escalation
+ *     signals. Version-control mechanics are NOT risk signals — mode is
+ *     driven by WHAT changes (sensitive dirs/keywords/file-count), so a
+ *     genuine heavy task is already heavy from its content signals long
+ *     before it reaches push. Auto-escalating every push to heavy only
+ *     re-tripped evaluation-gate on light tasks.
+ *   • set-mode.js segments are skipped — it is the de-escalation CLI, and
+ *     scanning its `--reason "..."` text re-escalated the very command that
+ *     was lowering the mode (error-log [2026-05-20] follow-up).
+ *   • quoted flag values / messages (`-m "...deploy..."`) and cross-command
+ *     `.*` spans (`cat secret.txt && echo set`) no longer match.
  */
 
 'use strict';
+
+const { splitSegments, isSetModeInvocation } = require('../lib/command-scan');
 
 const MAX_STDIN = 1024 * 1024;
 
@@ -24,10 +42,14 @@ const CROSS_FILE_HEAVY = 6;
 const TASK_BOUNDARY_MS = (parseInt(process.env.TASK_BOUNDARY_MINUTES, 10) || 5) * 60 * 1000;
 
 // ── Risk signal definitions ──────────────────────────────────
+//
+// NOTE: git VCS operations (add/commit/push/checkout/switch/merge/rebase/
+// cherry-pick) are intentionally absent. They are version-control mechanics,
+// not task-nature signals. routing.md never lists them as escalation
+// triggers; matching them here created the evaluation-gate deadlock.
 
 // Bash command patterns → Standard
 const STANDARD_BASH_PATTERNS = [
-  /\bgit\s+(add|commit|checkout|switch|merge|rebase|cherry-pick)\b/,
   /\bnpm\s+(run\s+build|run\s+dev|install|ci)\b/,
   /\bpip\s+install\b/,
   /\byarn\s+(add|install)\b/,
@@ -37,7 +59,6 @@ const STANDARD_BASH_PATTERNS = [
 
 // Bash command patterns → Heavy
 const HEAVY_BASH_PATTERNS = [
-  /\bgit\s+push\b/,
   /\b(deploy|terraform|kubectl|helm)\b/,
   /\bnpm\s+publish\b/,
   /\bdocker\s+push\b/,
@@ -57,6 +78,8 @@ const HEAVY_DIR_NAMES = [
   'shared-state', 'identity', 'oauth',
 ];
 
+const MODE_LEVELS = { fast: 0, standard: 1, heavy: 2 };
+
 /**
  * Check if a normalized path contains a directory segment.
  */
@@ -74,17 +97,24 @@ function detectEscalation(input) {
   const toolName = input.tool_name || '';
   const toolInput = input.tool_input || {};
 
-  // Check Bash commands
+  // Check Bash commands — per-segment, quote-stripped (see command-scan.js).
   if (toolName === 'Bash' || toolName === 'bash') {
     const cmd = toolInput.command || '';
     if (!cmd) return null;
 
-    for (const pattern of HEAVY_BASH_PATTERNS) {
-      if (pattern.test(cmd)) return { mode: 'heavy', signal: `bash: ${cmd.slice(0, 80)}` };
+    for (const seg of splitSegments(cmd)) {
+      // The de-escalation CLI is never a risk signal; skip it so its
+      // --reason text cannot re-escalate the mode it is lowering.
+      if (isSetModeInvocation(seg)) continue;
+
+      for (const pattern of HEAVY_BASH_PATTERNS) {
+        if (pattern.test(seg)) return { mode: 'heavy', signal: `bash: ${seg.slice(0, 80)}` };
+      }
+      for (const pattern of STANDARD_BASH_PATTERNS) {
+        if (pattern.test(seg)) return { mode: 'standard', signal: `bash: ${seg.slice(0, 80)}` };
+      }
     }
-    for (const pattern of STANDARD_BASH_PATTERNS) {
-      if (pattern.test(cmd)) return { mode: 'standard', signal: `bash: ${cmd.slice(0, 80)}` };
-    }
+    return null;
   }
 
   // Check Edit/Write file paths
@@ -121,6 +151,19 @@ function detectEscalation(input) {
 }
 
 /**
+ * Map a cross-file-accumulation count to an escalation mode (or null).
+ * Pure function so the threshold logic is unit-testable.
+ *
+ * @param {number} fileCount unique files touched this task
+ * @returns {'standard'|'heavy'|null}
+ */
+function accumulationMode(fileCount) {
+  if (fileCount >= CROSS_FILE_HEAVY) return 'heavy';
+  if (fileCount >= CROSS_FILE_STANDARD) return 'standard';
+  return null;
+}
+
+/**
  * Extract file path from tool input (Edit/Write targets).
  */
 function extractFilePath(input) {
@@ -133,121 +176,134 @@ function extractFilePath(input) {
 
 // ── Main logic ───────────────────────────────────────────────
 
-let data = '';
-process.stdin.setEncoding('utf8');
+function runMain() {
+  let data = '';
+  process.stdin.setEncoding('utf8');
 
-process.stdin.on('data', chunk => {
-  if (data.length < MAX_STDIN) {
-    const remaining = MAX_STDIN - data.length;
-    data += chunk.substring(0, remaining);
-  }
-});
+  process.stdin.on('data', chunk => {
+    if (data.length < MAX_STDIN) {
+      const remaining = MAX_STDIN - data.length;
+      data += chunk.substring(0, remaining);
+    }
+  });
 
-process.stdin.on('end', () => {
-  try {
-    const input = JSON.parse(data);
-    const {
-      getCurrentMode, setMode, MODE_LEVELS,
-      appendModeTrace,
-      getEscalationState, setEscalationState
-    } = require('../lib/mode-check');
+  process.stdin.on('end', () => {
+    try {
+      const input = JSON.parse(data);
+      const {
+        getCurrentMode, setMode, MODE_LEVELS: LIB_MODE_LEVELS,
+        appendModeTrace,
+        getEscalationState, setEscalationState
+      } = require('../lib/mode-check');
 
-    const escState = getEscalationState();
-    const now = Date.now();
-    let currentMode = getCurrentMode();
+      const escState = getEscalationState();
+      const now = Date.now();
+      let currentMode = getCurrentMode();
 
-    // ── Task boundary detection ──
-    // If idle for > TASK_BOUNDARY_MS, reset to fast and clear file tracking
-    if (escState.lastToolUseAt && (now - escState.lastToolUseAt) > TASK_BOUNDARY_MS) {
-      const prevMode = currentMode;
-      if (prevMode !== 'fast') {
-        setMode('fast');
-        appendModeTrace({
-          trigger: 'pre-tool-escalate',
-          prev_mode: prevMode,
-          next_mode: 'fast',
-          reason: `task-boundary: idle ${Math.round((now - escState.lastToolUseAt) / 60000)}min`,
-          matched_signal: null,
-          overridden_by_user: false
-        });
-        console.error(`[PreToolEscalate] Task boundary detected (idle ${Math.round((now - escState.lastToolUseAt) / 60000)}min). Mode reset: ${prevMode} → fast`);
-        try {
-          const { getModelSummary } = require('../lib/model-map');
-          console.error(`[PreToolEscalate] ${getModelSummary({ mode: 'fast' })}`);
-        } catch { /* model-map not available */ }
-        currentMode = 'fast';
+      // ── Task boundary detection ──
+      // If idle for > TASK_BOUNDARY_MS, reset to fast and clear file tracking
+      if (escState.lastToolUseAt && (now - escState.lastToolUseAt) > TASK_BOUNDARY_MS) {
+        const prevMode = currentMode;
+        if (prevMode !== 'fast') {
+          setMode('fast');
+          appendModeTrace({
+            trigger: 'pre-tool-escalate',
+            prev_mode: prevMode,
+            next_mode: 'fast',
+            reason: `task-boundary: idle ${Math.round((now - escState.lastToolUseAt) / 60000)}min`,
+            matched_signal: null,
+            overridden_by_user: false
+          });
+          console.error(`[PreToolEscalate] Task boundary detected (idle ${Math.round((now - escState.lastToolUseAt) / 60000)}min). Mode reset: ${prevMode} → fast`);
+          try {
+            const { getModelSummary } = require('../lib/model-map');
+            console.error(`[PreToolEscalate] ${getModelSummary({ mode: 'fast' })}`);
+          } catch { /* model-map not available */ }
+          currentMode = 'fast';
+        }
+        // Clear file tracking for new task
+        escState.filesTracked = [];
       }
-      // Clear file tracking for new task
-      escState.filesTracked = [];
-    }
 
-    // ── Track unique files ──
-    const filePath = extractFilePath(input);
-    if (filePath && !escState.filesTracked.includes(filePath)) {
-      escState.filesTracked.push(filePath);
-    }
+      // ── Track unique files ──
+      const filePath = extractFilePath(input);
+      if (filePath && !escState.filesTracked.includes(filePath)) {
+        escState.filesTracked.push(filePath);
+      }
 
-    // ── Determine target mode from all signals ──
-    let targetMode = null;
-    let targetSignal = null;
-    let targetReason = null;
+      // ── Determine target mode from all signals ──
+      let targetMode = null;
+      let targetSignal = null;
+      let targetReason = null;
 
-    // 1. Risk signal detection (highest priority)
-    const riskResult = detectEscalation(input);
-    if (riskResult) {
-      targetMode = riskResult.mode;
-      targetSignal = riskResult.signal;
-      targetReason = `risk-signal: ${riskResult.signal}`;
-    }
+      // 1. Risk signal detection (highest priority)
+      const riskResult = detectEscalation(input);
+      if (riskResult) {
+        targetMode = riskResult.mode;
+        targetSignal = riskResult.signal;
+        targetReason = `risk-signal: ${riskResult.signal}`;
+      }
 
-    // 2. Cross-file accumulation (only upgrade if risk didn't already set higher)
-    const fileCount = escState.filesTracked.length;
-    if (fileCount >= CROSS_FILE_HEAVY) {
-      if (!targetMode || MODE_LEVELS[targetMode] < MODE_LEVELS.heavy) {
-        targetMode = 'heavy';
+      // 2. Cross-file accumulation (only upgrade if risk didn't already set higher)
+      const fileCount = escState.filesTracked.length;
+      const accMode = accumulationMode(fileCount);
+      if (accMode && (!targetMode || LIB_MODE_LEVELS[targetMode] < LIB_MODE_LEVELS[accMode])) {
+        const threshold = accMode === 'heavy' ? CROSS_FILE_HEAVY : CROSS_FILE_STANDARD;
+        targetMode = accMode;
         targetSignal = `${fileCount} unique files`;
-        targetReason = `cross-file: ${fileCount} files touched (threshold: ${CROSS_FILE_HEAVY})`;
+        targetReason = `cross-file: ${fileCount} files touched (threshold: ${threshold})`;
       }
-    } else if (fileCount >= CROSS_FILE_STANDARD) {
-      if (!targetMode || MODE_LEVELS[targetMode] < MODE_LEVELS.standard) {
-        targetMode = 'standard';
-        targetSignal = `${fileCount} unique files`;
-        targetReason = `cross-file: ${fileCount} files touched (threshold: ${CROSS_FILE_STANDARD})`;
+
+      // ── Apply escalation (only upgrade, never downgrade) ──
+      if (targetMode) {
+        const currentLevel = LIB_MODE_LEVELS[currentMode] ?? 0;
+        const targetLevel = LIB_MODE_LEVELS[targetMode] ?? 0;
+
+        if (targetLevel > currentLevel) {
+          setMode(targetMode);
+          appendModeTrace({
+            trigger: 'pre-tool-escalate',
+            prev_mode: currentMode,
+            next_mode: targetMode,
+            reason: targetReason,
+            matched_signal: targetSignal,
+            overridden_by_user: false
+          });
+          console.error(`[PreToolEscalate] Mode escalated: ${currentMode} → ${targetMode} (${targetReason})`);
+          try {
+            const { getModelSummary } = require('../lib/model-map');
+            console.error(`[PreToolEscalate] ${getModelSummary({ mode: targetMode })}`);
+          } catch { /* model-map not available */ }
+        }
       }
+
+      // ── Update escalation state ──
+      escState.lastToolUseAt = now;
+      setEscalationState(escState);
+
+    } catch {
+      // Parse error or mode-check unavailable — pass through
     }
 
-    // ── Apply escalation (only upgrade, never downgrade) ──
-    if (targetMode) {
-      const currentLevel = MODE_LEVELS[currentMode] ?? 0;
-      const targetLevel = MODE_LEVELS[targetMode] ?? 0;
+    // Always pass through original input unchanged
+    process.stdout.write(data);
+    process.exit(0);
+  });
+}
 
-      if (targetLevel > currentLevel) {
-        setMode(targetMode);
-        appendModeTrace({
-          trigger: 'pre-tool-escalate',
-          prev_mode: currentMode,
-          next_mode: targetMode,
-          reason: targetReason,
-          matched_signal: targetSignal,
-          overridden_by_user: false
-        });
-        console.error(`[PreToolEscalate] Mode escalated: ${currentMode} → ${targetMode} (${targetReason})`);
-        try {
-          const { getModelSummary } = require('../lib/model-map');
-          console.error(`[PreToolEscalate] ${getModelSummary({ mode: targetMode })}`);
-        } catch { /* model-map not available */ }
-      }
-    }
+// ── Exports for unit tests ───────────────────────────────────
+module.exports = {
+  detectEscalation,
+  accumulationMode,
+  extractFilePath,
+  pathContainsDir,
+  STANDARD_BASH_PATTERNS,
+  HEAVY_BASH_PATTERNS,
+  MODE_LEVELS,
+  CROSS_FILE_STANDARD,
+  CROSS_FILE_HEAVY,
+};
 
-    // ── Update escalation state ──
-    escState.lastToolUseAt = now;
-    setEscalationState(escState);
-
-  } catch {
-    // Parse error or mode-check unavailable — pass through
-  }
-
-  // Always pass through original input unchanged
-  process.stdout.write(data);
-  process.exit(0);
-});
+if (require.main === module) {
+  runMain();
+}
