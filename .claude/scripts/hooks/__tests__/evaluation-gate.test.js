@@ -243,6 +243,18 @@ test('git as an argument is not a commit/push', () => {
   assert.strictEqual(isCommitOrPush('echo git push'), false);
 });
 
+test('#1 git global options do not hide a real push/commit from the gate', () => {
+  // Codex review: `git --no-pager push` / `git -c x=y commit` previously
+  // returned false → bypassed the Heavy gate.
+  assert.strictEqual(isCommitOrPush('git --no-pager push origin main'), true);
+  assert.strictEqual(isCommitOrPush('git -c user.email=x commit -m y'), true);
+  assert.strictEqual(isCommitOrPush('git -C /repo push'), true);
+});
+
+test('#2 backslash-newline continued git push is still a push', () => {
+  assert.strictEqual(isCommitOrPush('git \\\n push origin main'), true);
+});
+
 // ─── Integration: gate blocks/allows via subprocess (hermetic HOME) ───
 // os.homedir() honors $HOME, so we run the real hook with a throwaway HOME
 // (no marker file) and a throwaway projectRoot whose .task-mode = heavy.

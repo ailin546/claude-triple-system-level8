@@ -129,6 +129,15 @@ t('risk signal survives when chained after a set-mode segment', () => {
   );
 });
 
+t('#6 risk hidden in a set-mode --reason command substitution still escalates', () => {
+  // Codex review: `$(terraform apply)` EXECUTES even inside a set-mode reason;
+  // the set-mode skip must not mask it. splitSegments surfaces it as a segment.
+  assert.strictEqual(
+    detectEscalation(bash('node set-mode.js --reset standard --reason "$(terraform apply)"')).mode,
+    'heavy'
+  );
+});
+
 // ─── Edit/Write path signals unchanged ───────────────────────────────
 process.stdout.write('\nEdit/Write path signals (unchanged):\n');
 

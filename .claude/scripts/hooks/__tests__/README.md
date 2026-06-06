@@ -20,11 +20,11 @@
 
 | 文件 | 覆盖类别 | 测试数 |
 |---|---|---|
-| [careful-guard.test.js](./careful-guard.test.js) | 阻断 + 解析配置 + 改 context | 41 |
-| [evaluation-gate.test.js](./evaluation-gate.test.js) | state file + mode gate + 阻断 + hermetic subprocess 集成 | 29 |
+| [careful-guard.test.js](./careful-guard.test.js) | 阻断 + 解析配置 + 改 context | 42 |
+| [evaluation-gate.test.js](./evaluation-gate.test.js) | state file + mode gate + 阻断 + hermetic subprocess 集成 | 31 |
 | [fix-depth-check.test.js](./fix-depth-check.test.js) | 解析配置 + 改 context | 31 |
-| [pre-tool-escalate.test.js](./pre-tool-escalate.test.js) | 解析配置（命令分段匹配）+ mode 升档 | 22 |
-| [command-scan.test.js](./command-scan.test.js) | 纯函数解析库（strip-quote / segment / git-head）| 20 |
+| [pre-tool-escalate.test.js](./pre-tool-escalate.test.js) | 解析配置（命令分段匹配）+ mode 升档 | 23 |
+| [command-scan.test.js](./command-scan.test.js) | 纯函数解析库（strip-quote / segment / git-head / 全局选项 / 重定向 / 命令替换）| 25 |
 
 > 2026-06-06：`command-scan.js` 是 `lib/` 下的纯函数解析库（无副作用，README §17 本可豁免），但因它支撑两个阻断 hook（evaluation-gate exit 2 + pre-tool-escalate mode），仍配单测。`evaluation-gate.test.js` 新增 subprocess 集成测试演示如何用 throwaway `HOME` hermetic 跑真实 hook 的 exit-code，不碰真实 marker。
 

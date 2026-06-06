@@ -212,6 +212,13 @@ test('a real force-push in a later segment is still caught', () => {
   assert.strictEqual(r.decision, 'block');
 });
 
+test('force-push with fd redirection is still blocked (Codex #4) ★', () => {
+  // `2>&1` contains an `&` that must NOT stop the force-flag scan — this is a
+  // single real force push. The first fix `[^|;&\n]*` wrongly allowed it.
+  assert.strictEqual(classifyCommand('git push origin main 2>&1 -f').decision, 'block');
+  assert.strictEqual(classifyCommand('git push origin main &>out.log --force').decision, 'block');
+});
+
 test('CONTEXTUAL: git restore . on clean tree allowed (no-op)', () => {
   const r = classifyCommand('git restore .', { cwd: tmpClean });
   assert.strictEqual(r.decision, 'allow');

@@ -88,13 +88,16 @@ const CONTEXTUAL_PATTERNS = [
     },
   },
   {
-    // The `-f`/`--force` must belong to the `git push` command itself, so the
-    // run between `push` and the flag excludes chain operators (& | ; newline).
-    // Bug history (2026-06-06): `[^|;]*` allowed `&` through, so
-    // `git push origin main && git branch -f x y` cross-associated the
-    // `git branch -f` flag with the earlier push → false force-push block.
-    // `git branch -f` (move a local ref) is safe and must pass.
-    pattern: /\bgit\s+push\s+[^|;&\n]*(-f\b|--force(?!-with-lease))/,
+    // The `-f`/`--force` must belong to the `git push` command itself. The run
+    // between `push` and the flag excludes chain operators (& | ; newline) so a
+    // later `git branch -f x y` is not cross-associated with the push — BUT an
+    // `&` that is part of a redirection (`2>&1`, `>&2`, `&>file`) is allowed
+    // through, since `git push origin main 2>&1 -f` is a single real force push.
+    // Bug history (2026-06-06): `[^|;]*` cross-associated `git push && git
+    // branch -f`; the first fix `[^|;&\n]*` over-corrected and let
+    // `git push 2>&1 -f` slip (the `&` in `2>&1` stopped the scan). `git branch
+    // -f` (move a local ref) is safe and must pass.
+    pattern: /\bgit\s+push\s+(?:[^|;&\n]|&(?=[\d>]))*(-f\b|--force(?!-with-lease))/,
     desc: 'git push --force (use --force-with-lease)',
     check: () => ({ allow: false, reason: 'use `--force-with-lease` to avoid clobbering remote' }),
   },

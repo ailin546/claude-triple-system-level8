@@ -140,6 +140,41 @@ t('unrelated commands → false', () => {
   assert.strictEqual(isSetModeInvocation('node get-mode.js --all'), false);
 });
 
+// ─── Hardening (2026-06-06 Codex review findings) ────────────────────
+process.stdout.write('\nhardening (codex review):\n');
+
+t('#1 gitSubcommand skips git global options (--no-pager, -c, -C)', () => {
+  assert.strictEqual(gitSubcommand('git --no-pager push origin main'), 'push');
+  assert.strictEqual(gitSubcommand('git -c user.email=x commit -m y'), 'commit');
+  assert.strictEqual(gitSubcommand('git -C /repo push'), 'push');
+  assert.strictEqual(gitSubcommand('git --git-dir=/x/.git push'), 'push');
+});
+
+t('#2 line continuation is joined before head detection', () => {
+  assert.strictEqual(gitSubcommand(splitSegments('git \\\n push origin main')[0]), 'push');
+  // backslash-newline is gone and the head is `git push` (exact spacing N/A).
+  const joined = stripQuotedStrings('git \\\n push');
+  assert.ok(!/\\\n/.test(joined) && /^git\s+push\b/.test(joined.trim()), `got: ${JSON.stringify(joined)}`);
+});
+
+t('#7 redirect & is not a separator: git push 2>&1 stays one segment', () => {
+  assert.deepStrictEqual(splitSegments('git push origin main 2>&1'), ['git push origin main 2>&1']);
+  assert.deepStrictEqual(splitSegments('echo hi &>out'), ['echo hi &>out']);
+});
+
+t('background & and && still split', () => {
+  assert.deepStrictEqual(splitSegments('a & b'), ['a', 'b']);
+  assert.deepStrictEqual(splitSegments('a && b'), ['a', 'b']);
+});
+
+t('#6 command substitution contents surface as their own segment', () => {
+  assert.deepStrictEqual(
+    splitSegments('node set-mode.js --reset standard --reason "$(terraform apply)"'),
+    ['node set-mode.js --reset standard --reason', 'terraform apply']
+  );
+  assert.deepStrictEqual(splitSegments('echo `git push`'), ['echo', 'git push']);
+});
+
 // ─── Result ──────────────────────────────────────────────────────────
 process.stdout.write(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) {
