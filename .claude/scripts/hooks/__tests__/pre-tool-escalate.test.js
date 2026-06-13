@@ -92,6 +92,38 @@ t('cross-command keyword+verb span does NOT falsely escalate', () => {
   assert.strictEqual(detectEscalation(bash('cat secret.txt && echo set')), null);
 });
 
+// ─── Hyphenated-path false-positive (error-log 2026-06-13) ───────────
+// JS `\b` treats `-` as a word boundary → /\bdeploy\b/ wrongly matched the
+// project dir name `quant-deploy` in plain navigation/path args, re-escalating
+// standard→heavy and deadlocking evaluation-gate on every commit. The
+// hyphen-aware boundary must reject an adjacent `-` while keeping real verbs.
+process.stdout.write('\nhyphenated-path false-positive (must NOT escalate):\n');
+
+t('cd into a quant-deploy path does NOT escalate', () => {
+  assert.strictEqual(detectEscalation(bash('cd /Users/hi/quant-deploy')), null);
+});
+
+t('git -C with a quant-deploy path does NOT escalate', () => {
+  assert.strictEqual(detectEscalation(bash('git -C /home/ubuntu/quant-deploy commit -m "x"')), null);
+});
+
+t('ls of *.sh under a quant-deploy path does NOT escalate', () => {
+  assert.strictEqual(detectEscalation(bash('ls -la /Users/hi/quant-deploy/*.sh')), null);
+});
+
+t('hyphenated compound (re-deploy-tool / db-migrate-job) does NOT escalate', () => {
+  assert.strictEqual(detectEscalation(bash('cat /opt/re-deploy-tool/readme')), null);
+  assert.strictEqual(detectEscalation(bash('ls /srv/db-migrate-job/')), null);
+});
+
+t('chained set-mode reset + cd quant-deploy + git commit does NOT escalate', () => {
+  // The exact shape that bit the 2026-06-13 commit flow.
+  assert.strictEqual(
+    detectEscalation(bash('node set-mode.js --reset standard --force && cd /Users/hi/quant-deploy && git commit -m x')),
+    null
+  );
+});
+
 // ─── Genuine risk: these MUST still escalate ─────────────────────────
 process.stdout.write('\nstill-escalates (real risk):\n');
 
@@ -101,6 +133,12 @@ t('terraform → heavy', () => {
 
 t('deploy script → heavy', () => {
   assert.strictEqual(detectEscalation(bash('./deploy.sh prod')).mode, 'heavy');
+});
+
+t('npm run deploy (space-preceded verb) → heavy', () => {
+  // Hyphen-aware boundary must NOT over-correct: a real standalone `deploy`
+  // verb still escalates; only adjacent-hyphen compounds (quant-deploy) are spared.
+  assert.strictEqual(detectEscalation(bash('npm run deploy')).mode, 'heavy');
 });
 
 t('docker push → heavy', () => {

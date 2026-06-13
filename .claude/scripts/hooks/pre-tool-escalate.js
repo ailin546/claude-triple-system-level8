@@ -58,11 +58,21 @@ const STANDARD_BASH_PATTERNS = [
 ];
 
 // Bash command patterns → Heavy
+//
+// Hyphen-aware boundary (2026-06-13): single-word verbs match as STANDALONE
+// commands, not as a segment of a hyphenated compound such as the project dir
+// name `quant-deploy`. JS `\b` treats `-` as a word boundary, so the old
+// /\bdeploy\b/ matched `cd /Users/hi/quant-deploy` and `git -C .../quant-deploy`
+// → spurious heavy escalation → evaluation-gate blocked every commit in any
+// repo whose path contains a risk keyword (error-log 2026-06-13, same
+// substring-matching class as the 2026-06-06 fixes). `(?<![\w-])`/`(?![\w-])`
+// reject an adjacent word-char or hyphen while still matching `deploy`,
+// `./deploy.sh`, `npm run deploy`, `terraform apply`, `npm run migrate`.
 const HEAVY_BASH_PATTERNS = [
-  /\b(deploy|terraform|kubectl|helm)\b/,
+  /(?<![\w-])(deploy|terraform|kubectl|helm)(?![\w-])/,
   /\bnpm\s+publish\b/,
   /\bdocker\s+push\b/,
-  /\b(migrate|prisma\s+migrate)\b/,
+  /(?<![\w-])(migrate|prisma\s+migrate)(?![\w-])/,
   /\b(payment|billing|auth|oauth|secret|token)\b.*\b(create|update|delete|set|rotate)\b/,
 ];
 
