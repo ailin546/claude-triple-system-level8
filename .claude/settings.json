@@ -146,6 +146,11 @@
             "type": "command",
             "command": "node ~/.claude/scripts/hooks/post-edit-light.js",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/scripts/hooks/ssot-source-guard.js",
+            "timeout": 5000
           }
         ]
       },

@@ -254,6 +254,22 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型 — 
 3. **不破坏** — 引入新依赖或破坏现有接口前，必须获得用户确认
 4. **Outcome 优先** — 先确认用户要的结果（不是功能），再分析怎么做。诊断问题时用证据不用猜测 — 加日志、跑测试、看数据，禁止连续给出未经验证的不同猜测
 
+## SSOT 单一访问器铁律（强制）
+
+> 2026-06-27 来源：一类反复出现的 bug —— 一个**逻辑字段长出 ≥2 个物理源/表示**，新功能接新源却不回收旧消费者（或反之）→ 两源漂移 → SSOT 违反 → bug。单会话曾连发 4 个同形 bug（市场 bid/ask 公共代理 vs 引擎 book、腿仓位 perp notional vs 引擎 mid×qty、entry_threshold deploy 烧录拷贝 vs ArcSwap 热更新、价差原始 vs 净）。`§一致性原则` 第 2 条"不重复 — 遵守 SSOT"是原则，本条是其**强制化**：让错源不可达 / 对源不可绕过。
+
+**读取或新增任何被 ≥2 处消费的共享值前，三步**：
+1. **先 grep 找 canonical 访问器** —— 有就用它，**绝不直接读原始源/底层 field**（`fetch`/`.get(field)`/直读 struct field）。
+2. **若引入新表示/新源**，必须在**同一改动**里让旧 API 委托到新源（或回收所有旧消费者）。
+3. **绝不留两个独立活源** —— "旧 map 留着 fallback 给其他读者"就是漂移温床。
+
+**反模式**（说出/做出立即自检）：
+- "这个值我直接 `fetch`/`.get(field)` 拿一下"
+- "先加个新 hook/新端点取数，旧的不动"
+- "热更新加 ArcSwap，旧 map 留着 fallback 给其他读者"
+
+**强制/检测层**：① 全局 hook `ssot-source-guard.js`（PostToolUse Edit|Write，Always-on）在组件层加 `useMarketMidPrice`/`/proxy-` 或 Rust 直读 `strategy_configs.get` 时 stderr 软提醒（每会话每文件一次）；② 项目级可建审计脚本（注册表 + grep 禁源）接 pre-commit（CCHFT 实现见 `quant-deploy/scripts/audit/ssot-single-source.sh`）；③ 封装（错源设 private + 单 public 访问器）是最强但最重的手段，只对少数 SSOT-critical 字段做（§3 反过度设计：单源的别硬封装）。
+
 ## Triple-System 自演进铁律（强制）
 
 > 2026-04-19 元反思：多次出现"改了 hook/skill/rule 但没同步 CLAUDE.md/文档 → 新 session 不知道 → 重复发明轮子 / 规则被遗忘"。这条铁律把"系统级改动必须持久化"从建议升级为硬约束。
@@ -491,3 +507,4 @@ git worktree add ~/<project>-s2 -b dev/session-2
 - [2026-06-05] 系统级改动（A/B/C1 记忆修复）改完 ~/.claude 但未立即 push system repo → 中途 pull-all 的 system apply 用旧版覆盖 ~/.claude → A（对现有文件的修改：extract-lessons/stop-summary/periodic + doc 4 处）**全部丢失**，只有新建文件（lesson-nudge.js + test）和已 push 的 settings.json 幸存 → **铁律：系统级改动（尤其改现有文件）改完必须立即 `push-all` 进 system repo，不能留 ~/.claude 未推状态跨 pull-all 边界**（§自演进铁律"持久化"的并发覆盖维度）。检测：改 ~/.claude 后用户问"是否真 push"时，必须 grep system repo origin 端实际内容（不只看本地 ahead/behind），新建文件 vs 现有文件修改要分别验证（apply 不删新文件但覆盖现有文件修改）
 - [2026-06-06] `pre-tool-escalate × evaluation-gate × careful-guard` 升档死循环根治（[2026-05-03]/[2026-05-20] follow-up 一直未实施，2026-06-05 单 session 触发 4+ 次）→ 三处共享同一深层根因：**对整条命令字符串做无语义子串匹配**。修复：① 新建共享库 `scripts/lib/command-scan.js`（`stripQuotedStrings` / `splitSegments` / `gitSubcommand` / `isSetModeInvocation`，20 单测）；② **pre-tool-escalate** 移除 git VCS 升档信号（commit/push/add 是版控机制非任务性质，routing.md 从未列为升档触发）+ 段级 quote-strip 匹配 + 跳过 `set-mode.js` 段（实施 [2026-05-20] 未做的 follow-up），22 单测；③ **evaluation-gate** `isCommitOrPush` 改 strip-quotes + segment + git-head 匹配，`--reason "...git push..."` 不再被当真 push 拦（+7 单测，含 hermetic subprocess 集成测试验证真 push heavy 无 marker 仍 exit 2）；④ **careful-guard** force-push 正则 `[^|;]*`→`[^|;&\n]*`，`git push && git branch -f` 不再跨命令误关联 `-f`（+5 单测）。**元教训：守卫互锁类 bug，三处独立打补丁不如先找共享根因（命令解析精度）抽一个 SSOT 解析库**。完成门三 utility 全过，无新增 drift/namespace Review。**Codex 对抗审查轮（NEEDS-WORK→已加固）**：发现首版 careful-guard `[^|;]*`→`[^|;&\n]*` 修复**过度矫正**——修了跨 `&&` 关联却漏放 `git push 2>&1 -f`（fd-redirect `2>&1` 的 `&` 截断了 force-flag 扫描，#4 我引入的回归）；set-mode skip + quote-strip 漏过 `--reason "$(terraform apply)"` 命令替换（#6 回归）；外加 2 个预存洞 `git --no-pager/-c push` 漏过 gate（#1）、`git \<换行>push` 行续（#2）。加固：careful-guard 改 redirect-aware `(?:[^|;&\n]|&(?=[\d>]))*`；command-scan `gitSubcommand` 跳 git 全局选项、`splitSegments` 行续 normalize + 命令替换内容提取为独立段 + `&` 重定向感知。#3(`isCrossRepoPush $VAR` 宽松豁免)/#5(`stripQuotes` 抹引号 flag)/#7(CI/deploy 文件无 Heavy 路径) 属我未触碰的路径或策略选择，flag 待独立处理。全 **174 测试**通过（careful-guard 42/command-scan 25/evaluation-gate 31/pre-tool-escalate 23）。**二级元教训：守卫正则收窄边界时，"排除命令分隔符 `&`" 与 "保留同命令内 token（fd-redirect 的 `2>&1`）" 必须同时验证，否则修一个误拦立刻换一个误放——对抗性 review 不可省**
 - [2026-06-13] `pre-tool-escalate` hyphen-as-word-boundary 假阳性（[2026-06-06] 同子串匹配类的新实例，命令解析侧未覆盖路径名）→ 在 `quant-deploy` 仓库内每次 `cd /Users/hi/quant-deploy` / `git -C …/quant-deploy commit` 命令里，JS `\b` 把 `-` 当词边界，`/\bdeploy\b/` 匹配 `quant-deploy` 路径 → standard 被反复假升 heavy → evaluation-gate 拦 commit（单 session 触发 4 次，靠"相对路径 + commit msg 写文件避开 token 子串"绕过才提交成功）。根因：HEAVY_BASH_PATTERNS 单词 verb 用 `\b` 边界，对**含风险关键词子串的路径段**（项目目录名 `quant-deploy`）无免疫。修复：`deploy|terraform|kubectl|helm` 与 `migrate` 两组改 `(?<![\w-])…(?![\w-])` 边界——拒绝相邻 `-`/词字符，放行 `quant-deploy` 路径，仍匹配 `deploy`/`./deploy.sh`/`npm run deploy`/`terraform apply`。+6 单测（5 假阳性回归 + 1 `npm run deploy` 正向守卫不过度矫正），29 用例全过。完成门：M1 D2-D8 全 0（7 项全是 pre-existing D1 orphan 工具）/ M2 Hard 0、Review 未增。**元教训：风险关键词若是常见英文单词（deploy/migrate/auth），词边界必须 hyphen-aware——否则任何项目/路径名含该词就误升档；命令解析精度 SSOT 应把"路径段里的关键词子串"纳入测试矩阵**
+- [2026-06-27] 一类反复 bug：逻辑字段长出第 2 个物理源/表示，新功能接新源不回收旧消费者 → 漂移 → SSOT 违反（单会话连发 4 个同形 bug：市场 bid/ask、腿仓位、entry_threshold、价差）→ §SSOT 单一访问器铁律来源（A）+ 全局 hook `ssot-source-guard.js`（组件层 useMarketMidPrice/proxy- + Rust strategy_configs.get 直读 → 软提醒，23 单测）+ CCHFT 项目级 B（封装 effective_config / useMarketPrice + ESLint）/ C（审计脚本 ssot-single-source.sh 接 pre-commit）。**元教训：SSOT 长期只是"原则"不强制 → 新功能作者不知 canonical 源在哪、顺手抓显眼但错的源；要把"错源不可达/对源不可绕过"做成 hook+lint+audit 三层守，复刻 fix-depth-check"规则 0%→hook 守 100%"**
