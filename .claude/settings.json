@@ -28,8 +28,7 @@
       "EnterPlanMode",
       "ExitPlanMode",
       "ScheduleWakeup",
-      "ToolSearch",
-      "mcp__*"
+      "ToolSearch"
     ],
     "deny": [
       "CronCreate",
@@ -187,13 +186,18 @@
         ]
       },
       {
-        "matcher": "Bash",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
             "command": "node ~/.claude/scripts/hooks/fault-hint.js",
             "timeout": 5000
-          },
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
           {
             "type": "command",
             "command": "node ~/.claude/scripts/hooks/lesson-nudge.js",
@@ -359,6 +363,7 @@
     }
   },
   "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
   "theme": "dark",
   "agentPushNotifEnabled": true
 }

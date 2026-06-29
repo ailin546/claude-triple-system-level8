@@ -6,7 +6,9 @@
  *
  * Runs after Edit/Write tool use. Scans the edited file for patterns
  * that indicate error handling, external dependencies, or resilience
- * logic. When detected, emits a reminder to run `/verify fault`.
+ * logic. When detected, emits a reminder to run `/verify fault` via
+ * additionalContext (visible to the model — plain stdout/stderr on a
+ * PostToolUse exit-0 hook is NOT, see lib/hook-output.js).
  *
  * Lightweight by design — reads only the edited file, no spawns.
  */
@@ -16,15 +18,16 @@
 // ── Mode gate: Standard+ only ───────────────────────────────
 const { requireMode } = require('../lib/mode-check');
 if (!requireMode('standard')) {
-  let d = '';
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('data', c => { d += c; });
-  process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+  // Fast mode — drain stdin and exit silently (no passthrough: stdout is
+  // reserved for the additionalContext JSON envelope).
+  process.stdin.on('data', () => {});
+  process.stdin.on('end', () => process.exit(0));
   return;
 }
 // ─────────────────────────────────────────────────────────────
 
-const { readFile, log } = require('../lib/utils');
+const { readFile } = require('../lib/utils');
+const { emitAdditionalContext } = require('../lib/hook-output');
 
 const MAX_STDIN = 1024 * 1024; // 1MB limit
 
@@ -116,21 +119,11 @@ process.stdin.on('end', () => {
     const input = JSON.parse(data);
     const filePath = String(input.tool_input?.file_path || '');
 
-    if (!filePath || !SCANNABLE_EXTENSIONS.test(filePath)) {
-      process.stdout.write(data);
-      process.exit(0);
-    }
-
-    if (SKIP_PATTERNS.some(p => p.test(filePath))) {
-      process.stdout.write(data);
-      process.exit(0);
-    }
+    if (!filePath || !SCANNABLE_EXTENSIONS.test(filePath)) process.exit(0);
+    if (SKIP_PATTERNS.some(p => p.test(filePath))) process.exit(0);
 
     const content = readFile(filePath);
-    if (!content) {
-      process.stdout.write(data);
-      process.exit(0);
-    }
+    if (!content) process.exit(0);
 
     const detected = [];
 
@@ -144,12 +137,13 @@ process.stdin.on('end', () => {
     }
 
     if (detected.length > 0) {
-      log(`[fault-hint] 检测到: ${detected.join('、')} → 建议运行 /verify fault 验证故障场景`);
+      emitAdditionalContext(
+        `[fault-hint] 检测到: ${detected.join('、')} → 建议运行 /verify fault 验证故障场景`
+      );
     }
   } catch {
-    // Invalid input — pass through
+    // Invalid input — no-op
   }
 
-  process.stdout.write(data);
   process.exit(0);
 });

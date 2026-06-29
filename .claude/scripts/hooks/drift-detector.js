@@ -29,12 +29,12 @@ const PROJECT_ROOT = getProjectRoot();
 
 // ── Mode gate: Standard+ only ───────────────────────────────
 const { requireMode } = require('../lib/mode-check');
+const { emitAdditionalContext } = require('../lib/hook-output');
 if (!requireMode('standard')) {
-  // Fast mode — skip drift detection, pass through stdin
-  let d = '';
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('data', c => { d += c; });
-  process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });
+  // Fast mode — skip drift detection. Drain stdin and exit silently (no
+  // passthrough: stdout is reserved for the additionalContext JSON envelope).
+  process.stdin.on('data', () => {});
+  process.stdin.on('end', () => process.exit(0));
   return;
 }
 // ─────────────────────────────────────────────────────────────
@@ -163,20 +163,24 @@ function processInput(input) {
 
   saveState(state);
 
-  // Emit warnings based on score
-  // NOTE: PostToolUse hooks cannot block (tool already executed).
-  // All output goes to stderr as warnings visible to the user.
-  if (state.score >= 40) {
-    process.stderr.write(
-      `[drift-detector] CRITICAL: drift score ${state.score}%!\n` +
+  // Emit warnings based on score.
+  // NOTE: PostToolUse hooks cannot block (tool already executed). Warnings are
+  // injected via additionalContext (visible to the model — plain stderr on an
+  // exit-0 PostToolUse hook is NOT, see lib/hook-output.js).
+  // Both branches gate on scoreChanged so the same warning is not re-injected on
+  // every subsequent tool call once a threshold is reached (additionalContext
+  // enters context — unlike the old stderr, repeats would be real noise).
+  if (state.score >= 40 && scoreChanged) {
+    emitAdditionalContext(
+      `[drift-detector] CRITICAL: drift score ${state.score}%! ` +
       `Reverts: ${state.revertCount}, Dirs touched: ${state.editedDirs.size}, ` +
-      `Consecutive test fails: ${state.consecutiveTestFails}\n` +
-      `STOP and run /verify before continuing.\n`
+      `Consecutive test fails: ${state.consecutiveTestFails}. ` +
+      `STOP and run /verify before continuing.`
     );
   } else if (state.score >= 20 && scoreChanged) {
-    process.stderr.write(
+    emitAdditionalContext(
       `[drift-detector] Warning: drift score ${state.score}%. ` +
-      `Consider pausing to verify direction is correct.\n`
+      `Consider pausing to verify direction is correct.`
     );
   }
 }

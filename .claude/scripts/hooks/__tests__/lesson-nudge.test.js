@@ -3,8 +3,8 @@
  * Unit tests for lesson-nudge.js.
  *
  * Categories (per hooks/__tests__/README.md): state file (lesson-nudge.json
- * throttle), 改 context (stderr nudge), 解析配置 (commit msg + transcript
- * regex). All must be tested.
+ * throttle), 改 context (additionalContext nudge on stdout), 解析配置 (commit
+ * msg + transcript regex). All must be tested.
  *
  * Pure-function tests run in-process. End-to-end tests spawn the hook with a
  * temp HOME so the throttle state file never touches the real ~/.claude.
@@ -47,6 +47,14 @@ function runHook({ command = 'git commit -m "fix: x"', tool = 'Bash', transcript
   return { stderr: r.stderr || '', stdout: r.stdout || '', status: r.status, home: tmpHome };
 }
 
+// The nudge now lands in additionalContext on stdout. Returns the injected
+// text, or '' if the hook emitted nothing (suppressed/throttled).
+function nudgeText(r) {
+  if (!r.stdout.trim()) return '';
+  const parsed = JSON.parse(r.stdout); // throws if stdout is not pure JSON → contract violated
+  return parsed.hookSpecificOutput?.additionalContext || '';
+}
+
 // ── Pure: LESSON_WORTHY ──
 test('LESSON_WORTHY matches fix/perf/refactor/revert/hotfix/patch', () => {
   for (const m of ['fix: a', 'fixed b', 'perf: c', 'refactor: d', 'revert: e', 'hotfix x', 'patch y']) {
@@ -82,34 +90,44 @@ test('transcriptHasLessons false on missing file', () => {
   assert.strictEqual(transcriptHasLessons('/no/such/transcript.jsonl'), false);
 });
 
-// ── E2E: nudge fires ──
+// ── E2E: nudge fires (now via additionalContext on stdout) ──
 test('E2E: fix commit + no-lessons transcript → nudge fires', () => {
   const tp = tmpFile('{"type":"assistant","message":{"content":[{"type":"text","text":"just code, no lessons"}]}}');
   const r = runHook({ command: 'git commit -m "fix: foo"', transcript: tp });
-  assert.ok(r.stderr.includes('[LessonNudge]'), `stderr was: ${r.stderr}`);
+  assert.ok(nudgeText(r).includes('[LessonNudge]'), `stdout was: ${r.stdout}`);
 });
 
-// ── E2E: nudge suppressed ──
+test('E2E: nudge stdout is a valid additionalContext envelope (contract)', () => {
+  const tp = tmpFile('{"type":"assistant","message":{"content":[{"type":"text","text":"just code"}]}}');
+  const r = runHook({ command: 'git commit -m "fix: foo"', transcript: tp });
+  const parsed = JSON.parse(r.stdout); // must be PURE JSON, no passthrough bytes
+  assert.strictEqual(parsed.hookSpecificOutput.hookEventName, 'PostToolUse');
+  assert.ok(typeof parsed.hookSpecificOutput.additionalContext === 'string');
+  // Must NOT self-satisfy transcriptHasLessons (no line-start bold-Lessons header).
+  assert.ok(!/\n\s*\*\*Lessons:?\*\*/.test(parsed.hookSpecificOutput.additionalContext));
+});
+
+// ── E2E: nudge suppressed → stdout empty (no passthrough) ──
 test('E2E: feat commit → no nudge', () => {
   const tp = tmpFile('no lessons');
   const r = runHook({ command: 'git commit -m "feat: foo"', transcript: tp });
-  assert.ok(!r.stderr.includes('[LessonNudge]'));
+  assert.strictEqual(nudgeText(r), '');
 });
 
 test('E2E: non-Bash tool → no nudge', () => {
   const r = runHook({ tool: 'Edit', command: 'irrelevant' });
-  assert.ok(!r.stderr.includes('[LessonNudge]'));
+  assert.strictEqual(nudgeText(r), '');
 });
 
 test('E2E: non-commit Bash → no nudge', () => {
   const r = runHook({ command: 'git status' });
-  assert.ok(!r.stderr.includes('[LessonNudge]'));
+  assert.strictEqual(nudgeText(r), '');
 });
 
 test('E2E: transcript already has lessons → no nudge', () => {
   const tp = tmpFile('{"text":"x\\n**Lessons:**\\n- a -> b"}');
   const r = runHook({ command: 'git commit -m "fix: foo"', transcript: tp });
-  assert.ok(!r.stderr.includes('[LessonNudge]'));
+  assert.strictEqual(nudgeText(r), '');
 });
 
 // ── E2E: throttle (state file) ──
@@ -117,9 +135,9 @@ test('E2E: throttle — second run same transcript+home → no nudge', () => {
   const tp = tmpFile('{"text":"no lessons at all here"}');
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'nudge-home-'));
   const r1 = runHook({ command: 'git commit -m "fix: a"', transcript: tp, home });
-  assert.ok(r1.stderr.includes('[LessonNudge]'), 'first run should nudge');
+  assert.ok(nudgeText(r1).includes('[LessonNudge]'), 'first run should nudge');
   const r2 = runHook({ command: 'git commit -m "fix: b"', transcript: tp, home });
-  assert.ok(!r2.stderr.includes('[LessonNudge]'), 'second run should be throttled');
+  assert.strictEqual(nudgeText(r2), '', 'second run should be throttled');
   // state file written under temp home
   assert.ok(fs.existsSync(path.join(home, '.claude', '.session-state', 'lesson-nudge.json')));
 });

@@ -17,9 +17,11 @@
  *   makes a behavior reliable where a passive rule was 0% followed. This is
  *   the same nudge, aimed at the Lessons section instead of commit-body WHY.
  *
- * Non-blocking (exit 0). The nudge prints to stderr (visible to Claude), who
- * then writes a Lessons section in the next reply → stop-summary extracts it
- * → long-term resumes growing.
+ * Non-blocking (exit 0). The nudge is injected via hookSpecificOutput
+ * additionalContext (the ONLY non-blocking channel the model actually sees from
+ * PostToolUse — plain stdout/stderr on exit 0 are invisible to the model, see
+ * lib/hook-output.js). Claude then writes a Lessons section in the next reply →
+ * stop-summary extracts it → long-term resumes growing.
  *
  * Throttle: once per transcript (state in lesson-nudge.json). Also stays
  * silent if the session already wrote any Lessons section (culture present).
@@ -29,6 +31,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { emitAdditionalContext } = require('../lib/hook-output');
 
 // Commit types worth a reusable lesson. feat/docs/chore are usually not.
 const LESSON_WORTHY = /\b(fix(?:es|ed|ing)?|hotfix|bugfix|patch|perf|refactor|revert)\b/i;
@@ -100,9 +103,9 @@ function markNudged(transcriptPath) {
 }
 
 function main() {
+  // No stdin passthrough: stdout is reserved for the additionalContext JSON
+  // envelope (any extra bytes make it invalid JSON → nudge silently dropped).
   const raw = readStdin();
-  // Passthrough stdin (PostToolUse data-flow contract; matches fault-hint/periodic-memory).
-  process.stdout.write(raw);
   let parsed;
   try { parsed = JSON.parse(raw || '{}'); } catch { process.exit(0); }
 
@@ -122,14 +125,17 @@ function main() {
   // Throttle: one nudge per transcript.
   if (alreadyNudged(transcriptPath)) process.exit(0);
 
-  console.error(
-    `[LessonNudge] You just committed a fix/refactor but this session has no Lessons section yet.\n` +
-    `[LessonNudge] The memory pipeline sediments knowledge ONLY from a bolded Lessons: header in your\n` +
-    `[LessonNudge] reply (extracted → today.md → weekly → long-term). Root causes in the commit body or\n` +
-    `[LessonNudge] KNOWN_ISSUES never reach long-term — that gap is why project long-term stopped growing\n` +
-    `[LessonNudge] 2026-04-27 despite a month of heavy fixes. If this fix has a reusable lesson, add a\n` +
-    `[LessonNudge] bolded Lessons: section in your next reply, one bullet: - <symptom> -> <root cause / guard>.\n` +
-    `[LessonNudge] Abstract it (reusable across sessions), don't just restate the commit. Shown once per session.\n`
+  // Injected via additionalContext (visible to Claude). The wording deliberately
+  // never writes a line-start bold-Lessons header, so this text — now part of the
+  // transcript — cannot self-satisfy transcriptHasLessons on the next call.
+  emitAdditionalContext(
+    `[LessonNudge] You just committed a fix/refactor but this session has no Lessons section yet. ` +
+    `The memory pipeline sediments knowledge ONLY from a bolded Lessons: header in your reply ` +
+    `(extracted → today.md → weekly → long-term). Root causes in the commit body or KNOWN_ISSUES never ` +
+    `reach long-term — that gap is why project long-term stopped growing 2026-04-27 despite a month of ` +
+    `heavy fixes. If this fix has a reusable lesson, add a bolded Lessons: section in your next reply, ` +
+    `one bullet: - <symptom> -> <root cause / guard>. Abstract it (reusable across sessions), don't just ` +
+    `restate the commit. Shown once per session.`
   );
   markNudged(transcriptPath);
   process.exit(0);

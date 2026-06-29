@@ -190,10 +190,14 @@ function detectDrift(hooks, agents, skills, modelMapAgents) {
   }
 
   // D6: hook 数据流契约不完整 (M5a, Codex 推荐优先做 — 对应 M3 触发场景第 7 类)
-  // 检测每个注册 hook 是否实现 stdin → stdout passthrough OR 显式阻断 exit.
+  // 检测每个注册 hook 是否实现 stdin → stdout passthrough OR 显式阻断 exit
+  //   OR 发射 additionalContext (结构化 stdout 契约, passthrough 反而破坏 JSON).
   // 排除:
   //   - SessionStart hooks (写 stdout 输出给 Claude, 不是 chain 传递)
   //   - PreToolUse 阻断式 guard (exit 1/2 阻断, passthrough 反而抵消阻断意图)
+  //   - additionalContext 注入式 (emitAdditionalContext: stdout 必须是纯 JSON,
+  //     不能 passthrough, 否则合并后非法 JSON → 注入被丢弃; 见 infrastructure.md
+  //     §Hook 输出渠道 SSOT)
   drift.hookContractIncomplete = [];
   const passthroughExclude = new Set([
     'session-start', 'task-router', 'rules-loader',  // SessionStart 输出类
@@ -208,10 +212,12 @@ function detectDrift(hooks, agents, skills, modelMapAgents) {
     const c = readSafe(filePath);
     const readsStdin = /process\.stdin\.on\s*\(\s*['"]data['"]/.test(c) || /process\.stdin\.on\s*\(\s*['"]end['"]/.test(c);
     if (!readsStdin) continue;
-    // Accept passthrough OR explicit exit (1/2 = blocking semantics)
+    // Accept passthrough OR explicit exit (1/2 = blocking semantics) OR
+    // additionalContext emission (structured stdout — passthrough would corrupt it)
     const writesStdoutPassthrough = /process\.stdout\.write\s*\(\s*(stdinData|d|raw|input|rawInput|chunks|buf)/.test(c);
     const explicitBlockingExit = /process\.exit\s*\(\s*[12]\s*\)/.test(c);
-    if (!writesStdoutPassthrough && !explicitBlockingExit) {
+    const emitsAdditionalContext = /emitAdditionalContext|hookSpecificOutput|hook-output/.test(c);
+    if (!writesStdoutPassthrough && !explicitBlockingExit && !emitsAdditionalContext) {
       drift.hookContractIncomplete.push(`${hookName}.js (reads stdin but no passthrough/blocking-exit)`);
     }
   }
@@ -356,7 +362,7 @@ function main() {
     console.log('- D3: clean stale agent names from model-map.js');
     console.log('- D4: rename one to break normalize-equal collision');
     console.log('- D5: prefix with `~/.claude/CLAUDE.md §` or `PROJECT/CLAUDE.md §` per agents.md §Hook 文案锚点规则');
-    console.log('- D6: add stdin passthrough (process.stdout.write(stdinData)) or document why excluded');
+    console.log('- D6: add stdin passthrough (process.stdout.write(stdinData)), emit additionalContext (lib/hook-output), or document why excluded');
     console.log('- D7: update agents-orchestrator team list to match actual agent files');
     console.log('- D8: fix dangling path in source doc OR create the referenced file');
   }
