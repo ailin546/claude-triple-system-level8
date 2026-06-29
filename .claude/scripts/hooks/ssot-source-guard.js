@@ -27,14 +27,18 @@
  *     dropped — they flag legitimate code (LoginGate / IndexComponentsCard /
  *     SpotTrading widgets) and drown the signal.
  *
- * Non-blocking (exit 0). Prints to stderr (visible to Claude). Passthrough
- * stdin (PostToolUse data-flow contract; matches lesson-nudge/fault-hint).
+ * Non-blocking (exit 0). The nudge is injected via hookSpecificOutput
+ * additionalContext — the only non-blocking channel the model actually sees
+ * from PostToolUse (plain stdout/stderr on exit 0 are invisible to the model;
+ * see lib/hook-output.js and infrastructure.md §Hook 输出渠道 SSOT). No stdin
+ * passthrough: stdout is reserved for the JSON envelope.
  */
 
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
+const { emitAdditionalContext } = require('../lib/hook-output');
 
 const STATE_DIR = path.join(process.env.HOME || '/home/ubuntu', '.claude', 'state');
 const STATE_FILE = path.join(STATE_DIR, 'ssot-source-guard.json');
@@ -183,8 +187,9 @@ function filterUnseen(state, transcript, filePath, matches) {
 }
 
 function main() {
+  // No stdin passthrough: stdout is reserved for the additionalContext JSON
+  // envelope (extra bytes make it invalid JSON → nudge silently dropped).
   const raw = readStdin();
-  process.stdout.write(raw); // passthrough (PostToolUse contract)
 
   let parsed;
   try { parsed = JSON.parse(raw || '{}'); } catch { process.exit(0); }
@@ -210,10 +215,10 @@ function main() {
   saveState(state);
 
   const lines = fresh.map((m) => `[SSOT 单一访问器] ${m.hint}`);
-  console.error(
+  emitAdditionalContext(
     `${lines.join('\n')}\n` +
     `[SSOT 单一访问器] 该数据是否已有 canonical 访问器？直接读底层源/新增取数路径前先 grep；引入新源须在同一改动里回收旧消费者。\n` +
-    `[SSOT 单一访问器] 详见 ~/.claude/CLAUDE.md §SSOT 单一访问器铁律（每会话每文件提示一次）。\n`
+    `[SSOT 单一访问器] 详见 ~/.claude/CLAUDE.md §SSOT 单一访问器铁律（每会话每文件提示一次）。`
   );
   process.exit(0);
 }

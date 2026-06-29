@@ -3,7 +3,7 @@
  * Unit tests for ssot-source-guard.js.
  *
  * Categories (per hooks/__tests__/README.md): state file (ssot-source-guard
- * .json dedup), 改 context (stderr nudge), 解析配置 (added-text extraction +
+ * .json dedup), 改 context (additionalContext nudge on stdout), 解析配置 (added-text extraction +
  * pattern regex + comment stripping). All covered.
  *
  * Pure-function tests run in-process. E2E tests spawn the hook with a temp
@@ -45,6 +45,13 @@ function runHook({ tool = 'Edit', input = {}, transcript = '/tmp/tx.jsonl', home
   const stdin = JSON.stringify({ tool_name: tool, tool_input: input, transcript_path: transcript });
   const r = spawnSync('node', [HOOK_PATH], { input: stdin, env: { ...process.env, HOME: tmpHome }, encoding: 'utf8' });
   return { stderr: r.stderr || '', stdout: r.stdout || '', status: r.status, home: tmpHome };
+}
+
+// The nudge now lands in additionalContext on stdout. Returns the injected
+// text, or '' if the hook emitted nothing (suppressed/deduped).
+function nudgeText(r) {
+  if (!r.stdout.trim()) return '';
+  return JSON.parse(r.stdout).hookSpecificOutput?.additionalContext || '';
 }
 
 // ── Pure: PRESENTATION_FILE ──
@@ -172,25 +179,28 @@ test('filterUnseen dedups same key within transcript, resets on new transcript',
   assert.strictEqual(filterUnseen(st, 'tx2', 'src/engine.rs', m).length, 1, 'new transcript resets');
 });
 
-// ── E2E: nudge fires / suppressed ──
-test('E2E: Edit adding strategy_configs.get → stderr nudge', () => {
+// ── E2E: nudge fires / suppressed (now via additionalContext on stdout) ──
+test('E2E: Edit adding strategy_configs.get → additionalContext nudge', () => {
   const r = runHook({ tool: 'Edit', input: { file_path: 'src/engine.rs', new_string: 'self.config.strategy_configs.get(s)' } });
-  assert.ok(r.stderr.includes('[SSOT 单一访问器]'), `stderr was: ${r.stderr}`);
+  assert.ok(nudgeText(r).includes('[SSOT 单一访问器]'), `stdout was: ${r.stdout}`);
 });
 
-test('E2E: non-matching Write → no nudge', () => {
+test('E2E: nudge stdout is a valid additionalContext envelope (contract)', () => {
+  const r = runHook({ tool: 'Edit', input: { file_path: 'src/engine.rs', new_string: 'self.config.strategy_configs.get(s)' } });
+  const parsed = JSON.parse(r.stdout); // must be PURE JSON, no passthrough bytes
+  assert.strictEqual(parsed.hookSpecificOutput.hookEventName, 'PostToolUse');
+  assert.ok(typeof parsed.hookSpecificOutput.additionalContext === 'string');
+});
+
+test('E2E: non-matching Write → no nudge (stdout empty, no passthrough)', () => {
   const r = runHook({ tool: 'Write', input: { file_path: 'src/engine.rs', content: 'let x = 1;' } });
-  assert.ok(!r.stderr.includes('[SSOT 单一访问器]'));
+  assert.strictEqual(nudgeText(r), '');
+  assert.ok(!r.stdout.includes('"tool_name"'), 'must NOT echo stdin (passthrough removed)');
 });
 
 test('E2E: non-Edit/Write tool → no nudge', () => {
   const r = runHook({ tool: 'Bash', input: { command: 'strategy_configs.get(x)' } });
-  assert.ok(!r.stderr.includes('[SSOT 单一访问器]'));
-});
-
-test('E2E: stdin is passed through to stdout', () => {
-  const r = runHook({ tool: 'Edit', input: { file_path: 'a.rs', new_string: 'x' } });
-  assert.ok(r.stdout.includes('"tool_name":"Edit"'), `stdout was: ${r.stdout}`);
+  assert.strictEqual(nudgeText(r), '');
 });
 
 // ── E2E: throttle (state file) ──
@@ -198,9 +208,9 @@ test('E2E: throttle — second identical edit same home → no nudge + state fil
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ssot-home-'));
   const input = { file_path: 'src/engine.rs', new_string: 'self.config.strategy_configs.get(s)' };
   const r1 = runHook({ tool: 'Edit', input, home });
-  assert.ok(r1.stderr.includes('[SSOT 单一访问器]'), 'first should nudge');
+  assert.ok(nudgeText(r1).includes('[SSOT 单一访问器]'), 'first should nudge');
   const r2 = runHook({ tool: 'Edit', input, home });
-  assert.ok(!r2.stderr.includes('[SSOT 单一访问器]'), 'second should be deduped');
+  assert.strictEqual(nudgeText(r2), '', 'second should be deduped');
   assert.ok(fs.existsSync(path.join(home, '.claude', 'state', 'ssot-source-guard.json')), 'state file written');
 });
 
