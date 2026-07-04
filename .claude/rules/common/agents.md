@@ -101,7 +101,6 @@ For complex problems, use split role sub-agents:
 ~/.claude/scripts/lib/model-map.js     # 模型映射表 ⚠️ 易漏
 ~/.claude/scripts/hooks/*.js           # hook 内 spawn
 ~/.claude/on-demand/*.md       # 按需加载规则
-~/.claude/daily-trending-review.md     # 顶层评估文档
 ~/.claude/settings.json /.claude/settings.local.json
 ```
 
@@ -236,4 +235,4 @@ User-level hook（`~/.claude/scripts/hooks/*.js`）注入文案引用 CLAUDE.md 
 
 ### 反向 TODO 检测
 
-删除 agent 时同步搜 `daily-trending-review.md` / 任何评估清单中**意图相反**的待办（`- [ ] 保留 X 删除 Y` 当你做的是相反操作时），标记 `[x] DONE YYYY-MM-DD (做法相反: ...)`，避免未来盲执行。
+删除 agent 时同步搜任何评估清单/待办文档中**意图相反**的待办（`- [ ] 保留 X 删除 Y` 当你做的是相反操作时），标记 `[x] DONE YYYY-MM-DD (做法相反: ...)`，避免未来盲执行。

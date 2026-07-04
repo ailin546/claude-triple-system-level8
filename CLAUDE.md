@@ -348,7 +348,7 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型 — 
 
 ## Sessions Board（多 Claude session 协调）
 
-文件：`~/.claude/state/sessions-board.md`（全局软协调层，worktree 是硬隔离重武器）。完整 4 层协作栈见 `~/.claude/COLLABORATION.md`。
+文件：`~/.claude/state/sessions-board.md`（全局软协调层，worktree 是硬隔离重武器）。
 
 **必读时机**：① session 开始 ② 改仓库级共享文件（worker.json / master.json / scripts / hooks / CLAUDE.md）③ 启占端口 process ④ spawn 修改类后台 agent ⑤ `git stash/reset/commit` 前 ⑥ `git status` 有不认识修改时。
 

@@ -4,7 +4,7 @@
 >
 > 文件：`~/.claude/state/sessions-board.md`（全局，所有项目共用，不在任何 git repo 内）
 >
-> **完整 4 层协作栈索引**（代码同步 / 同机协调 / 跨机通信 / 多 agent 内）见 `~/.claude/COLLABORATION.md`。本节是其中 L2 的详细规则。
+> 4 层协作栈（代码同步 / 同机协调 / 跨机通信 / 多 agent 内）中，本文件是 L2（同机多 session 协调）的详细规则。
 >
 > Claude 应在以下场景主动引入本文件：
 > - 启动新 session（第一次写 board entry）
