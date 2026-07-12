@@ -23,7 +23,7 @@ User Request
     │   Stop → 保存状态、提取模式、追踪成本、记忆整合
     │
     ├─► Superpowers Process (流程纪律)
-    │   brainstorming → 探索需求、生成设计文档
+    │   brainstorming → 探索/拷问需求(grill)、生成设计文档
     │   writing-plans → 拆解为TDD小任务
     │   test-driven-development → 铁律：先写失败测试
     │   systematic-debugging → 4阶段根因分析

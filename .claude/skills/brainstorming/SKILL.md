@@ -1,6 +1,6 @@
 ---
 name: brainstorming
-description: Use before any creative work — feature creation, component building, behavior changes — to explore user intent, requirements, and design before implementation begins.
+description: Use before any creative work — feature creation, component building, behavior changes — to explore user intent, requirements, and design before implementation begins. Also use when the user wants to grill / stress-test / 拷问 an existing plan or design — same dialogue, with the Interrogation discipline applied.
 ---
 
 # Brainstorming Ideas Into Designs
@@ -79,6 +79,17 @@ digraph brainstorming {
 - Prefer multiple choice questions when possible, but open-ended is fine too
 - Only one question per message - if a topic needs more exploration, break it into multiple questions
 - Focus on understanding: purpose, constraints, success criteria
+
+**Interrogation discipline (grill):**
+
+These rules govern every clarifying question (ported 2026-07-12 from mattpocock/skills `grilling` + `domain-modeling`):
+
+- **Facts vs decisions** — if a *fact* can be found in the codebase or docs, look it up instead of asking. *Decisions* are the user's: put each one to them explicitly and wait for the answer.
+- **Recommend with every question** — every question ships with your recommended answer and a one-line why. Never ask bare "what do you want?".
+- **Walk the design tree** — enumerate the decision branches and resolve dependencies between decisions one by one. Stop when every branch is resolved or explicitly deferred — not when you merely *feel* you understand.
+- **Cross-examine claims** — when the user states how something works, check whether the code agrees and surface contradictions immediately ("the code does X, but you just said Y — which is right?"). Invent edge-case scenarios that force precision about concept boundaries.
+
+When the user already has a plan and asks to grill / stress-test it, interrogate that plan branch-by-branch with these rules; the "propose 2-3 approaches" step collapses to keep / modify / replace with reasoning.
 
 **Exploring approaches:**
 

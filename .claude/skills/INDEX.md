@@ -5,7 +5,7 @@
 
 ## Process & Workflow
 
-- [brainstorming](brainstorming/SKILL.md) — Use before any creative work to explore user intent, requirements, and design options
+- [brainstorming](brainstorming/SKILL.md) — Use before any creative work to explore user intent, requirements, and design options; also grills/stress-tests an existing plan（拷问需求/设计，Interrogation discipline：事实自查/决策必问、每问带推荐、遍历决策树、代码对质+边缘场景压测）
 - [specify](specify/SKILL.md) — Use before /plan in Standard+ mode to lock down task constitution — AC, scope, inviolable principles
 - [writing-plans](writing-plans/SKILL.md) — Use when you have a spec or requirements for a multi-step task, before touching code
 - [executing-plans](executing-plans/SKILL.md) — Use when you have a written implementation plan to execute in a separate session with review checkpoints
