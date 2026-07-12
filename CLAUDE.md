@@ -150,8 +150,27 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型 — 
 | `/codex:rescue` | 委派复杂任务/根因/二次实现给 Codex（详见 §Codex 调用规则） | 所有模式 |
 | `/codex:review` `/codex:adversarial-review` | Codex 视角代码/对抗审查 | Standard+ |
 | `/codex:setup` `/codex:status` `/codex:result` `/codex:cancel` | Codex 运行时管理 | 所有模式 |
+| `/grill` | 对抗审查当前 diff（攻击者视角打破代码：边界/故障/隐式假设；与 /code-review 合规检查互补）。**需求级拷问**用 brainstorming skill 的 Interrogation discipline | Standard+ |
+| `/audit` | Layer 3 多 Agent 全局审计（4 阶段协议；Step 0 先读 `on-demand/audit-protocol.md`） | Heavy |
+| `/audit-crate` | 单个 Rust crate 的 agent team 审计（同 audit-protocol） | Heavy |
+| `/design-consultation` | UI 实施前多视角设计咨询（UI Designer + UX Architect + Researcher 并行） | Standard+ |
+| `/design-review` | UI 改动后设计审查（/code-review 的视觉对应物） | Standard+ |
+| `/e2e` | Playwright 端到端测试：生成 journey + 运行 + 截图/视频/trace | Standard+ |
+| `/test-coverage` | 覆盖率分析 + 补齐缺口到 80%+ | Standard+ |
+| `/refactor-clean` | 死代码识别与安全删除（每步测试验证） | Standard+ |
+| `/quality-gate` | 按需跑 ECC 质量管线（文件或项目范围） | 所有模式 |
+| `/eval` | eval 驱动开发（EDD）工作流管理 | Standard+ |
+| `/harness-audit` | 审计当前 repo 的 agent harness 配置，输出优先级记分卡 | 所有模式 |
+| `/aside` | 不打断当前任务回答旁支问题，答完自动续上 | 所有模式 |
+| `/checkpoint` | 创建/验证工作流 checkpoint | Standard+ |
+| `/sessions` | 管理会话历史（list/load/alias/edit `~/.claude/sessions/`） | 所有模式 |
+| `/memory-status` | 查看双轨记忆（系统级 + 项目级）状态 | 所有模式 |
+| `/learn` / `/learn-eval` | 从当前会话提取可复用模式（learn-eval 含质量自评 + Global/Project 保存位置判定） | 所有模式 |
+| `/restore` | 查看/恢复 `*-archive/` 中的归档组件 | 所有模式 |
+| `/update-docs` | 文档与代码同步（从 source-of-truth 生成） | 所有模式 |
+| `/codex`（本地遗留） | ⚠ 已被插件链取代——一律改用 `/codex:review`（§Codex 调用规则强制） | — |
 
-全部命令见 `~/.claude/commands/` 和 `~/.claude/skills/`。
+全部命令见 `~/.claude/commands/` 和 `~/.claude/skills/`（skill 索引：`~/.claude/skills/INDEX.md`）。
 
 ## 记忆系统（双层）
 
@@ -345,6 +364,16 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型 — 
 - 两者分别在两个 CLAUDE.md,互不重叠
 
 **关联**: 项目级 CCHFT 有同构规则在 `/home/ubuntu/quant-deploy/CLAUDE.md §十二`,作用域严格互补(user-level 管 Claude Code 基础设施,project-level 管 CCHFT 代码/监控/修复)。
+
+### 通用文档化触发（重要内容 / 长时间阻碍，2026-07-12 用户指令）
+
+以下三类事件发生时，**当次会话内**落文档（不是"以后补"）：
+
+1. **重要新增/改动** — 系统级（`~/.claude`）走本铁律三项硬要求；项目级走 PROJECT CLAUDE.md 对应持久化章节（CCHFT = §十二 + doc-sync commit gate）。此处只声明触发，不复制规则。
+2. **长时间阻碍**（任一为真即触发）：① 同一问题卡住 ≥30 分钟无实质进展 ② 问题跨会话仍未解 ③ 被外部依赖阻塞（等 API/审批/环境）。动作：项目问题 → 项目 KNOWN_ISSUES 或 `reports/T-*` follow-up 记录**现象 + 已试路径 + 当前假设**；系统/流程问题 → 本文件 §错误教训日志 或 `**Lessons:**` 格式（走自动沉淀管道）。解决后回同一 entry 补根因。动机：卡点不落文档 = 下个 session 从零重走同一条死路（"重复发明"反模式的时间维度版本）。
+3. **重要讨论产出/决策（非代码）** — 用 `**Decisions:**` 格式写出（Stop hook 自动提取进记忆）；影响长期方向的写进对应文档（ADR / OPERATIONS / 本文件）。
+
+判据"重要"与持久化验证同源：**换一个新 session 会被再次问起、且需要重读代码/重走弯路才能回答 → 就是重要，必须落文档**。
 
 ## Sessions Board（多 Claude session 协调）
 
