@@ -113,8 +113,10 @@ node .claude/scripts/hooks/get-model.js --summary       # 分类汇总
 2. 将模型作为 `model` 参数传入 Agent tool，覆盖 agent 定义中的静态值
 3. 模式升档后（set-mode / pre-tool-escalate），后续 agent spawn 自动使用更高模型
 4. 用户可通过 `MODEL_MAP_OVERRIDE` 环境变量覆盖特定 agent 的模型
+5. **默认继承陷阱（2026-07-12，Claude 官方数据背书）**：Agent/Workflow spawn 不传 `model` 时默认**继承主会话模型**（通常 = Fable 5，最贵档）——本表只管"查表 spawn"，管不住默认继承。token-heavy 机械工作（检索扫盘/批量迁移/文档同步/soak 巡检）必须显式传 model 降到 worker/development 档；只有判断、裁决、对抗审查类才值得继承主会话模型。官方基准：编排者 + Sonnet worker = 96% 质量 @ 46% 成本（BrowseComp）
+6. **同上下文迭代用 SendMessage 续命**：每个子代理有独立 prompt cache——对同一子系统/同一 review 的多轮追问，用 SendMessage 继续已有 agent（上下文保留、cache 命中），不要重新 spawn（重读全部上下文 = 全额计费）
 
-**映射逻辑**：`.claude/scripts/lib/model-map.js`
+**映射逻辑**：`.claude/scripts/lib/model-map.js`（三档 haiku/sonnet/opus 设计早于 Fable 5；`fable` 不进 map——它是主会话/默认继承档，不是派工档）
 
 ## 禁止行为
 

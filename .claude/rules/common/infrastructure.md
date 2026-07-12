@@ -230,10 +230,12 @@ State stored in `.claude/.drift-state/{session-id}.json`. Resets per session.
 **查询**：`node .claude/scripts/hooks/get-model.js <agent-name>`
 **覆盖**：`MODEL_MAP_OVERRIDE=planner:sonnet,doc-updater:opus`
 
-**模型能力参考**：
-- **Haiku 4.5**：90% Sonnet 能力，3x 成本节省，适合高频轻量 worker
-- **Sonnet 4.6**：最佳编码模型，适合主力开发和编排
-- **Opus 4.6**：最深推理，适合架构决策和复杂审查
+**模型能力参考**（2026-07-12 刷新到 Claude 5 家族）：
+- **Fable 5**（Mythos 级，> Opus）：主会话默认模型，最强判断/裁决。子代理 spawn 不传 `model` 时**默认继承它**（最贵档）——token-heavy 子任务必须显式降档，见 `~/.claude/rules/routing.md §模型自动选择` 使用规则 5
+- **Opus 4.8**：最深推理，适合架构决策和复杂审查
+- **Sonnet 5**：最佳性价比编码模型，适合主力开发和编排（官方基准：Sonnet + Fable advisor = 92% Fable 质量 @ 63% 成本）
+- **Haiku 4.5**：轻量高频 worker，3x 成本节省
+- 别名 `haiku`/`sonnet`/`opus`/`fable` 由 harness 解析到当前最新版本，model-map 表内别名无需随版本号更新
 
 ### Context Window Management
 
