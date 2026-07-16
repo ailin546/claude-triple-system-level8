@@ -39,8 +39,21 @@
  * "heuristic lacks immunity for a legitimate work shape" class as the
  * 2026-06-13 hyphenated-path fix. Behavior-bearing config (.json/.yaml/.toml)
  * still counts: excluding it would trade a false positive for a false
- * negative. Risk-signal path detection (auth/, deploy/, ...) is unaffected —
- * it fires on WHERE a file lives, not on how many files were touched.
+ * negative.
+ *
+ * ── Dir-name signals: prose docs exempt (2026-07-17) ──────────────────
+ * The same immunity extends to the Edit/Write dir-name risk signals. A
+ * prose doc inside a risk-named directory (docs/auth/setup.md,
+ * docs/deploy/guide.md) is documentation ABOUT a sensitive area, not a
+ * change TO it — routing.md's "docs work → Fast" applies regardless of
+ * where the doc lives. Without the exemption a single Edit under a deploy/
+ * or auth/ segment escalated straight to heavy and interlocked with
+ * evaluation-gate on docs-only commits. No incident recorded yet, but the
+ * shape exists in real repos (cc/paperclip: docs/deploy/ ×9 → heavy,
+ * docs/api/ ×11 → standard), and unlike the counter there is no threshold
+ * — the first edit fires. Behavior-bearing files in those dirs
+ * (.ts/.json/.sh/extensionless) still escalate: isProseDocPath is
+ * fail-closed.
  */
 
 'use strict';
@@ -152,6 +165,12 @@ function detectEscalation(input) {
   if (/^(Edit|Write)$/i.test(toolName)) {
     const filePath = (toolInput.file_path || '').replace(/\\/g, '/');
     if (!filePath) return null;
+
+    // Prose docs never escalate on location (see header §Dir-name signals):
+    // a guide under docs/deploy/ or docs/auth/ carries no runtime behavior.
+    // The SSOT content check below loses nothing — it only applies to
+    // .ts/.tsx/.js/.jsx files, which are never prose.
+    if (isProseDocPath(filePath)) return null;
 
     for (const dir of HEAVY_DIR_NAMES) {
       if (pathContainsDir(filePath, dir)) return { mode: 'heavy', signal: `path: ${filePath}` };

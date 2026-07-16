@@ -292,6 +292,49 @@ t('trackFile dedups repeats and ignores Bash inputs', () => {
   assert.strictEqual(escState.filesTracked.length, 1);
 });
 
+// ─── Dir-name signal docs exemption (2026-07-17) ─────────────────────
+// Dir-name signals fire on WHERE a file lives, but a prose doc inside
+// docs/auth/ or docs/deploy/ is documentation ABOUT the sensitive area,
+// not a change TO it. Without the exemption a single Edit of
+// docs/deploy/guide.md jumped straight to heavy (no threshold, unlike the
+// counter) and interlocked with evaluation-gate on docs-only commits —
+// same legitimate-work-shape class. Exposure verified in real repos
+// (cc/paperclip docs/deploy/ ×9, docs/api/ ×11) though no incident yet.
+process.stdout.write('\ndir-name docs exemption (must NOT escalate):\n');
+
+t('prose doc under a heavy dir (auth/) → null', () => {
+  assert.strictEqual(detectEscalation(edit('docs/auth/setup.md')), null);
+});
+
+t('prose doc under a heavy dir (deploy/) → null', () => {
+  assert.strictEqual(
+    detectEscalation(edit('/Users/hi/cc/paperclip/docs/deploy/guide.md')),
+    null
+  );
+});
+
+t('prose doc under a standard dir (api/) → null', () => {
+  assert.strictEqual(detectEscalation(edit('docs/api/costs.md')), null);
+});
+
+t('README directly inside a risk-dir root → null', () => {
+  assert.strictEqual(
+    detectEscalation({ tool_name: 'Write', tool_input: { file_path: 'shared-state/README.md' } }),
+    null
+  );
+});
+
+t('no over-correction: code in auth/ still → heavy', () => {
+  assert.strictEqual(detectEscalation(edit('src/auth/token.ts')).mode, 'heavy');
+});
+
+t('no over-correction: behavior-bearing files in risk dirs still escalate', () => {
+  assert.strictEqual(detectEscalation(edit('config/settings.json')).mode, 'standard');
+  assert.strictEqual(detectEscalation(edit('deploy/run.sh')).mode, 'heavy');
+  assert.strictEqual(detectEscalation(edit('docs/deploy/guide.mdx')).mode, 'heavy'); // .mdx compiles to JSX
+  assert.strictEqual(detectEscalation(edit('auth/Dockerfile')).mode, 'heavy');       // extensionless → fail-closed
+});
+
 // ─── Result ──────────────────────────────────────────────────────────
 process.stdout.write(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) {
