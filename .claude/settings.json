@@ -364,6 +364,7 @@
   },
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
+  "effortLevel": "high",
   "theme": "dark",
   "agentPushNotifEnabled": true
 }
