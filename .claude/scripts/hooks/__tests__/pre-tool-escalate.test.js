@@ -23,6 +23,8 @@ const {
   detectEscalation,
   accumulationMode,
   extractFilePath,
+  isProseDocPath,
+  trackFile,
 } = require(path.join(__dirname, '..', 'pre-tool-escalate.js'));
 
 let pass = 0;
@@ -221,6 +223,116 @@ t('3-5 files → standard', () => {
 t('6+ files → heavy', () => {
   assert.strictEqual(accumulationMode(6), 'heavy');
   assert.strictEqual(accumulationMode(12), 'heavy');
+});
+
+// ─── Docs-batch false-positive (error-log 2026-07-16) ────────────────
+// The counter is a proxy for module-spanning CODE complexity; routing.md
+// classifies docs work as Fast. A batch mechanical edit of 18 markdown files
+// (wikimind session) hit the 6-file threshold 3× in one day, re-escalating
+// to heavy seconds after every manual reset and deadlocking docs-only
+// commits against evaluation-gate. Prose docs must not enter filesTracked.
+process.stdout.write('\ndocs-batch false-positive (must NOT count):\n');
+
+const edit = (file_path) => ({ tool_name: 'Edit', tool_input: { file_path } });
+
+t('prose extensions classify as docs (case-insensitive)', () => {
+  for (const p of [
+    '/Users/hi/wikimind/docs/plan.md',
+    'notes/overview.markdown',
+    'guide/setup.rst',
+    'book/ch1.adoc',
+    'book/ch2.asciidoc',
+    'todo.txt',
+    'README.MD',
+  ]) {
+    assert.strictEqual(isProseDocPath(p), true, p);
+  }
+});
+
+t('code/config/unknown extensions stay counted', () => {
+  for (const p of [
+    'src/main.ts', 'src/lib.rs', 'scripts/run.py',
+    'package.json', 'ci/deploy.yaml', 'Cargo.toml',
+    'docs/page.mdx',       // compiles to JSX — behavior-bearing
+    'README',              // extensionless → unknown → counted (fail-closed)
+    'src/util.md.ts',      // last extension wins
+  ]) {
+    assert.strictEqual(isProseDocPath(p), false, p);
+  }
+});
+
+t('wikimind regression: 6 markdown edits → zero count → no escalation', () => {
+  const escState = { filesTracked: [], lastToolUseAt: null };
+  for (let i = 1; i <= 6; i++) {
+    trackFile(escState, edit(`/Users/hi/wikimind/docs/superpowers/specs/doc-${i}.md`));
+  }
+  assert.strictEqual(escState.filesTracked.length, 0);
+  assert.strictEqual(accumulationMode(escState.filesTracked.length), null);
+});
+
+t('mixed batch: 3 code + 3 docs → counts only code → standard, not heavy', () => {
+  const escState = { filesTracked: [], lastToolUseAt: null };
+  for (let i = 1; i <= 3; i++) trackFile(escState, edit(`src/mod-${i}.ts`));
+  for (let i = 1; i <= 3; i++) trackFile(escState, edit(`docs/doc-${i}.md`));
+  assert.strictEqual(escState.filesTracked.length, 3);
+  assert.strictEqual(accumulationMode(escState.filesTracked.length), 'standard');
+});
+
+t('no over-correction: 6 code files still → heavy', () => {
+  const escState = { filesTracked: [], lastToolUseAt: null };
+  for (let i = 1; i <= 6; i++) trackFile(escState, edit(`src/mod-${i}.rs`));
+  assert.strictEqual(accumulationMode(escState.filesTracked.length), 'heavy');
+});
+
+t('trackFile dedups repeats and ignores Bash inputs', () => {
+  const escState = { filesTracked: [], lastToolUseAt: null };
+  trackFile(escState, edit('src/a.ts'));
+  trackFile(escState, edit('src/a.ts'));
+  trackFile(escState, bash('git status'));
+  assert.strictEqual(escState.filesTracked.length, 1);
+});
+
+// ─── Dir-name signal docs exemption (2026-07-17) ─────────────────────
+// Dir-name signals fire on WHERE a file lives, but a prose doc inside
+// docs/auth/ or docs/deploy/ is documentation ABOUT the sensitive area,
+// not a change TO it. Without the exemption a single Edit of
+// docs/deploy/guide.md jumped straight to heavy (no threshold, unlike the
+// counter) and interlocked with evaluation-gate on docs-only commits —
+// same legitimate-work-shape class. Exposure verified in real repos
+// (cc/paperclip docs/deploy/ ×9, docs/api/ ×11) though no incident yet.
+process.stdout.write('\ndir-name docs exemption (must NOT escalate):\n');
+
+t('prose doc under a heavy dir (auth/) → null', () => {
+  assert.strictEqual(detectEscalation(edit('docs/auth/setup.md')), null);
+});
+
+t('prose doc under a heavy dir (deploy/) → null', () => {
+  assert.strictEqual(
+    detectEscalation(edit('/Users/hi/cc/paperclip/docs/deploy/guide.md')),
+    null
+  );
+});
+
+t('prose doc under a standard dir (api/) → null', () => {
+  assert.strictEqual(detectEscalation(edit('docs/api/costs.md')), null);
+});
+
+t('README directly inside a risk-dir root → null', () => {
+  assert.strictEqual(
+    detectEscalation({ tool_name: 'Write', tool_input: { file_path: 'shared-state/README.md' } }),
+    null
+  );
+});
+
+t('no over-correction: code in auth/ still → heavy', () => {
+  assert.strictEqual(detectEscalation(edit('src/auth/token.ts')).mode, 'heavy');
+});
+
+t('no over-correction: behavior-bearing files in risk dirs still escalate', () => {
+  assert.strictEqual(detectEscalation(edit('config/settings.json')).mode, 'standard');
+  assert.strictEqual(detectEscalation(edit('deploy/run.sh')).mode, 'heavy');
+  assert.strictEqual(detectEscalation(edit('docs/deploy/guide.mdx')).mode, 'heavy'); // .mdx compiles to JSX
+  assert.strictEqual(detectEscalation(edit('auth/Dockerfile')).mode, 'heavy');       // extensionless → fail-closed
 });
 
 // ─── Result ──────────────────────────────────────────────────────────

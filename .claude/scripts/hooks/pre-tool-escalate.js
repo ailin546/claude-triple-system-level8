@@ -27,6 +27,33 @@
  *     was lowering the mode (error-log [2026-05-20] follow-up).
  *   • quoted flag values / messages (`-m "...deploy..."`) and cross-command
  *     `.*` spans (`cat secret.txt && echo set`) no longer match.
+ *
+ * ── Cross-file accumulation (2026-07-16 docs exclusion) ───────────────
+ * Prose-documentation files (.md/.txt/.rst/...) are NOT counted toward the
+ * 3/6-file thresholds. The counter is a proxy for module-spanning CODE
+ * complexity; routing.md explicitly classifies docs work as Fast, so a batch
+ * mechanical edit of 18 markdown files must not read as a heavy task. Before
+ * this fix, such batches hit the 6-file threshold within seconds and re-hit
+ * it after every manual reset (the task legitimately kept touching new .md
+ * files), deadlocking docs-only commits against evaluation-gate — same
+ * "heuristic lacks immunity for a legitimate work shape" class as the
+ * 2026-06-13 hyphenated-path fix. Behavior-bearing config (.json/.yaml/.toml)
+ * still counts: excluding it would trade a false positive for a false
+ * negative.
+ *
+ * ── Dir-name signals: prose docs exempt (2026-07-17) ──────────────────
+ * The same immunity extends to the Edit/Write dir-name risk signals. A
+ * prose doc inside a risk-named directory (docs/auth/setup.md,
+ * docs/deploy/guide.md) is documentation ABOUT a sensitive area, not a
+ * change TO it — routing.md's "docs work → Fast" applies regardless of
+ * where the doc lives. Without the exemption a single Edit under a deploy/
+ * or auth/ segment escalated straight to heavy and interlocked with
+ * evaluation-gate on docs-only commits. No incident recorded yet, but the
+ * shape exists in real repos (cc/paperclip: docs/deploy/ ×9 → heavy,
+ * docs/api/ ×11 → standard), and unlike the counter there is no threshold
+ * — the first edit fires. Behavior-bearing files in those dirs
+ * (.ts/.json/.sh/extensionless) still escalate: isProseDocPath is
+ * fail-closed.
  */
 
 'use strict';
@@ -40,6 +67,13 @@ const MAX_STDIN = 1024 * 1024;
 const CROSS_FILE_STANDARD = 3;
 const CROSS_FILE_HEAVY = 6;
 const TASK_BOUNDARY_MS = (parseInt(process.env.TASK_BOUNDARY_MINUTES, 10) || 5) * 60 * 1000;
+
+// Prose-documentation extensions excluded from cross-file accumulation
+// (see header §Cross-file accumulation). Deliberately a narrow prose list,
+// not a code whitelist: unknown extensions stay counted (fail-closed), and
+// behavior-bearing config (.json/.yaml/.toml) stays counted. `.mdx` also
+// stays counted — it compiles to JSX.
+const PROSE_DOC_EXTENSIONS = new Set(['md', 'markdown', 'rst', 'adoc', 'asciidoc', 'txt']);
 
 // ── Risk signal definitions ──────────────────────────────────
 //
@@ -132,6 +166,12 @@ function detectEscalation(input) {
     const filePath = (toolInput.file_path || '').replace(/\\/g, '/');
     if (!filePath) return null;
 
+    // Prose docs never escalate on location (see header §Dir-name signals):
+    // a guide under docs/deploy/ or docs/auth/ carries no runtime behavior.
+    // The SSOT content check below loses nothing — it only applies to
+    // .ts/.tsx/.js/.jsx files, which are never prose.
+    if (isProseDocPath(filePath)) return null;
+
     for (const dir of HEAVY_DIR_NAMES) {
       if (pathContainsDir(filePath, dir)) return { mode: 'heavy', signal: `path: ${filePath}` };
     }
@@ -182,6 +222,28 @@ function extractFilePath(input) {
     return (input.tool_input?.file_path || '').replace(/\\/g, '/') || null;
   }
   return null;
+}
+
+/**
+ * True if the path is prose documentation (excluded from the cross-file
+ * counter). Extensionless paths return false (unknown → counted).
+ */
+function isProseDocPath(filePath) {
+  const match = /\.([^./\\]+)$/.exec(filePath || '');
+  return match ? PROSE_DOC_EXTENSIONS.has(match[1].toLowerCase()) : false;
+}
+
+/**
+ * Record the tool's target file into escState.filesTracked for cross-file
+ * accumulation. Prose docs are skipped — they never count toward the
+ * 3/6-file thresholds. Mutates escState; returns the tracked count.
+ */
+function trackFile(escState, input) {
+  const filePath = extractFilePath(input);
+  if (filePath && !isProseDocPath(filePath) && !escState.filesTracked.includes(filePath)) {
+    escState.filesTracked.push(filePath);
+  }
+  return escState.filesTracked.length;
 }
 
 // ── Main logic ───────────────────────────────────────────────
@@ -235,11 +297,8 @@ function runMain() {
         escState.filesTracked = [];
       }
 
-      // ── Track unique files ──
-      const filePath = extractFilePath(input);
-      if (filePath && !escState.filesTracked.includes(filePath)) {
-        escState.filesTracked.push(filePath);
-      }
+      // ── Track unique files (prose docs excluded) ──
+      trackFile(escState, input);
 
       // ── Determine target mode from all signals ──
       let targetMode = null;
@@ -260,8 +319,8 @@ function runMain() {
       if (accMode && (!targetMode || LIB_MODE_LEVELS[targetMode] < LIB_MODE_LEVELS[accMode])) {
         const threshold = accMode === 'heavy' ? CROSS_FILE_HEAVY : CROSS_FILE_STANDARD;
         targetMode = accMode;
-        targetSignal = `${fileCount} unique files`;
-        targetReason = `cross-file: ${fileCount} files touched (threshold: ${threshold})`;
+        targetSignal = `${fileCount} unique files (docs excluded)`;
+        targetReason = `cross-file: ${fileCount} non-docs files touched (threshold: ${threshold})`;
       }
 
       // ── Apply escalation (only upgrade, never downgrade) ──
@@ -306,12 +365,15 @@ module.exports = {
   detectEscalation,
   accumulationMode,
   extractFilePath,
+  isProseDocPath,
+  trackFile,
   pathContainsDir,
   STANDARD_BASH_PATTERNS,
   HEAVY_BASH_PATTERNS,
   MODE_LEVELS,
   CROSS_FILE_STANDARD,
   CROSS_FILE_HEAVY,
+  PROSE_DOC_EXTENSIONS,
 };
 
 if (require.main === module) {
