@@ -244,6 +244,52 @@ test('CONTEXTUAL: rm -rf node_modules is allowed', () => {
   assert.strictEqual(r.decision, 'allow');
 });
 
+// ── rm -rf 豁免按「路径操作数」判定（2026-07-18 根因修复）──
+// 旧实现把豁免写成对整条命令串的**前缀**匹配（`rm -rf ` 后必须紧跟
+// target/ 等 token），故绝对路径——真实世界最常见形态——永远走不进豁免。
+// 症状是操作员被推向 `/careful off`（关掉全部守卫，比不修更糟）。
+test('CONTEXTUAL: rm -rf <绝对路径>/target/debug is allowed (build artifact)', () => {
+  const r = classifyCommand('rm -rf /home/ubuntu/celue/quant_base-main/target/debug');
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('CONTEXTUAL: rm -rf <绝对路径>/node_modules is allowed', () => {
+  const r = classifyCommand('rm -rf /srv/app/frontend/node_modules');
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('CONTEXTUAL: 链式命令中的 build-artifact 删除同样放行', () => {
+  const r = classifyCommand('df -h / ; rm -rf /home/u/proj/target/debug');
+  assert.strictEqual(r.decision, 'allow');
+});
+
+// ── 收窄豁免时不得开洞（对抗用例）──
+test('CONTEXTUAL: rm -rf "/ target/" — 混合操作数必须全安全才放行', () => {
+  // `/` 与 target/ 同为操作数：旧「包含 target/ 即放行」式写法会漏放这条。
+  const r = classifyCommand('rm -rf / target/');
+  assert.strictEqual(r.decision, 'block');
+});
+
+test('CONTEXTUAL: rm -rf 含 .. 逃逸的 target 路径被拦', () => {
+  const r = classifyCommand('rm -rf /home/u/proj/target/../..');
+  assert.strictEqual(r.decision, 'block');
+});
+
+test('CONTEXTUAL: rm -rf 未展开变量 fail-closed', () => {
+  const r = classifyCommand('rm -rf $BUILD_DIR');
+  assert.strictEqual(r.decision, 'block');
+});
+
+test('CONTEXTUAL: rm -rf /tmp 裸目录仍拦（须删 /tmp 下具体项）', () => {
+  assert.strictEqual(classifyCommand('rm -rf /tmp').decision, 'block');
+  assert.strictEqual(classifyCommand('rm -rf /tmp/build-xyz').decision, 'allow');
+});
+
+test('CONTEXTUAL: rm -rf 无操作数被拦', () => {
+  const r = classifyCommand('rm -rf');
+  assert.strictEqual(r.decision, 'block');
+});
+
 test('CONTEXTUAL: rm -rf /etc/foo is blocked', () => {
   const r = classifyCommand('rm -rf /etc/foo');
   assert.strictEqual(r.decision, 'block');

@@ -42,6 +42,7 @@
     ],
     "defaultMode": "bypassPermissions"
   },
+  "model": "opus[1m]",
   "hooks": {
     "SessionStart": [
       {
@@ -366,6 +367,5 @@
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "dark",
-  "agentPushNotifEnabled": true,
-  "model": "claude-fable-5[1m]"
+  "agentPushNotifEnabled": true
 }

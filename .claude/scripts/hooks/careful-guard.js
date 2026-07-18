@@ -40,6 +40,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execSync } = require('child_process');
+const { splitSegments } = require('../lib/command-scan');
 
 const STATE_FILE = path.join(os.homedir(), '.claude', '.careful-enabled');
 
@@ -54,6 +55,58 @@ const DENY_PATTERNS = [
   { pattern: /\brm\s+-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*\s+(\$HOME|~)(\/?\s*$|\s+)/, desc: 'rm -rf $HOME' },
   { pattern: /\bchmod\s+(-R\s+)?777\s+\/\s*$/, desc: 'chmod 777 /' },
 ];
+
+// ─── rm -rf 豁免：按路径操作数判定（2026-07-18）────────────────────
+//
+// 设计要点（收窄豁免时最容易开的洞，逐条对应一个回归测试）：
+//   • 判定单位是 **每个路径操作数**，且要求 *全部* 安全才放行 ——
+//     `rm -rf / target/` 里 `/` 与 `target/` 同为操作数，"命令串里出现
+//     target/ 就放行"式写法会漏放它。
+//   • 含 `..` 的路径一律拒绝 —— `…/target/../..` 能逃出构建目录。
+//   • 未展开变量（`$BUILD_DIR`）拒绝 —— 内容不可知即 fail-closed。
+//   • 引号内容被 splitSegments 抹平 → 引号路径落入"不安全"分支，同样
+//     fail-closed（安全方向；构建目录极少加引号）。
+//   • `/tmp` 裸目录仍拒绝，必须删其**下属**具体项（保持旧实现的严格度）。
+
+/** 构建工件目录名（作为完整路径段出现才算数，防 `mytarget/` 类误判）。*/
+const SAFE_DELETE_SEGMENT = /(^|\/)(target|node_modules|build|dist)(\/|$)/;
+/** scratch 目录：必须删其下属项，不允许删 /tmp 本身。*/
+const SAFE_DELETE_SCRATCH = /^\/(tmp|var\/tmp)\/.+/;
+
+/**
+ * 取出命令中每个 `rm` 调用的路径操作数（丢弃 flag 与 `--`）。
+ * 逐 segment 扫描，故链式命令（`a ; rm -rf x`）同样被覆盖。
+ * @returns {string[]|null} null = 命令里没有 rm 调用
+ */
+function rmPathOperands(command) {
+  const operands = [];
+  let sawRm = false;
+  for (const seg of splitSegments(command)) {
+    const tokens = seg.trim().split(/\s+/).filter(Boolean);
+    const idx = tokens.findIndex((t) => t === 'rm' || t.endsWith('/rm'));
+    if (idx === -1) continue;
+    sawRm = true;
+    let afterDashDash = false;
+    for (const tok of tokens.slice(idx + 1)) {
+      if (!afterDashDash && tok === '--') { afterDashDash = true; continue; }
+      if (!afterDashDash && tok.startsWith('-')) continue; // flag
+      operands.push(tok);
+    }
+  }
+  return sawRm ? operands : null;
+}
+
+/** 单个路径操作数是否属于"例行删除构建工件/scratch"。*/
+function isSafeDeletePath(p) {
+  const clean = String(p).replace(/^["']|["']$/g, '').replace(/\/+$/, '');
+  if (!clean) return false;                    // 空 / 被抹平的引号内容
+  if (clean.includes('..')) return false;      // 逃逸出构建目录
+  if (clean.includes('$') || clean.includes('`')) return false; // 未展开变量 / 命令替换
+  if (clean === '/' || clean === '~') return false;
+  // 注：glob（`target/*`）刻意放行——它仍受下面的路径段判定约束。
+  if (SAFE_DELETE_SCRATCH.test(clean)) return true;
+  return SAFE_DELETE_SEGMENT.test(clean);
+}
 
 // ─── Group 2: CONTEXTUAL (pattern + context check) ──────────────────
 // Each entry has a `check(command, ctx)` returning:
@@ -146,9 +199,14 @@ const CONTEXTUAL_PATTERNS = [
     pattern: /\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|--recursive\s+--force|-[a-zA-Z]*f[a-zA-Z]*r)\b/,
     desc: 'rm -rf (recursive force delete)',
     check: (command) => {
-      // Allow rm -rf on tmp / build artifact paths
-      const safeTargets = /\brm\s+-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*\s+(\/tmp\/|\/var\/tmp\/|\.\/target\/|target\/|\.\/node_modules\/|node_modules\/|\.\/build\/|build\/|\.\/dist\/|dist\/)/;
-      if (safeTargets.test(command)) return { allow: true };
+      // 豁免按 **路径操作数** 判定，不是对整条命令串做前缀匹配。
+      // 2026-07-18 根因修复：旧写法要求 `rm -rf ` 后紧跟 target/ 等 token，
+      // 故绝对路径（`rm -rf /home/u/proj/target/debug`——真实世界最常见形态）
+      // 永远走不进豁免 → 操作员被推向 `/careful off`（关掉全部守卫，比不修更糟）。
+      const operands = rmPathOperands(command);
+      if (operands && operands.length > 0 && operands.every(isSafeDeletePath)) {
+        return { allow: true };
+      }
       return { allow: false, reason: 'verify target path is correct; if intentional use `/careful off`' };
     },
   },
