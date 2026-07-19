@@ -131,7 +131,7 @@ Heavy 模式下 `git commit/push` 必须有 pass marker，否则 hook exit 2 阻
 ```
 
 **Hook 严格校验的 fields**（缺一或不符即 marker 失效）：
-- `ts` — Unix epoch ms，hook 检查 staleness（默认 2h TTL）
+- `ts` — Unix epoch **毫秒**（13 位），hook 检查 staleness（默认 2h TTL）。**必须用 `Date.now()` 或 `python3 -c "import time;print(int(time.time()*1000))"` 生成；禁用 `date +%s%3N`**——`%N` 在部分平台不支持，会吐出完整纳秒（19 位）。校验由纯函数 `markerTsProblem(ts, now, threshold)` 承担（`evaluation-gate.js`，9 单测）：非数字 / 超出 60s 时钟偏移容忍的**未来**时间戳 / 超 TTL 三者皆拒。**2026-07-19 修复**：原判据是裸的 `now - ts > threshold`，未来时间戳会让 `now - ts` 变负 → 永远不大于阈值 → **TTL 静默失效**；野外实测一份 19 位纳秒 marker 使 2h TTL 完全不设防（`git_head` pin 仍在，故门未全失守，失效的是时间维度那道网）。教训：安全门**静默**失效比缺席更危险——缺席会被注意到。
 - `git_head` — short hash 必须 **等于** 当前 HEAD（否则 marker 失效，提示"code changed since evaluation — re-run"）
 - `evaluator_agent_id` — 非空且 `String(...).length >= 3`（防 Claude 自填空串/单字符绕过）
 - `verdict_summary` — `String(...).trim().length >= 10` 字符（防占位符如 "ok"/"pass"）

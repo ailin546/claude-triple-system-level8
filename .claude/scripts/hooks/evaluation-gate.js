@@ -218,6 +218,52 @@ function readLastPass() {
   }
 }
 
+/**
+ * Validate the marker's `ts` and report the problem, or null if it's fine.
+ *
+ * Why this is a named, tested function rather than one inline comparison:
+ *
+ *   The original check was `now - ts > staleThresholdMs`, which silently
+ *   treats ANY future timestamp as fresh forever — `now - ts` goes negative
+ *   and a negative is never greater than the threshold. Found in the wild
+ *   (2026-07-19): a marker written with `date +%s%3N` on a machine where
+ *   `%3N` is not supported got a 19-digit NANOSECOND ts. `now - ts` was
+ *   ≈ -1.78e18 → judged FRESH → the 2h TTL was inert for that marker, with
+ *   nothing anywhere reporting that the time-based half of the gate had
+ *   stopped guarding.
+ *
+ *   Any future ts does this — wrong unit, a typo'd extra digit, or a clock
+ *   jump. The fix is to stop assuming the value is a sane epoch-ms and check
+ *   it, because a security gate that fails silently is worse than one that
+ *   is absent: absent gates get noticed.
+ *
+ * Fails closed: unparseable / future / stale all return a reason (→ block).
+ * A small future tolerance absorbs benign clock skew between the writer and
+ * this process without reopening the hole.
+ */
+const TS_FUTURE_TOLERANCE_MS = 60 * 1000;
+
+function markerTsProblem(ts, now, staleThresholdMs) {
+  const n = Number(ts);
+  if (!Number.isFinite(n)) {
+    return 'marker `ts` is not a number (expected Unix epoch MILLISECONDS)';
+  }
+  if (n > now + TS_FUTURE_TOLERANCE_MS) {
+    const digits = String(Math.trunc(Math.abs(n))).length;
+    return (
+      `marker \`ts\` is in the future (${n}, ${digits} digits) — expected Unix ` +
+      `epoch MILLISECONDS (13 digits). A nanosecond/microsecond value makes ` +
+      `the ${STALE_HOURS}h TTL never expire, so it is rejected. Write it with ` +
+      `Date.now() or python3 -c "import time;print(int(time.time()*1000))" ` +
+      `(NOT \`date +%s%3N\` — %N is unsupported on some platforms and yields ns).`
+    );
+  }
+  if (now - n > staleThresholdMs) {
+    return `last pass was ${Math.round((now - n) / 60000)} min ago, stale (> ${STALE_HOURS}h)`;
+  }
+  return null;
+}
+
 function main() {
   const payload = readStdinJSON();
   const toolName = payload.tool_name || '';
@@ -253,8 +299,8 @@ function main() {
     reason = 'evaluation-loop has never run (or state file missing)';
   } else if (!lastPass.ts) {
     reason = 'marker missing `ts` field';
-  } else if (now - lastPass.ts > staleThresholdMs) {
-    reason = `last pass was ${Math.round((now - lastPass.ts) / 60000)} min ago, stale (> ${STALE_HOURS}h)`;
+  } else if (markerTsProblem(lastPass.ts, now, staleThresholdMs)) {
+    reason = markerTsProblem(lastPass.ts, now, staleThresholdMs);
   } else if (!lastPass.git_head) {
     reason = 'marker missing `git_head` — Reality Checker output must anchor to a commit';
   } else {
@@ -279,7 +325,9 @@ function main() {
       `    1. Run \`/evaluation-loop\` (preferred) or \`/verify pre-pr\`\n` +
       `    2. When Reality Checker returns ACCEPTED, write the marker with Write tool:\n` +
       `       path: ~/.claude/state/evaluation-gate/last-pass.json\n` +
-      `       schema: {"ts": <Date.now()>, "git_head": "<short hash of HEAD>",\n` +
+      `       schema: {"ts": <Date.now() — epoch MILLISECONDS, 13 digits;\n` +
+      `                       NOT \`date +%s%3N\` (yields ns on some platforms)>,\n` +
+      `                "git_head": "<short hash of HEAD>",\n` +
       `                "mode": "heavy", "round": <N>,\n` +
       `                "evaluator_agent_id": "<Task agent id>",\n` +
       `                "verdict_summary": "<Reality Checker's one-line ACCEPTED reason, >=10 chars>"}\n` +
@@ -299,6 +347,7 @@ module.exports = {
   isInsideProjectRoot,
   isCrossRepoPush,
   isCommitOrPush,
+  markerTsProblem,
 };
 
 // Only run main() when invoked directly as a hook, not when require()'d.

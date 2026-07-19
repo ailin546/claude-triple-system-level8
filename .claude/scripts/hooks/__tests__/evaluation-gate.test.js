@@ -20,7 +20,7 @@ const fs = require('fs');
 const { execFileSync } = require('child_process');
 
 const HOOK_PATH = path.join(__dirname, '..', 'evaluation-gate.js');
-const { isInsideProjectRoot, isCrossRepoPush, isCommitOrPush } = require(HOOK_PATH);
+const { isInsideProjectRoot, isCrossRepoPush, isCommitOrPush, markerTsProblem } = require(HOOK_PATH);
 
 let passed = 0;
 let failed = 0;
@@ -306,6 +306,75 @@ test('heavy + set-mode --reason "git push" → NOT blocked (exit 0)', () => {
 
 test('heavy + non-commit command → NOT blocked (exit 0)', () => {
   assert.strictEqual(runGate('git status'), 0);
+});
+
+// ─── marker `ts` validation (2026-07-19) ──────────────────────────────
+//
+// Bug found in the wild: the staleness check was `now - ts > threshold`,
+// which judges ANY future ts as fresh forever (negative is never >
+// threshold). A marker written with `date +%s%3N` on a box where %N is
+// unsupported carried a 19-digit NANOSECOND ts → the 2h TTL was inert and
+// nothing reported it. These pin both directions: the hole stays shut, and
+// legitimately-fresh markers still pass.
+
+const STALE_MS = 2 * 60 * 60 * 1000;
+
+test('ts: fresh (1h ago) → no problem', () => {
+  const now = 1784468000000;
+  assert.strictEqual(markerTsProblem(now - 3600 * 1000, now, STALE_MS), null);
+});
+
+test('ts: stale (3h ago) → reports stale', () => {
+  const now = 1784468000000;
+  const r = markerTsProblem(now - 3 * 3600 * 1000, now, STALE_MS);
+  assert.ok(r && /stale/.test(r), `expected stale reason, got: ${r}`);
+});
+
+test('ts: NANOSECOND value (the real 2026-07-19 marker) → rejected, NOT fresh', () => {
+  // This exact value was found in last-pass.json. Pre-fix it returned null
+  // (treated fresh) and the TTL never fired.
+  const now = 1784468000000;
+  const r = markerTsProblem(1784465891148949725, now, STALE_MS);
+  assert.ok(r, 'nanosecond ts must be rejected, not silently accepted as fresh');
+  assert.ok(/future/.test(r), `reason should name the future-ts problem, got: ${r}`);
+  assert.ok(/19 digits/.test(r), `reason should report the digit count, got: ${r}`);
+});
+
+test('ts: microsecond value → rejected', () => {
+  const now = 1784468000000;
+  assert.ok(markerTsProblem(now * 1000, now, STALE_MS));
+});
+
+test('ts: seconds value (10 digits) → treated as very stale, blocked', () => {
+  // The opposite unit error: seconds instead of ms lands ~56 years in the
+  // past, so the stale branch catches it. Blocked either way.
+  const now = 1784468000000;
+  const r = markerTsProblem(Math.floor(now / 1000), now, STALE_MS);
+  assert.ok(r && /stale/.test(r), `expected stale, got: ${r}`);
+});
+
+test('ts: small clock skew (30s future) → tolerated, still fresh', () => {
+  // Writer/reader skew must not block legitimate work.
+  const now = 1784468000000;
+  assert.strictEqual(markerTsProblem(now + 30 * 1000, now, STALE_MS), null);
+});
+
+test('ts: beyond skew tolerance (5min future) → rejected', () => {
+  const now = 1784468000000;
+  assert.ok(markerTsProblem(now + 5 * 60 * 1000, now, STALE_MS));
+});
+
+test('ts: non-numeric → rejected', () => {
+  const now = 1784468000000;
+  assert.ok(markerTsProblem('not-a-number', now, STALE_MS));
+  assert.ok(markerTsProblem(NaN, now, STALE_MS));
+  assert.ok(markerTsProblem(Infinity, now, STALE_MS));
+});
+
+test('ts: numeric string (valid ms) → accepted', () => {
+  // JSON writers sometimes stringify; a correct value should still pass.
+  const now = 1784468000000;
+  assert.strictEqual(markerTsProblem(String(now - 60000), now, STALE_MS), null);
 });
 
 // ─── Summary ──────────────────────────────────────────────────────────
