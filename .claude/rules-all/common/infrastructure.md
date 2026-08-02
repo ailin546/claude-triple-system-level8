@@ -30,24 +30,21 @@ Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式�
 | Hook | 类型 | 用途 |
 |------|------|------|
 | drift-detector | PostToolUse(Edit\|Write\|Bash) | 漂移检测（WTF-likelihood 评分） |
-| quality-gate | PostToolUse(Edit\|Write) | 局部质量门（格式/lint 检查） |
+| quality-gate | **手动命令**（`/quality-gate`，非自动 hook） | 局部质量门（格式/lint 检查）。2026-08-02 更正：从未注册为 hook，文档降级为真实形态 |
 | post-edit-typecheck | PostToolUse(Edit) | TS 类型检查（tsc --noEmit） |
 | fault-hint | PostToolUse(Edit\|Write) | 容错提示 |
 | cost-tracker | Stop | 成本追踪 |
 | suggest-compact | PreToolUse(Edit\|Write) | 压缩建议 |
-| auto-tmux-dev | PreToolUse(Bash) | tmux 自动启动 dev server |
 | session-end | Stop | 持久化会话状态 |
+<!-- auto-tmux-dev 已归档 2026-08-02：从未注册，文件移 scripts/hooks-archive/ -->
 
 #### Heavy-only（重型模式，模式门控）
+
+> 2026-08-02：5 个记忆类 Stop hook 已退役归档（见 rules/common/infrastructure.md 同节说明）。
 
 | Hook | 类型 | 用途 |
 |------|------|------|
 | shared-state-sync | Stop | 任务板维护、stale worker 回收、需重新分配任务标记 |
-| sprint-memory | Stop | 跨会话目标记录 |
-| memory-consolidate | Stop | 长期记忆沉淀 |
-| evaluate-session | Stop | 提取可复用模式 |
-| shared-memory-sync | Stop | 跨工具共享记忆同步 |
-| memory-promote | Stop | ECC instinct 推广（与 stop-summary 的错误教训沉淀不同） |
 
 ### 模式升档机制
 

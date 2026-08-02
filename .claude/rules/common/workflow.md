@@ -133,7 +133,7 @@ When creating PRs:
     ├─ 沉淀：weekly.md 超过 2 周的内容 → Lessons/Decisions 提取到 long-term.md
     │   └─ 流水账自动丢弃，只保留有长期价值的内容
     │
-    ├─ 推广：promoteLessons() 扫描 **Lessons:** section 下出现 2+ 次的教训 → 写入 CLAUDE.md
+    ├─ 推广：promoteLessons() 扫描 **Lessons:** section 下出现 2+ 次的教训 → 写入 .memory/promoted-lessons.md（2026-08-02 B9 迁出 CLAUDE.md 止增肥）
     │
     └─ 更新 ~/.memory/index.md（全局项目索引）
 ```
@@ -199,7 +199,7 @@ today.md ──[次日 Stop hook]──→ weekly.md ──[2周后 Stop hook]�
 |------|----------|----------|----------|
 | today → weekly | 每日首次 Stop hook（日期变化） | 全部 body | 无（全量归档） |
 | weekly → long-term | 每周一次（超过 2 周的 section） | `**Lessons:**` 和 `**Decisions:**` 下的条目 | 流水账、Open Loops、session 记录 |
-| long-term → CLAUDE.md | 每日一次（promoteLessons） | 出现 2+ 次的 `→` 教训 | 只出现 1 次的不推广 |
+| long-term → promoted-lessons.md | 每日一次（promoteLessons；2026-08-02 前写 CLAUDE.md） | 出现 2+ 次的 `→` 教训 | 只出现 1 次的不推广 |
 
 ### Claude 主动写入（可选补充）
 

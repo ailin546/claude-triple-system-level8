@@ -1,8 +1,8 @@
 # Audit Protocol — 多 Agent 全面审计强制规则
 
 > **定位：三层审计体系的 Layer 3（发现层）。**
-> Layer 1（pre-edit-check.sh, PreToolUse hook）和 Layer 2（run-all.sh, Stop hook）
-> 负责已知 bug 模式的自动检测与回归防护。
+> Layer 1（pre-commit 硬门族）和 Layer 2（run-all.sh 统一审计入口）
+> 负责已知 bug 模式的检测与回归防护。
 > 本规则负责 Layer 3：通过多 Agent 并行审计**发现新的、未知的问题**。
 > 
 > 三层体系详见 `SYSTEM.md` §13 和 `quant_base-main/scripts/audit/`。
@@ -13,8 +13,12 @@
 ## 与 Layer 1-2 的关系
 
 ```
-Layer 1: scripts/audit/pre-edit-check.sh   自动，每次 Edit .rs 文件触发，检测 7 种已知反模式
-Layer 2: scripts/audit/run-all.sh          自动(Stop hook) + 手动，7 维度 grep 扫描已知 bug 模式
+Layer 1: tools/git-hooks/pre-commit        自动（commit 时硬门）：cargo check×3 / gitleaks / SSOT / strategy-type / capability-diff
+Layer 2: scripts/audit/run-all.sh          手动 + /verify 流程调用：13 项静态检查 + 2 项条件 bonus（统一入口，skipped≠pass）
+# 2026-08-02 更正（T-old-coder B2）：本文件曾声称 pre-edit-check.sh 是 PreToolUse 自动 hook、
+# run-all.sh 挂 Stop hook 自动跑——实测项目 settings 从无 hooks 块，两个"自动"声明为纸面
+# （M-47 "CI 持续验证"假声明同型）。真实的自动层 = pre-commit 硬门族；pre-edit-check.sh 保留
+# 为可手动接线的 hook 形态脚本。
 Layer 3: 本规则（audit-protocol.md）       手动触发，多 Agent 发现新类型问题 + 跨层一致性
 ```
 

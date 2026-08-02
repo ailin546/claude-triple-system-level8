@@ -17,6 +17,12 @@
 
 ## Code Quality & Review
 
+> **评审入口三档归并（2026-08-02 T-old-coder B11）**——语义全保留，按强度选一个入口，档内工具是可选层不是并列入口：
+> - **快**（每次改动）：`/verify` —— build/type/lint/audit 单入口
+> - **标准**（Standard+ 功能/修复）：`/code-review` —— 档内可选叠加 `/grill`（对抗视角）、scope-drift-detection、qa-health-score
+> - **重**（Heavy/money-path）：`evaluation-loop` + Reality Checker marker —— 档内可选叠加 codex:adversarial-review（Codex 恢复后）、Systems Reality Checker（Rust 后端）
+> requesting/receiving-code-review、verification-before-completion 是贯穿三档的纪律 skill，非独立入口。
+
 - [test-driven-development](test-driven-development/SKILL.md) — Use when implementing any feature or bugfix, before writing implementation code
 - [requesting-code-review](requesting-code-review/SKILL.md) — Use when completing tasks, implementing major features, or before merging
 - [receiving-code-review](receiving-code-review/SKILL.md) — Use when receiving code review feedback, before implementing suggestions
@@ -39,15 +45,11 @@
 - [ecc-api-design](ecc-api-design/SKILL.md) — Use when designing or reviewing REST API endpoints — resource naming, status codes, pagination, filtering
 - [ecc-cost-aware-llm-pipeline](ecc-cost-aware-llm-pipeline/SKILL.md) — Use when building LLM-powered apps — model routing by complexity, budget tracking, retry logic
 
-## Database
+## Database / Infrastructure（已归档 2026-08-02）
 
-- [ecc-postgres-patterns](ecc-postgres-patterns/SKILL.md) — Use when writing PostgreSQL queries, designing schemas, choosing indexes, or troubleshooting performance
-- [ecc-database-migrations](ecc-database-migrations/SKILL.md) — Use when writing database migrations — schema changes, data backfills, rollbacks, zero-downtime patterns
-
-## Infrastructure / Deployment
-
-- [ecc-deployment-patterns](ecc-deployment-patterns/SKILL.md) — Use when planning deployment workflow, CI/CD pipeline, health checks, or rollback strategy
-- [ecc-docker-patterns](ecc-docker-patterns/SKILL.md) — Use when writing Docker / Docker Compose for local dev, container security, networking, volumes
+> ecc-postgres-patterns / ecc-database-migrations / ecc-deployment-patterns / ecc-docker-patterns
+> 四技能移入 `skills-archive/`（T-old-coder B10：活跃项目栈 Rust+SQLite+React，无 Postgres/Docker/
+> SQL-migration 面，技能列表逐条进 session context = 常驻 token 税）。需要时 `/restore` 恢复。
 - [using-git-worktrees](using-git-worktrees/SKILL.md) — Use when starting feature work that needs isolation from current workspace
 
 ## Security

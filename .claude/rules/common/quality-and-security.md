@@ -63,7 +63,12 @@ Before marking work complete:
 
 ## Testing Requirements
 
-### Minimum Test Coverage: 80%
+### Coverage: changed-line coverage（2026-08-02 取代纸面全局 80%）
+
+- **改动行覆盖**：本次改动触碰的行必须被测试执行（工具：cargo-llvm-cov / vitest coverage + diff-cover；CCHFT 落地 `scripts/changed-line-cov.sh` + CI 观测 job）
+- 原"全局 ≥80%"退役：该数字长期无任何工具 enforcement（纸面规则制造虚假合规感），且"追逐覆盖率数字"本身是反模式——覆盖率是**探测未测代码的探测器**，不是目标（old-coder anti-gaming #4；用户批准 T-old-coder A3/B5）
+- 风控/安全逻辑仍要求 100% 分支覆盖
+- **变异验证**（safety-critical 改动）：测试必须证明"真能失败"——注入 plausible bug 确认测试变红（`manual mutation: N/N killed` 证据行），工具版 cargo-mutants
 
 Test Types (ALL required):
 1. **Unit Tests** - Individual functions, utilities, components

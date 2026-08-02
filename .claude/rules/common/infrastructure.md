@@ -55,24 +55,27 @@ Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式�
 | Hook | 类型 | 用途 |
 |------|------|------|
 | drift-detector | PostToolUse(*) | 漂移检测（WTF-likelihood 评分）。≥20%/≥40% 警告经 **additionalContext 注入**（2026-06-29 修：原 stderr+exit0 模型看不到）。**2026-07-04 评分模型重设计**：score = 事件分（revert +15 / 连续 3+ 测试失败 +5，每次跑绿测试 -10 衰减，clamp 100）+ 广度分（最近 30 个 Edit/Write 滑动窗口现算，从不累积；目录按 monorepo 容器 `crates/x` 等归一；封顶 30——广度单独够不到 CRITICAL）。注入改档位边沿触发（`lastInjectedBand`），同档内涨分不重复注入——根治旧模型全 session 单调累积 + `scoreChanged` 门失效导致的 150%+ 假阳性 CRITICAL 刷屏。单测 36 用例：`__tests__/drift-detector.test.js` 详见 §Agent Drift Detection |
-| quality-gate | PostToolUse(Edit\|Write) | 局部质量门（格式/lint 检查） |
+| quality-gate | **手动命令**（`/quality-gate`，非自动 hook） | 局部质量门（格式/lint 检查）。2026-08-02 更正：曾标为 PostToolUse hook 但 settings 两层从未注册（daily-trending REPEAT 2 月漂移）——文档降级为真实形态，脚本保留供命令调用 |
 | post-edit-typecheck | PostToolUse(Edit) | TS 类型检查（tsc --noEmit） |
 | fault-hint | PostToolUse(Edit\|Write) | 容错提示。检测错误处理/外部调用/DB/韧性 pattern → 经 **additionalContext 注入**建议 `/verify fault`（2026-06-29 修：原 `log()`=stderr+exit0 模型看不到；同时修正 settings.json matcher `Bash`→`Edit\|Write`——此前注册在 Bash 下读 `file_path` 永远 undefined → 从未真正触发）|
 | cost-tracker | Stop | 成本追踪 |
 | suggest-compact | PreToolUse(Edit\|Write) | 压缩建议 |
-| auto-tmux-dev | PreToolUse(Bash) | tmux 自动启动 dev server |
 | session-end | Stop | 持久化会话状态 |
+<!-- auto-tmux-dev 已归档 2026-08-02（T-old-coder B1）：文档声称注册但 settings 两层 0 注册（永不触发），文件移 scripts/hooks-archive/ -->
 | shared-state-sync | Stop | 任务板维护、stale worker 回收（2026-05-20 从 Heavy-only 下移到 Standard+；Codex N2: Standard 已能 3-5 文件触发, 2026-05-01 字节级一致重复发明事故是 Standard 同步缺失证据） |
 
 #### Heavy-only（重型模式，模式门控）
 
+> **2026-08-02 记忆机器合并（T-old-coder B7，用户批准）**：原 5 个 Heavy-only Stop hook
+> （sprint-memory / memory-consolidate / evaluate-session / shared-memory-sync / memory-promote）
+> 全部退役归档（`scripts/hooks-archive/`）。依据：与 stop-summary 职责重叠（轮转+沉淀+promote
+> 已由 stop-summary 单点承担），且 [2026-06-05] 记忆系统曾静默失效一月无人察觉 = 低信号证据。
+> Stop 段现存 4 hook：stop-summary（记忆主干）/ cost-tracker / shared-state-sync（多 session
+> 任务板，非记忆）/ session-end（会话状态持久化）。/save-session /resume-session 的 sprint
+> 文件读取是 if-exists 优雅降级，不受影响。
+
 | Hook | 类型 | 用途 |
 |------|------|------|
-| sprint-memory | Stop | 跨会话目标记录 |
-| memory-consolidate | Stop | 长期记忆沉淀 |
-| evaluate-session | Stop | 提取可复用模式 |
-| shared-memory-sync | Stop | 跨工具共享记忆同步 |
-| memory-promote | Stop | ECC instinct 推广（与 stop-summary 的错误教训沉淀不同） |
 
 ### 模式升档机制
 

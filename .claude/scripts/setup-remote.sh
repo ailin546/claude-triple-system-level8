@@ -237,11 +237,6 @@ cat > "$SETTINGS_FILE" << 'SETTINGSEOF'
         "matcher": "",
         "hooks": [{ "type": "command", "command": "node \"${HOME}/.claude/scripts/hooks/shared-state-sync.js\"", "async": true, "timeout": 10 }],
         "description": "Shared state sync"
-      },
-      {
-        "matcher": "",
-        "hooks": [{ "type": "command", "command": "node \"${HOME}/.claude/scripts/hooks/sprint-memory.js\"", "async": true, "timeout": 10 }],
-        "description": "Sprint memory"
       }
     ],
     "PreCompact": [

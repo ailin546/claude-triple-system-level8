@@ -20,7 +20,7 @@ User Request
     │   PreToolUse → 危险命令守卫、编辑冻结
     │   PostToolUse → 自动格式化、类型检查、漂移检测
     │   PreCompact → 上下文压缩前保存状态
-    │   Stop → 保存状态、提取模式、追踪成本、记忆整合
+    │   Stop → 保存状态、教训/commit 沉淀(stop-summary)、成本追踪、任务板维护
     │
     ├─► Superpowers Process (流程纪律)
     │   brainstorming → 探索/拷问需求(grill)、生成设计文档
@@ -178,7 +178,7 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型 — 
 
 **三个自动采集触发点**（共享 `extract-lessons.js`）：① Periodic hook 每 30 分钟、② PreCompact hook 压缩前、③ Stop hook 会话结束兜底。门控：无 commits + 无 lessons + 无 decisions → 不记录。
 
-**`promoteLessons()` 关键行为**：扫 `.memory/today.md` / `weekly.md` / `long-term.md`，**出现 2+ 次的教训自动写回 CLAUDE.md**（这是 CLAUDE.md 持续增肥的来源 — 删条目无意义，必须从源头改 promote 策略）。
+**`promoteLessons()` 关键行为**：扫 `.memory/today.md` / `weekly.md` / `long-term.md`，出现 2+ 次的教训自动写入 **`.memory/promoted-lessons.md`**（按需引入，随 memory repo 跨机同步）。〔2026-08-02 T-old-coder B9 从源头改 promote 落点：原写回 CLAUDE.md 是其"持续增肥泵"（项目 CLAUDE.md 曾 197KB 超 155KB 上限），迁出后 CLAUDE.md 停止自动膨胀；遗留已 promote 条目留在 CLAUDE.md，去重仍对照防重复〕。
 
 **Claude 写教训格式**（hook 自动提取依赖此格式，必须保持）：
 ```markdown
@@ -520,7 +520,7 @@ git worktree add ~/<project>-s2 -b dev/session-2
 
 ## 错误教训日志
 
-> 格式：`- [日期] 错误描述 → 正确做法`。完整 11 条历史归档见 `~/.claude/on-demand/lesson-archive.md`。
+> 格式：`- [日期] 错误描述 → 正确做法`。完整 11 条历史归档见 `~/.claude/on-demand/lesson-archive.md`。自动沉淀（≥2 次教训）自 2026-08-02 起落各项目 `.memory/promoted-lessons.md`（B9，不再追加本文件）。
 
 <!-- 新错误追加在此行下方。SessionStart 只保留最多 5 条核心铁律来源；非核心或已被规则吸收的旧条目移到 lesson-archive.md -->
 

@@ -65,7 +65,7 @@ echo "🔗 [3/4] Checking hook scripts..."
 
 # Verify hook scripts exist
 MISSING_HOOKS=0
-for script in shared-state-sync.js sprint-memory.js; do
+for script in shared-state-sync.js; do  # sprint-memory.js 已归档 2026-08-02 (T-old-coder B7)
   if [ ! -f "$CLAUDE_DIR/scripts/hooks/$script" ]; then
     echo "   ❌ Missing: scripts/hooks/$script"
     MISSING_HOOKS=1
@@ -87,7 +87,6 @@ if grep -q "shared-state-sync.js" "$CLAUDE_DIR/settings.json" 2>/dev/null; then
 else
   echo "   ⚠️  Add these Stop hooks to .claude/settings.json manually:"
   echo '      { "matcher": "", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/shared-state-sync.js\"", "async": true, "timeout": 10 }], "description": "Shared state sync" }'
-  echo '      { "matcher": "", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PROJECT_ROOT}/.claude/scripts/hooks/sprint-memory.js\"", "async": true, "timeout": 10 }], "description": "Sprint memory" }'
 fi
 
 # ── 4. Permissions Template ────────────────────────────────

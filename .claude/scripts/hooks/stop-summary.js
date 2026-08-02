@@ -773,9 +773,17 @@ const PROMOTE_MARKER = '[auto]';
 
 /**
  * Scan .memory/ files for repeated "→" pattern lessons.
- * If a lesson appears 2+ times across memory files, auto-append to CLAUDE.md.
+ * If a lesson appears 2+ times across memory files, auto-append to
+ * .memory/promoted-lessons.md (on-demand file, synced via the memory repo).
  * Runs at most once per day (lock file).
- * Writes to BOTH CLAUDE.md files (root + .claude/) for consistency.
+ *
+ * 2026-08-02 (T-old-coder B9, user-approved): target changed FROM the two
+ * CLAUDE.md files TO .memory/promoted-lessons.md. Rationale: CLAUDE.md loads
+ * into EVERY session's context — auto-appending made it the self-admitted
+ * "增肥泵" (project CLAUDE.md hit 197KB > 155KB ceiling). Promoted lessons
+ * keep accumulating + cross-machine syncing, just not in the per-session
+ * token tax path. Dedup still checks root CLAUDE.md so legacy promoted
+ * entries are never re-promoted.
  */
 function promoteLessons() {
   try {
@@ -831,25 +839,20 @@ function promoteLessons() {
       return;
     }
 
-    // Read CLAUDE.md and check which lessons are already there
-    const claudeMdFiles = [
-      path.join(PROJECT_ROOT, 'CLAUDE.md'),
-      path.join(PROJECT_ROOT, '.claude', 'CLAUDE.md'),
-    ];
+    // Dedup targets: the promoted-lessons file itself + root CLAUDE.md
+    // (legacy promoted entries live in CLAUDE.md from the pre-2026-08-02
+    // design — never re-promote those).
+    const promotedFile = path.join(MEMORY_DIR, 'promoted-lessons.md');
+    const rootClaudeMd = path.join(PROJECT_ROOT, 'CLAUDE.md');
+    let existingContent = '';
+    if (fs.existsSync(promotedFile)) existingContent += fs.readFileSync(promotedFile, 'utf8');
+    if (fs.existsSync(rootClaudeMd)) existingContent += '\n' + fs.readFileSync(rootClaudeMd, 'utf8');
 
-    const rootClaudeMd = claudeMdFiles[0];
-    if (!fs.existsSync(rootClaudeMd)) {
-      fs.writeFileSync(PROMOTE_LOCK, getLocalDateString(), 'utf8');
-      return;
-    }
-
-    const claudeContent = fs.readFileSync(rootClaudeMd, 'utf8');
     const today = getLocalDateString();
-    // Dedup by lesson key against CLAUDE.md content (not exact text match)
+    // Dedup by lesson key against existing promoted/CLAUDE.md lines
     const newLessons = candidates.filter(lesson => {
       const key = lessonKey(lesson);
-      // Check if any existing line in CLAUDE.md has the same lesson key
-      for (const cLine of claudeContent.split('\n')) {
+      for (const cLine of existingContent.split('\n')) {
         const m = cLine.match(/^-\s+(.+(?:→|-{1,2}>).+)$/);
         if (m && lessonKey(cleanLesson(m[1])) === key) return false;
       }
@@ -861,29 +864,23 @@ function promoteLessons() {
       return;
     }
 
-    // Append to both CLAUDE.md files
+    // Append to .memory/promoted-lessons.md (create with header on first use)
     // Strip existing date prefix before re-adding (avoid "[2026-04-12] [2026-04-12] ...")
     const entries = newLessons.map(l => {
       const stripped = l.replace(/^\[[\d-]+\]\s*/, '');
       return `- [${today}] ${stripped} ${PROMOTE_MARKER}`;
     }).join('\n');
-    const marker = '<!-- 新错误追加在此行下方 -->';
 
-    for (const file of claudeMdFiles) {
-      if (!fs.existsSync(file)) continue;
-      let content = fs.readFileSync(file, 'utf8');
-      if (content.includes(marker)) {
-        content = content.replace(marker, `${marker}\n${entries}`);
-      } else if (content.includes('\n---\n\n## Sources')) {
-        content = content.replace(/\n---\n\n## Sources/, `\n${entries}\n\n---\n\n## Sources`);
-      } else {
-        // Final fallback: append to end of file
-        content = content.trimEnd() + `\n\n${entries}\n`;
-      }
-      fs.writeFileSync(file, content, 'utf8');
-    }
+    const header = '# Promoted Lessons（自动沉淀，出现 ≥2 次的教训）\n\n' +
+      '> 由 stop-summary.js promoteLessons() 每日写入（原落点 CLAUDE.md，2026-08-02 迁此止增肥）。\n' +
+      '> 按需引入；随 memory repo 跨机同步。新错误追加在文件末尾。\n';
+    let content = fs.existsSync(promotedFile)
+      ? fs.readFileSync(promotedFile, 'utf8')
+      : header;
+    content = content.trimEnd() + `\n${entries}\n`;
+    fs.writeFileSync(promotedFile, content, 'utf8');
 
-    log(`[StopSummary] Promoted ${newLessons.length} lesson(s) to CLAUDE.md`);
+    log(`[StopSummary] Promoted ${newLessons.length} lesson(s) to .memory/promoted-lessons.md`);
     fs.writeFileSync(PROMOTE_LOCK, getLocalDateString(), 'utf8');
   } catch (err) {
     log(`[StopSummary] Lesson promotion error (non-blocking): ${err.message}`);

@@ -269,62 +269,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ~/.claude/scripts/hooks/evaluate-session.js",
-            "timeout": 10000,
-            "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ~/.claude/scripts/hooks/memory-consolidate.js",
-            "timeout": 10000,
-            "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ~/.claude/scripts/hooks/memory-promote.js",
-            "timeout": 10000,
-            "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
             "command": "node ~/.claude/scripts/hooks/shared-state-sync.js",
-            "timeout": 10000,
-            "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ~/.claude/scripts/hooks/shared-memory-sync.js",
-            "timeout": 10000,
-            "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ~/.claude/scripts/hooks/sprint-memory.js",
             "timeout": 10000,
             "async": true
           }

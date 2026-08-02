@@ -5,7 +5,7 @@ when: 工作中断、需跨会话续做、沉淀阶段结论
 not_when: 单次问答、无状态操作
 prev: 任何实施步骤
 next: /resume-session（下次会话）
-heavy_deps: sprint-memory（Heavy 模式下自动同步）
+heavy_deps: sprint-memory〔已退役归档 2026-08-02 B7；sprint 文件为历史遗存，if-exists 读取〕（Heavy 模式下自动同步）
 ---
 
 # Save Session Command

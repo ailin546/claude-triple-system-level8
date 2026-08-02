@@ -24,8 +24,8 @@
 
 - [2026-05-20 follow-up] **D1 utility 移位**：`scripts/hooks/{get-model,set-mode,mode-explain}.js` 是 CLI utility 不是 hook，应移到 `scripts/utils/`。引用面大（CLAUDE.md / routing.md / infrastructure.md / task-router.js / set-mode.js 自身），需单独 session 做。**别忘**：每次跑 `manifest-generate.js --drift-only` 仍会列入 D1，关闭前确认移位 + 引用同步。Codex 保留意见：不能让它消失在"合理 orphan"措辞后。
 - [2026-05-20 follow-up] **post-edit-light.js cwd-gate**：5 段量化业务检测（EXCHANGE_URLS / proxy / Rust send() / 量化默认本金）跑全局，会在非量化项目误报。决策方向：① cwd-gate 只在量化项目跑 ② 移项目级 hook ③ 删除（信任 §八½ 文档不需要 hook 提醒）。
-- [2026-05-20 follow-up] **`auto-tmux-dev.js`**：infrastructure.md 说注册但 settings.json 未注册，是设计漂移。决策：要么注册（启用 dev server tmux 自动化）要么从 infrastructure.md 删除声明。
-- [2026-05-20 follow-up] **`discord-plugin-patch.js`**：Codex 建议应该注册到 SessionStart（恢复 Discord 状态），否则功能失效。需确认 plugin 实际依赖。
+- [x] [2026-05-20 follow-up] **`auto-tmux-dev.js`** — ✅ DONE 2026-08-02（T-old-coder B1，选了"删除声明"路：文件归档 scripts/hooks-archive/ + infrastructure.md 行删除。2 个月无人注册 = 无人需要该自动化）
+- [x] [2026-05-20 follow-up] **`discord-plugin-patch.js`** — ✅ DONE 2026-08-02（做法相反：Codex 曾建议注册到 SessionStart，但 2 个月无人接 + 独立冗余审计确认零引用零注册且 Discord plugin 现由官方插件链管理 → 归档 scripts/hooks-archive/ 而非注册）
 
 ## 2026-05-20 SSOT 治理元教训
 
