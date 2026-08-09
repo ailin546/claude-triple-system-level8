@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "system": {
+    "name": "Claude + Codex Unified Workflow",
+    "architecture": "shared-semantic-kernel-native-adapters",
+    "invariants": [
+      "Fast, Standard, and Heavy have the same intent on every client",
+      "completion claims require fresh verification evidence",
+      "Claude and Codex read and write the same memory paths",
+      "client runtime state, hook locks, transcripts, and caches stay isolated",
+      "Claude runtime behavior may change only through an explicit compatibility review"
+    ]
+  },
+  "memory_protocol": "shared/memory/PROTOCOL.md",
+  "codex": {
+    "agents_source": "shared/workflow/adapters/codex/AGENTS.md",
+    "agents_output": "adapters/codex/AGENTS.md",
+    "hook_source": "shared/workflow/adapters/codex/scripts/codex-global-hook.py",
+    "hook_output": "adapters/codex/scripts/codex-global-hook.py",
+    "skills_source_root": "shared/workflow/adapters/codex/skills",
+    "skills_output_root": "adapters/codex/skills"
+  },
+  "claude": {
+    "baseline": "shared/workflow/claude-baseline.json",
+    "protected_paths": [
+      "CLAUDE.md",
+      ".claude/CLAUDE.md",
+      ".claude/settings.json",
+      ".claude/rules/routing.md",
+      ".claude/skills/brainstorming/SKILL.md",
+      ".claude/skills/specify/SKILL.md",
+      ".claude/skills/writing-plans/SKILL.md",
+      ".claude/skills/executing-plans/SKILL.md",
+      ".claude/skills/verification-before-completion/SKILL.md",
+      ".claude/skills/evaluation-loop/SKILL.md",
+      ".claude/skills/requesting-code-review/SKILL.md",
+      ".claude/skills/ecc-configure-ecc/SKILL.md",
+      ".claude/commands/plan.md",
+      ".claude/commands/verify.md",
+      ".claude/commands/code-review.md",
+      ".claude/commands/harness-audit.md",
+      ".claude/commands/save-session.md",
+      ".claude/commands/resume-session.md",
+      ".claude/scripts/hooks/session-start.js",
+      ".claude/scripts/hooks/periodic-memory.js",
+      ".claude/scripts/hooks/stop-summary.js",
+      ".claude/scripts/hooks/session-end.js",
+      "install.sh",
+      "setup-claude.sh"
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "triage",
+      "intent": "Route work through Fast, Standard, or Heavy according to scope and risk.",
+      "codex_skill": "system-triage",
+      "claude_evidence": [
+        {
+          "path": ".claude/rules/routing.md",
+          "contains": ["### Fast", "### Standard", "### Heavy"]
+        }
+      ]
+    },
+    {
+      "id": "clarify_scope",
+      "intent": "Lock intent, scope, constraints, and acceptance criteria before ambiguous implementation.",
+      "codex_skill": "clarify-scope",
+      "claude_evidence": [
+        {
+          "path": ".claude/skills/brainstorming/SKILL.md",
+          "contains": ["Ask clarifying questions", "success criteria"]
+        },
+        {
+          "path": ".claude/skills/specify/SKILL.md",
+          "contains": ["范围", "验收"]
+        }
+      ]
+    },
+    {
+      "id": "plan_execute",
+      "intent": "Plan multi-step work with verification points, then continue through implementation.",
+      "codex_skill": "plan-execute",
+      "claude_evidence": [
+        {
+          "path": ".claude/skills/writing-plans/SKILL.md",
+          "contains": ["Writing Plans", "how to test"]
+        },
+        {
+          "path": ".claude/skills/executing-plans/SKILL.md",
+          "contains": ["Execute Tasks", "Run verifications"]
+        }
+      ]
+    },
+    {
+      "id": "verification_gate",
+      "intent": "Require fresh, relevant evidence before declaring completion.",
+      "codex_skill": "verification-gate",
+      "claude_evidence": [
+        {
+          "path": ".claude/skills/verification-before-completion/SKILL.md",
+          "contains": ["Evidence before claims", "NO COMPLETION CLAIMS"]
+        }
+      ]
+    },
+    {
+      "id": "iterative_improvement",
+      "intent": "Use bounded, measurable improvement loops with independent evaluation.",
+      "codex_skill": "autoresearch-lite",
+      "claude_evidence": [
+        {
+          "path": ".claude/skills/evaluation-loop/SKILL.md",
+          "contains": ["Generator-Evaluator", "生成者不评估自己的工作"]
+        }
+      ]
+    },
+    {
+      "id": "review_gate",
+      "intent": "Review non-trivial changes before delivery or merge and rank actionable findings.",
+      "codex_skill": "code-review-gate",
+      "claude_evidence": [
+        {
+          "path": ".claude/skills/requesting-code-review/SKILL.md",
+          "contains": ["Requesting Code Review", "Before merge"]
+        }
+      ]
+    },
+    {
+      "id": "workflow_diagnostics",
+      "intent": "Diagnose installation, configuration, hook, and skill drift without destructive repair.",
+      "codex_skill": "workflow-doctor",
+      "claude_evidence": [
+        {
+          "path": ".claude/skills/ecc-configure-ecc/SKILL.md",
+          "contains": ["verifying ECC installation", "verifies correctness"]
+        },
+        {
+          "path": ".claude/commands/harness-audit.md",
+          "contains": ["Harness Audit", "Quality Gates"]
+        }
+      ]
+    },
+    {
+      "id": "handoff_memory",
+      "intent": "Persist goals, decisions, risks, and recovery points to shared memory paths.",
+      "codex_skill": "handoff-memory",
+      "claude_evidence": [
+        {
+          "path": ".claude/commands/save-session.md",
+          "contains": ["Save Session", "hand off context"]
+        },
+        {
+          "path": ".claude/scripts/hooks/stop-summary.js",
+          "contains": ["weekly.md", "long-term.md"]
+        }
+      ]
+    }
+  ]
+}

@@ -10,6 +10,28 @@
 
 一套为 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 打造的完整开发框架，整合三个开源系统并扩展多 Agent 协作能力。
 
+### Codex 适配
+
+本仓库同时维护一个不会修改 Claude 运行路径的 Codex 原生适配器：
+
+```bash
+bash adapters/codex/install.sh
+```
+
+Claude 继续使用现有 `.claude/`、`CLAUDE.md` 和 Hooks；Codex 使用由
+`shared/workflow/` 生成并校验的 `adapters/codex/`。共享 manifest 映射两端的
+路由、澄清、计划、验证、迭代、审查、诊断和交接能力。两端共享 `~/.memory/`
+和项目级 `PROJECT/.memory/`，但不共享 Hook 锁、日志、会话和模式状态。设计边界见
+[`docs/UNIFIED_WORKFLOW.md`](docs/UNIFIED_WORKFLOW.md)，Codex 使用方式见
+[`docs/CODEX_USAGE.md`](docs/CODEX_USAGE.md)。
+
+维护与防漂移检查：
+
+```bash
+python3 scripts/sync_workflow.py
+python3 scripts/sync_workflow.py --check
+```
+
 ### 系统架构
 
 框架由三层系统 + 一层协作层组成：
@@ -219,6 +241,29 @@ MIT
 ## English
 
 A comprehensive development framework for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), integrating three open-source systems with multi-agent coordination capabilities.
+
+### Codex Adapter
+
+This repository also carries a native Codex adapter that does not modify the Claude runtime paths:
+
+```bash
+bash adapters/codex/install.sh
+```
+
+Claude continues to use the existing `.claude/`, `CLAUDE.md`, and hooks. Codex uses generated
+artifacts under `adapters/codex/`. The shared manifest maps routing, clarification, planning,
+verification, iteration, review, diagnostics, and handoff capabilities across both clients.
+Both tools share `~/.memory/` and `PROJECT/.memory/`, while hook locks, logs, sessions, and mode
+state remain tool-specific. See
+[`docs/UNIFIED_WORKFLOW.md`](docs/UNIFIED_WORKFLOW.md) for the compatibility contract.
+See [`docs/CODEX_USAGE.md`](docs/CODEX_USAGE.md) for the Codex-native lifecycle and usage.
+
+Generate and check adapter drift with:
+
+```bash
+python3 scripts/sync_workflow.py
+python3 scripts/sync_workflow.py --check
+```
 
 ### Architecture
 

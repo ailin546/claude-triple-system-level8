@@ -1,0 +1,37 @@
+name: Unified workflow compatibility
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Python 3.9 TOML parser
+        if: matrix.python-version == '3.9'
+        run: python -m pip install 'tomli>=2,<3'
+      - name: Check shared sources and compatibility baseline
+        run: python scripts/sync_workflow.py --check
+      - name: Run workflow tests
+        run: |
+          python -m unittest discover -s adapters/codex/tests -v
+          python -m unittest discover -s tests -v
+      - name: Exercise Codex installer
+        run: |
+          target="$(mktemp -d)/.codex"
+          bash adapters/codex/install.sh --codex-home "$target"
+          bash adapters/codex/install.sh --codex-home "$target" --check
