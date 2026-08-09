@@ -1,0 +1,7 @@
+interface:
+  display_name: "System Triage"
+  short_description: "Route work by task weight and risk"
+  default_prompt: "Use $system-triage to classify this task and choose the right Codex workflow."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Plan Execute"
+  short_description: "Plan compactly, then implement end to end"
+  default_prompt: "Use $plan-execute to turn this task into a compact plan and carry it through implementation."
+
+policy:
+  allow_implicit_invocation: true

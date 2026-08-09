@@ -1,0 +1,7 @@
+interface:
+  display_name: "Verification Gate"
+  short_description: "Choose evidence before calling work done"
+  default_prompt: "Use $verification-gate to define the smallest meaningful verification set for this work."
+
+policy:
+  allow_implicit_invocation: true

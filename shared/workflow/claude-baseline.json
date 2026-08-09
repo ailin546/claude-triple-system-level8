@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "purpose": "Protected Claude compatibility surface; refresh only after explicit review.",
+  "files": {
+    ".claude/CLAUDE.md": "9e4418017c4122da75ad0ecd5a4c2cb8729667b3664ae14a2c0180f7fe793d33",
+    ".claude/commands/code-review.md": "027841d00dab9c830e31a1969d4ff89429fb5a36b6a0043194b79f14b6bcd7e2",
+    ".claude/commands/harness-audit.md": "8051ebfe1ac1efd74d9cf6f1dc526a06bc35fdfab88ac40c6700dbfa51504542",
+    ".claude/commands/plan.md": "801e3aba55057d0388f02a3b7effe217a33867d817564377adfe621ed1b6b914",
+    ".claude/commands/resume-session.md": "8b08f6ea72e55a8e5a7252493a19c6bcf5b4b1e644f3b52cbce1c49e67a70977",
+    ".claude/commands/save-session.md": "ff7c8e32b52f3b1a41ee701fc0c3ebe297a216ff805015c372bf8940d463b3ce",
+    ".claude/commands/verify.md": "49b2eb06f5d9d5555fbdb58a3cdeea4e761d2793e19e413fbc8be03758e4063c",
+    ".claude/rules/routing.md": "542c043a077d3cb638f293dfe2750be7262ac99b62aee126ba9ce3a5ed65557d",
+    ".claude/scripts/hooks/periodic-memory.js": "4e1599ff48d4a5e6ea1baf8490739c5d80b79126b47829aac91077776aa90ad9",
+    ".claude/scripts/hooks/session-end.js": "b6d462610bdab99b87c8c2b34abeac3f97e2288a95ca803225fd9b6b04d3a831",
+    ".claude/scripts/hooks/session-start.js": "6a8f95a160b99f547f0dbed7716a5b0d9cedf413c0d4517c35e5270a8acb2dd5",
+    ".claude/scripts/hooks/stop-summary.js": "6d73bb6be0eab2c405dbebb79dceccaad2fc0514018d5a3f875b7837d04f183b",
+    ".claude/settings.json": "1969e92445846fc84bd5cb6ec64d7a01e68183d6a3698a294d4c8773502d63e7",
+    ".claude/skills/brainstorming/SKILL.md": "9588b4f06b1738fcb17ff089335ff6f42c2243382dc04c4327690d7f7b6c80c6",
+    ".claude/skills/ecc-configure-ecc/SKILL.md": "f82ff870101f16123b2b24d51ac08db1d9c83d2237cdb4360a858a9db0edf35a",
+    ".claude/skills/evaluation-loop/SKILL.md": "26dea1995d5d6211f090cd0d84aafab23faf6571691025613cd33ebbdfaedf17",
+    ".claude/skills/executing-plans/SKILL.md": "a711f83fb762e2ea0fa151f598893da9911a408895c91cc7a7e0770dd59a27b3",
+    ".claude/skills/requesting-code-review/SKILL.md": "a5ff68586ccf62d1803cedeb71d60fd96ec05591d29c8d123196117eefd34cd0",
+    ".claude/skills/specify/SKILL.md": "1e8db0ae993081aa2475ab53925183f9cafc141cabe4cb3279848889758a485f",
+    ".claude/skills/verification-before-completion/SKILL.md": "ea52d15aabaf72bc6b558efe2c126f161b53961090ddcd712000273bfe8c7b6c",
+    ".claude/skills/writing-plans/SKILL.md": "3d864857928dec2d03e913984e50f4b931277b8fc2871365d8e32569e961fc50",
+    "CLAUDE.md": "cc06a301ebf47f190f0c5d22a59c3abef426fba3a779c5c8a2a4c566f701b389",
+    "install.sh": "82269cf49b5c88a6c590aa24f6c235c33bccca701992972f60fb4d95686330ed",
+    "setup-claude.sh": "678932d0be4004e5a89744b83c25b7a19fa2e62395e5b1a097f38156869465f1"
+  }
+}

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Handoff Memory"
+  short_description: "Capture durable handoff and lessons"
+  default_prompt: "Use $handoff-memory to summarize progress, decisions, risks, and the next restart point."
+
+policy:
+  allow_implicit_invocation: true
