@@ -140,7 +140,7 @@ Artifacts are the **handoff mechanism** between agents. Each agent reads its dep
 | `/save-session` | Includes board.json snapshot in session file |
 | `/resume-session` | Restores board.json state from session |
 | `session-end.js` hook | Auto-archives board state on session end |
-| `dispatching-parallel-agents` | Agents register in board.json before work |
+| Native multi-agent work | Agents register in board.json before work when shared state is explicitly enabled |
 
 ## Example: Feature Workflow
 

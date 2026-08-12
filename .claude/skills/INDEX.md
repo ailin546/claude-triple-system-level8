@@ -1,33 +1,25 @@
 # User-Level Skills Index
 
-> 41 skills @ ~/.claude/skills/. Last optimized 2026-05-20 (+caveman).
+> 29 active skills @ ~/.claude/skills/. Shared workflow alignment refreshed 2026-08-12.
 > All frontmatter validated (name + description only). Reference skills (1500+w) split to overview + subdocs.
 
 ## Process & Workflow
 
-- [brainstorming](brainstorming/SKILL.md) — Use before any creative work to explore user intent, requirements, and design options; also grills/stress-tests an existing plan（拷问需求/设计，Interrogation discipline：事实自查/决策必问、每问带推荐、遍历决策树、代码对质+边缘场景压测）
+- [brainstorming](brainstorming/SKILL.md) — Conditional Requirement Confirmation for ambiguous or Brownfield work; no automatic document/review loop
 - [specify](specify/SKILL.md) — Use before /plan in Standard+ mode to lock down task constitution — AC, scope, inviolable principles
 - [writing-plans](writing-plans/SKILL.md) — Use when you have a spec or requirements for a multi-step task, before touching code
-- [executing-plans](executing-plans/SKILL.md) — Use when you have a written implementation plan to execute in a separate session with review checkpoints
-- [using-superpowers](using-superpowers/SKILL.md) — Use when starting any conversation — establishes how to find and use skills
+- [executing-plans](executing-plans/SKILL.md) — Execute an approved plan through implementation and relevant verification
 - [verification-before-completion](verification-before-completion/SKILL.md) — Use when about to claim work is complete, before committing or creating PRs
-- [finishing-a-development-branch](finishing-a-development-branch/SKILL.md) — Use when implementation is complete and you need to decide how to integrate the work
 - [scope-drift-detection](scope-drift-detection/SKILL.md) — Use before code review or PR creation to detect scope drift vs original task intent
-- [systematic-debugging](systematic-debugging/SKILL.md) — Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes
 
 ## Code Quality & Review
 
-> **评审入口三档归并（2026-08-02 T-old-coder B11）**——语义全保留，按强度选一个入口，档内工具是可选层不是并列入口：
-> - **快**（每次改动）：`/verify` —— build/type/lint/audit 单入口
-> - **标准**（Standard+ 功能/修复）：`/code-review` —— 档内可选叠加 `/grill`（对抗视角）、scope-drift-detection、qa-health-score
-> - **重**（Heavy/money-path）：`evaluation-loop` + Reality Checker marker —— 档内可选叠加 codex:adversarial-review（Codex 恢复后）、Systems Reality Checker（Rust 后端）
-> requesting/receiving-code-review、verification-before-completion 是贯穿三档的纪律 skill，非独立入口。
+> **共享审查预算**：Fast 默认只 `/verify`；Standard/Heavy 按风险一次 `/code-review`；
+> 只有修复 Critical/High 后允许一次复核。`evaluation-loop` 仅用于具备基线和指标的改进任务。
 
-- [test-driven-development](test-driven-development/SKILL.md) — Use when implementing any feature or bugfix, before writing implementation code
-- [requesting-code-review](requesting-code-review/SKILL.md) — Use when completing tasks, implementing major features, or before merging
-- [receiving-code-review](receiving-code-review/SKILL.md) — Use when receiving code review feedback, before implementing suggestions
+- [requesting-code-review](requesting-code-review/SKILL.md) — One bounded Review Gate before delivery or merge for non-trivial/high-risk changes
 - [qa-health-score](qa-health-score/SKILL.md) — Use after /verify or before PR creation to compute a quantitative 0-100 codebase health score
-- [evaluation-loop](evaluation-loop/SKILL.md) — Use after Heavy-mode feature implementation, before /verify — Generator-Evaluator loop
+- [evaluation-loop](evaluation-loop/SKILL.md) — Bounded measurable improvement loop; not a default delivery stage
 - [ecc-coding-standards](ecc-coding-standards/SKILL.md) — Use when writing or reviewing TypeScript/JavaScript code — universal style/quality rules
 - [codex-review](codex-review/SKILL.md) — Cross-AI code review via OpenAI Codex CLI for independent second-opinion before merging
 
@@ -50,7 +42,6 @@
 > ecc-postgres-patterns / ecc-database-migrations / ecc-deployment-patterns / ecc-docker-patterns
 > 四技能移入 `skills-archive/`（T-old-coder B10：活跃项目栈 Rust+SQLite+React，无 Postgres/Docker/
 > SQL-migration 面，技能列表逐条进 session context = 常驻 token 税）。需要时 `/restore` 恢复。
-- [using-git-worktrees](using-git-worktrees/SKILL.md) — Use when starting feature work that needs isolation from current workspace
 
 ## Security
 
@@ -59,7 +50,6 @@
 
 ## Skill / Memory Engineering
 
-- [writing-skills](writing-skills/SKILL.md) — Use when creating new skills, editing existing skills, or verifying skills before deployment
 - [ecc-continuous-learning-v2](ecc-continuous-learning-v2/SKILL.md) — Use when wanting to extract reusable patterns from sessions and evolve them into skills/commands
 - [ecc-eval-harness](ecc-eval-harness/SKILL.md) — Use when defining a formal evaluation harness for Claude Code sessions (eval-driven development)
 - [ecc-strategic-compact](ecc-strategic-compact/SKILL.md) — Use when in long sessions approaching context limits — suggests compaction at logical task-phase boundaries
@@ -71,8 +61,6 @@
 - [writing-plans](writing-plans/SKILL.md) — Use when you have a spec or requirements for a multi-step task, before touching code
 - [executing-plans](executing-plans/SKILL.md) — Use when executing a written implementation plan with review checkpoints
 - [ecc-blueprint](ecc-blueprint/SKILL.md) — Use when planning a complex multi-PR or multi-session engineering project
-- [dispatching-parallel-agents](dispatching-parallel-agents/SKILL.md) — Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies
-- [subagent-driven-development](subagent-driven-development/SKILL.md) — Use when executing implementation plans with independent tasks in the current session
 
 ## Output Control
 

@@ -8,68 +8,44 @@ Located in `~/.claude/agents/`:
 
 | Agent | Purpose | When to Use |
 |-------|---------|-------------|
-| planner | Implementation planning | Complex features, refactoring |
-| architect | System design | Architectural decisions |
-| tdd-guide | Test-driven development | New features, bug fixes |
-| code-reviewer | Code review | After writing code |
-| security-reviewer | Security analysis | Before commits |
+| planner | Implementation planning | 复杂且边界已确认的任务，需要独立规划视角时 |
+| architect | System design | Heavy 架构决策或用户明确要求时 |
+| tdd-guide | Test-driven development | 测试先行确实能降低风险时 |
+| code-reviewer | Code review | 高风险改动需要独立视角，或用户明确要求时 |
+| security-reviewer | Security analysis | 安全敏感改动或显式安全审计时 |
 | build-error-resolver | Fix build errors | When build fails |
 | e2e-runner | E2E testing | Critical user flows |
 | refactor-cleaner | Dead code cleanup | Code maintenance |
 | doc-updater | Documentation | Updating docs |
 | database-reviewer | DB query/schema review | When writing SQL/migrations |
 
-## Immediate Agent Usage
+## Agent Usage Gate
 
-No user prompt needed:
-1. Complex feature requests - Use **planner** agent
-2. Code just written/modified - Use **code-reviewer** agent
-3. Bug fix or new feature - Use **tdd-guide** agent
-4. Architectural decision - Use **architect** agent
-5. UI/UX work starting - Use **design-consultation** skill (auto-trigger, see below)
-6. UI code just written - Use **design-review** skill (auto-trigger, see below)
+默认单 agent 直接完成任务。只有同时满足以下条件时才派发子 agent：
 
-## Design System Auto-Trigger
+1. 子任务可独立描述和验证；
+2. ownership 与写入范围清楚，和主线程冲突低；
+3. 独立视角或并行能明显降低风险或关键路径时间；
+4. 不会把同一 Review/Verify 阶段重复执行。
 
-When the task involves UI/visual changes, the design system activates automatically:
+写了代码、修了 bug、任务较复杂，本身都不是自动派发 reviewer、planner 或 tdd-guide 的理由。
+普通 Review 由主 agent 执行一次即可；只有高风险任务确需独立视角或用户明确要求时，才派发一个 reviewer。
 
-**Before implementation** — auto-invoke `design-consultation` skill when the request involves:
-- New pages, screens, or layouts
-- New UI components (buttons, forms, cards, modals, navigation)
-- Color, typography, or spacing changes
-- Responsive design or dark mode work
-- UX flow changes or information architecture
+## Design System Routing
 
-**After implementation** — auto-invoke `design-review` skill when:
-- CSS/SCSS/styling files have been created or modified
-- Component files (.tsx/.jsx/.vue/.svelte) with visual elements were changed
-- Design tokens or theme variables were added/modified
-
-Detection: if changed files match `*.css|*.scss|*.less|*.tsx|*.jsx|*.vue|*.svelte` AND contain visual keywords (color, margin, padding, font, display, grid, flex, background, border, shadow, theme), auto-trigger design-review before code-review.
+小型样式修复和范围明确的组件改动由主 agent 直接处理。只有新页面、关键用户流、信息架构或
+品牌/无障碍风险较高的 UI 工作，才考虑 `design-consultation`；`design-review` 只在风险需要或
+用户明确要求时使用，不因文件扩展名自动触发。
 
 ## Parallel Task Execution
 
-ALWAYS use parallel Task execution for independent operations:
-
-```markdown
-# GOOD: Parallel execution
-Launch 3 agents in parallel:
-1. Agent 1: Security analysis of auth module
-2. Agent 2: Performance review of cache system
-3. Agent 3: Type checking of utilities
-
-# BAD: Sequential when unnecessary
-First agent 1, then agent 2, then agent 3
-```
+并行是优化手段，不是默认流程。只有两个以上子任务彼此独立、共享文件冲突低、各自有验收命令，
+且并行收益明显时才并行；否则保持在主线程串行完成。
 
 ## Multi-Perspective Analysis
 
-For complex problems, use split role sub-agents:
-- Factual reviewer
-- Senior engineer
-- Security expert
-- Consistency reviewer
-- Redundancy checker
+多视角只用于用户显式要求的全局审计，或确有安全/架构风险的 Heavy 任务。先定义每个视角的
+独立问题和输出，避免多个 reviewer 重复检查同一 diff。
 
 ## Audit Task Routing（强制）
 

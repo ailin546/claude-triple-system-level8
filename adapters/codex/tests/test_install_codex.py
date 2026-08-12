@@ -85,6 +85,7 @@ class CodexInstallerTests(unittest.TestCase):
             self.assertIn("<!-- unified-workflow:start -->", config_after_first)
             usage_guide = codex_home / "workflow-docs" / "CODEX_USAGE.md"
             self.assertTrue(usage_guide.is_file())
+            self.assertTrue((codex_home / "scripts" / "workflow-doctor.py").is_file())
             self.assertIn(
                 "Requirement Confirmation（按条件）",
                 usage_guide.read_text(encoding="utf-8"),

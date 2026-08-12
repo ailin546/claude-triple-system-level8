@@ -327,7 +327,7 @@ The following agents are available in `.claude/agents/` for orchestration:
 
 ### Orchestration
 - **agents-orchestrator**: This agent — autonomous pipeline manager
-- **superpowers-code-reviewer**: Plan-aligned code review
+- **主 agent Review Gate**: Plan-aligned bounded code review; use one optional independent reviewer only for high-risk work
 
 ---
 

@@ -111,6 +111,6 @@ before proceeding to implementation.
 
 ## Integration
 
-- **Before `/tdd`**: Run design consultation to define UI requirements, then write tests
+- **Before implementation**: Run design consultation to define UI requirements, then add focused tests where useful
 - **Before `/code-review`**: Design decisions are documented and reviewable
 - **Feeds into**: `design-review` skill for post-implementation validation

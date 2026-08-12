@@ -60,9 +60,11 @@ class WorkflowSyncTests(unittest.TestCase):
             repository = Path(temporary_root)
             agents_source = repository / "shared" / "AGENTS.md"
             hook_source = repository / "shared" / "hook.py"
+            doctor_source = repository / "shared" / "doctor.py"
             skill_source = repository / "shared" / "skills" / "triage"
             agents_output = repository / "adapter" / "AGENTS.md"
             hook_output = repository / "adapter" / "hook.py"
+            doctor_output = repository / "adapter" / "doctor.py"
             skill_output = repository / "adapter" / "skills" / "triage"
             agents_source.parent.mkdir(parents=True)
             skill_source.mkdir(parents=True)
@@ -70,9 +72,11 @@ class WorkflowSyncTests(unittest.TestCase):
             skill_output.mkdir(parents=True)
             agents_source.write_text("canonical agents\n", encoding="utf-8")
             hook_source.write_text("canonical hook\n", encoding="utf-8")
+            doctor_source.write_text("canonical doctor\n", encoding="utf-8")
             (skill_source / "SKILL.md").write_text("canonical skill\n", encoding="utf-8")
             agents_output.write_text("stale\n", encoding="utf-8")
             hook_output.write_text("stale\n", encoding="utf-8")
+            doctor_output.write_text("stale\n", encoding="utf-8")
             (skill_output / "SKILL.md").write_text("stale\n", encoding="utf-8")
             manifest = {
                 "codex": {
@@ -80,6 +84,8 @@ class WorkflowSyncTests(unittest.TestCase):
                     "agents_output": "adapter/AGENTS.md",
                     "hook_source": "shared/hook.py",
                     "hook_output": "adapter/hook.py",
+                    "doctor_source": "shared/doctor.py",
+                    "doctor_output": "adapter/doctor.py",
                     "skills_source_root": "shared/skills",
                     "skills_output_root": "adapter/skills",
                 },
@@ -89,13 +95,14 @@ class WorkflowSyncTests(unittest.TestCase):
             stale = SYNC.sync_codex_outputs(repository, manifest, check_only=True)
             synced = SYNC.sync_codex_outputs(repository, manifest, check_only=False)
 
-            self.assertEqual(len(stale), 3)
+            self.assertEqual(len(stale), 4)
             self.assertEqual(synced, [])
             self.assertEqual(
                 agents_output.read_text(encoding="utf-8"),
                 SYNC.GENERATED_NOTICE + "canonical agents\n",
             )
             self.assertEqual(hook_output.read_text(encoding="utf-8"), "canonical hook\n")
+            self.assertEqual(doctor_output.read_text(encoding="utf-8"), "canonical doctor\n")
             self.assertTrue(SYNC.trees_match(skill_source, skill_output))
 
     def test_workflow_doctor_uses_shared_optional_project_overlay(self):
@@ -135,6 +142,28 @@ class WorkflowSyncTests(unittest.TestCase):
         self.assertIn("brainstorming", guide)
         self.assertIn("spec", guide)
         self.assertIn("Fast 且清晰的任务直接走", agents)
+
+    def test_superpowers_entrypoints_remain_disabled(self):
+        manifest = SYNC.load_json(REPOSITORY / "shared" / "workflow" / "manifest.json")
+        claude = manifest["claude"]
+
+        for relative in claude["disabled_entrypoints"]:
+            self.assertFalse((REPOSITORY / relative).exists(), relative)
+
+        settings = json.loads((REPOSITORY / ".claude" / "settings.json").read_text())
+        commands = [
+            hook.get("command", "")
+            for groups in settings["hooks"].values()
+            for group in groups
+            for hook in group.get("hooks", [])
+        ]
+        self.assertFalse(any("evaluation-gate.js" in command for command in commands))
+
+    def test_claude_global_instruction_copies_do_not_drift(self):
+        self.assertEqual(
+            (REPOSITORY / "CLAUDE.md").read_text(encoding="utf-8"),
+            (REPOSITORY / ".claude" / "CLAUDE.md").read_text(encoding="utf-8"),
+        )
 
 
 if __name__ == "__main__":

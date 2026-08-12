@@ -376,6 +376,7 @@ def check_installation(codex_home: Path) -> int:
     checks: list[tuple[str, bool, str]] = []
     checks.append(("AGENTS.md", (codex_home / "AGENTS.md").is_file() and sha256_file(root / "AGENTS.md") == sha256_file(codex_home / "AGENTS.md"), "managed global instructions"))
     checks.append(("Hook script", (codex_home / "scripts/codex-global-hook.py").is_file() and sha256_file(root / "scripts/codex-global-hook.py") == sha256_file(codex_home / "scripts/codex-global-hook.py"), "shared-memory-aware hook"))
+    checks.append(("Workflow doctor", (codex_home / "scripts/workflow-doctor.py").is_file() and sha256_file(root / "scripts/workflow-doctor.py") == sha256_file(codex_home / "scripts/workflow-doctor.py"), "canonical diagnostic"))
     for source_skill in sorted((root / "skills").iterdir()):
         if source_skill.is_dir() and (source_skill / "SKILL.md").is_file():
             checks.append((f"Skill {source_skill.name}", trees_match(source_skill, codex_home / "skills" / source_skill.name), "managed skill tree"))
@@ -475,6 +476,7 @@ def install(codex_home: Path, dry_run: bool) -> int:
     managed_targets = [
         codex_home / "AGENTS.md",
         codex_home / "scripts/codex-global-hook.py",
+        codex_home / "scripts/workflow-doctor.py",
         codex_home / "config.toml",
         codex_home / "hooks.json",
         codex_home / "workflow-docs" / "UNIFIED_WORKFLOW.md",
@@ -506,6 +508,9 @@ def install(codex_home: Path, dry_run: bool) -> int:
         atomic_copy_file(root / "AGENTS.md", codex_home / "AGENTS.md")
         atomic_copy_file(root / "scripts/codex-global-hook.py", hook_target)
         hook_target.chmod(0o755)
+        doctor_target = codex_home / "scripts/workflow-doctor.py"
+        atomic_copy_file(root / "scripts/workflow-doctor.py", doctor_target)
+        doctor_target.chmod(0o755)
         for skill_source in skill_sources:
             atomic_replace_tree(skill_source, codex_home / "skills" / skill_source.name)
         update_config(config_path, rendered_config)

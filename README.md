@@ -8,7 +8,8 @@
 
 ## 中文
 
-一套为 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 打造的完整开发框架，整合三个开源系统并扩展多 Agent 协作能力。
+一套面向 Claude Code 与 Codex 的共享轻量开发工作流；保留原生 Hooks 和按需专家能力，
+统一任务分级、范围确认、计划、单次审查、验证与记忆语义。
 
 ### Codex 适配
 
@@ -34,17 +35,17 @@ python3 scripts/sync_workflow.py --check
 
 ### 系统架构
 
-框架由三层系统 + 一层协作层组成：
+框架由共享流程内核、基础设施和按需能力组成：
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Level 8: 多 Agent 协作层                                │
-│  shared-state (任务板) · sprint-memory (跨会话记忆)       │
+│  Shared Workflow Kernel: Fast · Standard · Heavy         │
+│  Confirm → Plan → Execute → Review → Verify → Summary    │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
-│  ECC (基础设施)         hooks · 记忆 · 28 个命令         │
-│  Superpowers (流程)     TDD · 调试 · 头脑风暴 · 质量门   │
-│  Agency Agents (专业)   26 个领域专家 Agent               │
+│  ECC (基础设施)         hooks · 记忆 · 命令               │
+│  Native Process         条件澄清 · 单次审查 · 验证门      │
+│  Agency Agents (专业)   按需领域专家 Agent                │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -52,9 +53,9 @@ python3 scripts/sync_workflow.py --check
 | 层 | 系统 | 来源 | 提供什么 |
 |----|------|------|---------|
 | 基础设施 | [ECC](https://github.com/affaan-m/everything-claude-code) | affaan-m | Hooks 生命周期管理、共享记忆、模式学习、28 个斜杠命令 |
-| 流程 | [Superpowers](https://github.com/obra/superpowers) | obra | TDD 铁律、系统化调试、头脑风暴、验证门控 |
+| 流程 | Shared Workflow Kernel | 本项目 | Claude/Codex 同语义的轻量生命周期；Superpowers 活动入口已停用 |
 | 专业 | [Agency Agents](https://github.com/msitarzewski/agency-agents) | msitarzewski | 26 个领域专家（安全、架构、前端、DevOps 等） |
-| 协作 | Level 8（本仓库） | 本项目 | 多 Agent 共享状态、跨会话记忆、自治权限 |
+| 协作 | 原生按需协作 | 本项目 | 只有独立、高价值子任务才使用多 Agent |
 
 ### 工作原理
 
@@ -78,7 +79,7 @@ python3 scripts/sync_workflow.py --check
 |------|---------|---------|
 | **Fast**（默认） | 写文档、单文件小改、配置微调 | 基础 Hook（安全守卫 + 轻量格式化 + 记忆摘要） |
 | **Standard** | 跨文件功能开发、一般 bugfix | Fast + 漂移检测、质量门、类型检查、决策记忆 |
-| **Heavy** | 认证/支付/权限/迁移/部署 | Standard + 共享状态、冲突检测、跨会话记忆 |
+| **Heavy** | 认证/支付/权限/迁移/部署 | Standard + Execution Brief 确认、严格验证、按风险一次审查 |
 
 **自动升档**：`pre-tool-escalate.js` 检测风险关键词（auth/payment/deploy）和跨文件累积（3 文件 → Standard，6 文件 → Heavy），5 分钟空闲自动重置。
 
@@ -97,9 +98,9 @@ python3 scripts/sync_workflow.py --check
 - 会话结束时自动抽取高价值信息（决策、约束、未完成事项）写入 `today.md`
 - 跨日自动归档（today → weekly）
 
-#### 4. 专家 Agent 自动路由
+#### 4. 专家 Agent 按需路由
 
-根据任务类型自动选择合适的专家 Agent：
+只有任务可独立拆分且确有收益时才选择专家 Agent；默认由主会话完成：
 
 | 任务 | Agent | 任务 | Agent |
 |------|-------|------|-------|
@@ -146,7 +147,6 @@ bash .claude-system/install.sh --update
 | 命令 | 说明 | 适用模式 |
 |------|------|---------|
 | `/plan` | 分析需求，生成分步实现计划，等待确认后再动手 | Standard+ |
-| `/tdd` | 强制测试驱动：先写失败测试 → 最小实现 → 重构 | Standard+ |
 | `/verify` | 运行 lint、类型检查、测试，用实际输出验证结果 | 所有模式 |
 | `/code-review` | 对已写代码进行安全和质量审查 | Standard+ |
 | `/build-fix` | 分析构建错误并修复 | 所有模式 |
@@ -181,8 +181,8 @@ bash .claude-system/install.sh --update
 
 ```
 Fast 模式:    直接做 → /verify
-Standard 模式: /plan → 实施 → /verify
-Heavy 模式:    /plan → /tdd → 实施 → /code-review → /verify
+Standard 模式: 必要时确认范围 → /plan → 实施 → 按风险一次 /code-review → /verify
+Heavy 模式:    确认 Execution Brief → /plan → 实施 → 一次 /code-review → /verify
 ```
 
 ### 手动模式控制
@@ -214,7 +214,7 @@ node .claude/scripts/hooks/set-mode.js --reset     # 重置为 Fast
 └── .claude/
     ├── settings.json          ← Hook 配置（所有 Hook 常驻注册，脚本内模式门控）
     ├── agents/                ← 26 个专家 Agent 定义
-    ├── skills/                ← 38 个 Skill（流程模板）
+    ├── skills/                ← 29 个活动 Skill（共享流程 + 按需能力）
     ├── commands/              ← 28 个斜杠命令
     ├── rules/                 ← 11 个规则文件
     ├── scripts/hooks/         ← 29 个 Hook 脚本
@@ -231,7 +231,7 @@ MIT
 ### 来源
 
 - [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code) (MIT)
-- [obra/superpowers](https://github.com/obra/superpowers) (MIT)
+- [obra/superpowers](https://github.com/obra/superpowers)（MIT；仅保留历史来源署名，运行入口已停用）
 - [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) (MIT)
 
 ---
@@ -240,7 +240,7 @@ MIT
 
 ## English
 
-A comprehensive development framework for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), integrating three open-source systems with multi-agent coordination capabilities.
+A shared lightweight workflow for Claude Code and Codex. It keeps native hooks and optional expert capabilities while unifying routing, scope confirmation, planning, bounded review, verification, and memory semantics.
 
 ### Codex Adapter
 
@@ -267,17 +267,17 @@ python3 scripts/sync_workflow.py --check
 
 ### Architecture
 
-The framework consists of three systems + one coordination layer:
+The framework consists of a shared process kernel, infrastructure, and on-demand capabilities:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Level 8: Multi-Agent Coordination                       │
-│  shared-state (task board) · sprint-memory (cross-session)│
+│  Shared Workflow Kernel: Fast · Standard · Heavy         │
+│  Confirm → Plan → Execute → Review → Verify → Summary    │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
-│  ECC (Infrastructure)    hooks · memory · 28 commands    │
-│  Superpowers (Process)   TDD · debugging · quality gates │
-│  Agency Agents (Expertise) 26 domain expert agents       │
+│  ECC (Infrastructure)    hooks · memory · commands       │
+│  Native Process          conditional scope · one review  │
+│  Agency Agents           on-demand domain expertise      │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -285,9 +285,9 @@ The framework consists of three systems + one coordination layer:
 | Layer | System | Source | What It Provides |
 |-------|--------|--------|-----------------|
 | Infrastructure | [ECC](https://github.com/affaan-m/everything-claude-code) | affaan-m | Hook lifecycle, shared memory, pattern learning, 28 slash commands |
-| Process | [Superpowers](https://github.com/obra/superpowers) | obra | TDD discipline, systematic debugging, brainstorming, verification gates |
+| Process | Shared Workflow Kernel | This project | Lightweight Claude/Codex lifecycle; Superpowers entrypoints are disabled |
 | Expertise | [Agency Agents](https://github.com/msitarzewski/agency-agents) | msitarzewski | 26 domain experts (security, architecture, frontend, DevOps, etc.) |
-| Coordination | Level 8 (this repo) | This project | Multi-agent shared state, cross-session memory, autonomous permissions |
+| Coordination | Native on-demand collaboration | This project | Multi-agent use only for bounded, high-value independent work |
 
 ### How It Works
 
@@ -311,7 +311,7 @@ Each task is automatically assigned a process intensity level. Hooks are layered
 |------|---------|-------------|
 | **Fast** (default) | Docs, single-file edits, config tweaks | Basic hooks (safety guard + light formatting + memory summary) |
 | **Standard** | Multi-file feature dev, general bugfixes | Fast + drift detection, quality gate, type checking, decision memory |
-| **Heavy** | Auth/payment/permissions/migration/deploy | Standard + shared state, conflict detection, cross-session memory |
+| **Heavy** | Auth/payment/permissions/migration/deploy | Standard + confirmed Execution Brief, strict verification, one risk-based review |
 
 **Auto-escalation**: `pre-tool-escalate.js` detects risk keywords (auth/payment/deploy) and cross-file accumulation (3 files → Standard, 6 files → Heavy). Resets after 5 minutes idle.
 
@@ -330,9 +330,9 @@ Three-layer memory architecture for cross-session, cross-tool knowledge persiste
 - High-value information (decisions, constraints, open items) auto-extracted at session end
 - Cross-day auto-archival (today → weekly)
 
-#### 4. Expert Agent Auto-Routing
+#### 4. Expert Agent On-Demand Routing
 
-The appropriate expert agent is automatically selected based on task type:
+Expert agents are selected only when a bounded independent subtask benefits from them; the main session is the default:
 
 | Task | Agent | Task | Agent |
 |------|-------|------|-------|
@@ -379,7 +379,6 @@ These commands are invoked via `/command-name` within a Claude Code conversation
 | Command | Description | Mode |
 |---------|-------------|------|
 | `/plan` | Analyze requirements, generate step-by-step plan, wait for confirmation | Standard+ |
-| `/tdd` | Enforce test-driven: write failing test → minimal impl → refactor | Standard+ |
 | `/verify` | Run lint, type check, tests; verify with actual output | All modes |
 | `/code-review` | Security and quality review of written code | Standard+ |
 | `/build-fix` | Analyze and fix build errors | All modes |
@@ -414,8 +413,8 @@ These commands are invoked via `/command-name` within a Claude Code conversation
 
 ```
 Fast mode:     Just do it → /verify
-Standard mode: /plan → implement → /verify
-Heavy mode:    /plan → /tdd → implement → /code-review → /verify
+Standard mode: confirm scope when needed → /plan → implement → one risk-based /code-review → /verify
+Heavy mode:    confirm Execution Brief → /plan → implement → one /code-review → /verify
 ```
 
 ### Manual Mode Control
@@ -447,7 +446,7 @@ Or tell Claude directly:
 └── .claude/
     ├── settings.json          ← Hook config (all hooks registered, mode-gated in scripts)
     ├── agents/                ← 26 expert agent definitions
-    ├── skills/                ← 38 skills (process templates)
+    ├── skills/                ← 29 active skills (shared workflow + on-demand capabilities)
     ├── commands/              ← 28 slash commands
     ├── rules/                 ← 11 rule files
     ├── scripts/hooks/         ← 29 hook scripts
@@ -464,5 +463,5 @@ MIT
 ### Sources
 
 - [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code) (MIT)
-- [obra/superpowers](https://github.com/obra/superpowers) (MIT)
+- [obra/superpowers](https://github.com/obra/superpowers) (MIT; historical source only, runtime entrypoints disabled)
 - [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) (MIT)

@@ -82,11 +82,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ~/.claude/scripts/hooks/evaluation-gate.js",
-            "timeout": 3000
-          },
-          {
-            "type": "command",
             "command": "node ~/.claude/scripts/hooks/careful-guard.js",
             "timeout": 5000
           },

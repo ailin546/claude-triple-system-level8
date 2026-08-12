@@ -6,9 +6,9 @@
 
 | Layer | System | What It Provides |
 |-------|--------|-----------------|
-| **Infrastructure** | ECC | Hooks, memory, learning, 30 commands, common rules |
-| **Process** | Superpowers | TDD iron law, systematic debugging, brainstorming, quality gates |
-| **Expertise** | Agency Agents | 28 active agents with domain knowledge |
+| **Infrastructure** | ECC | Hooks, memory, commands, common rules |
+| **Process** | Shared Workflow Kernel | Fast / Standard / Heavy、范围确认、计划、单次审查、验证、交接 |
+| **Expertise** | Agency Agents | 按需使用的领域知识，不默认派发 |
 
 ## 工作流程
 
@@ -22,22 +22,28 @@ User Request
     │   PreCompact → 上下文压缩前保存状态
     │   Stop → 保存状态、教训/commit 沉淀(stop-summary)、成本追踪、任务板维护
     │
-    ├─► Superpowers Process (流程纪律)
-    │   brainstorming → 探索/拷问需求(grill)、生成设计文档
-    │   writing-plans → 拆解为TDD小任务
-    │   test-driven-development → 铁律：先写失败测试
-    │   systematic-debugging → 4阶段根因分析
-    │   verification-before-completion → 跑验证才能说完成
+    ├─► Shared Workflow Kernel (与 Codex 同语义)
+    │   Requirement Confirmation（按条件）
+    │   → Plan → Execute → Review → Verify → Docs Sync → Summary
+    │   Fast 且清晰：Execute → Verify → Summary
+    │   Review 默认一次；只有修复 Critical/High 后允许一次复核
     │
     └─► Agency Agents Expertise (专业视角)
-        按任务类型自动路由到对应领域专家 agent
+        仅在独立、高价值且边界清楚时按需使用
 ```
+
+### 已停用的旧流程层
+
+Superpowers 插件及其活动入口已停用。`using-superpowers`、`subagent-driven-development`、
+逐任务/逐分块 reviewer、强制 TDD、强制 worktree、Heavy 自动 evaluation-loop 和
+`evaluation-gate` commit marker 均不再属于执行流程。文件下方若出现相关事故记录或历史名称，
+只作为历史资料，不构成当前指令。当前唯一交付语义以上述 Shared Workflow Kernel 为准。
 
 ## 优先级
 
 1. **用户显式指令** — 最高优先
 2. **ECC hooks & rules** — 基础设施（100% 可靠）
-3. **Superpowers skills** — 流程/工作流（HOW）
+3. **Shared workflow skills** — 按任务风险启用的流程能力（HOW）
 4. **Agency Agents personas** — 专业知识/角色（WHO）
 
 ## 任务模式路由
@@ -46,10 +52,14 @@ User Request
 
 **推荐命令链**：
 - Fast：直接做 → `/verify`
-- Standard：`/specify` → `/plan` → 实施 → `/verify`（对照 specify 验收条件检查）
-- Heavy：`/specify` → `/plan` → `/tdd` → 实施 → `evaluation-loop` → `/code-review` → `/verify`
+- Standard：必要时 `/specify` → `/plan` → 实施 → 按风险一次 `/code-review` → `/verify`
+- Heavy：确认 Execution Brief → `/plan` → 实施 → 一次 `/code-review` → `/verify`
 
-## Agent 路由（专长 agent，capital 名）
+`evaluation-loop` 只用于有基线、指标、验证命令和守护命令的可度量改进，默认最多 3 轮；
+它不是 Standard/Heavy 的默认步骤。代码审查默认一次，只有修复 Critical/High 后允许一次复核，
+第三次及以后必须由用户明确要求。
+
+## Agent 路由（专长 agent，capital 名，按需）
 
 > Spawn 用 frontmatter 的 canonical name（Capital Phrase 风格）。基础设施 agent（lowercase: `planner`、`tdd-guide` 等）见 `~/.claude/rules/common/agents.md`。
 
@@ -57,7 +67,7 @@ User Request
 |------|-------|------|-------|
 | React/Vue/CSS | `Frontend Developer` | Security audit | `Security Engineer` |
 | API/Database | `Backend Architect` | CI/CD/Docker | `DevOps Automator` |
-| AI/ML | `AI Engineer` | Code review | `code-reviewer` |
+| AI/ML | `AI Engineer` | Code review | 主 agent 单次 Review Gate |
 | Architecture | `Software Architect` | Full project | `Agents Orchestrator` |
 | Prototype | `Rapid Prototyper` | Tests | `API Tester` |
 | DB optimization | `Database Optimizer` | Git workflow | `Git Workflow Master` |
@@ -122,12 +132,12 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型 — 
 | §编码行为准则 重排 | Rule 1 根因优先 > Rule 2 精准改动 > Rule 3 过度设计 |
 | `user-prompt-classify` hook | fix/bug 关键词自动升 standard + 首条 prompt 注入深度评估 |
 | `fix-depth-check` hook | fix-only commit 缺根因 → stderr 软警告 |
-| `set-mode --reset` 加固 | `--reason` ≥10 字符 + 20min cooldown + 可疑词阻断（防 evaluation-gate 绕过） |
-| `evaluation-gate` | Heavy 模式 `git commit/push` 无 pass marker → exit 2 阻断（含 git_head pin 防 forge） |
+| `set-mode --reset` 加固 | `--reason` ≥10 字符 + 20min cooldown + 可疑词阻断（防无理由降档） |
+| Verification Gate | 完成声明必须附最新、相关的验证证据；不能运行的部分明确披露 |
 
 **反模式自警**（说出/做出立刻警觉）：
 - 说"症状级措辞"（详见 `on-demand/coding-discipline.md`）
-- 被 evaluation-gate 阻断 → 第一反应 `--reset` 而非跑 `/evaluation-loop`
+- 为通过流程门而伪造标记或无理由降档
 - bug 报告先想"如何最小修复"而非"为什么这个 bug 可能"
 - 修了 schema 漂移类问题但不查"为什么没被任何检查抓到"
 - 任务切碎成"做一段→报告→等批准"小循环（Discord 格式陷阱）
@@ -138,7 +148,6 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型 — 
 |---------|---------|---------|
 | `/specify` | 定义任务宪法（范围+原则+验收条件） | Standard+ |
 | `/plan` | 规划实现（强制输出 AC） | Standard+ |
-| `/tdd` | 测试驱动开发 | Standard+ |
 | `/verify` | 验证检查 | 所有模式 |
 | `/code-review` | 代码审查 | Standard+ |
 | `/build-fix` | 修复构建 | 所有模式 |
