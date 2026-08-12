@@ -6,9 +6,9 @@
 
 | Layer | System | What It Provides |
 |-------|--------|-----------------|
-| **Infrastructure** | ECC | Hooks, memory, learning, 30 commands, common rules |
-| **Process** | Superpowers | TDD iron law, systematic debugging, brainstorming, quality gates |
-| **Expertise** | Agency Agents | 28 active agents with domain knowledge |
+| **Infrastructure** | ECC | Hooks, memory, commands, common rules |
+| **Process** | Shared Workflow Kernel | Fast / Standard / Heavy、范围确认、计划、单次审查、验证、交接 |
+| **Expertise** | Agency Agents | 按需使用的领域知识，不默认派发 |
 
 ## 工作流程
 
@@ -20,24 +20,30 @@ User Request
     │   PreToolUse → 危险命令守卫、编辑冻结
     │   PostToolUse → 自动格式化、类型检查、漂移检测
     │   PreCompact → 上下文压缩前保存状态
-    │   Stop → 保存状态、提取模式、追踪成本、记忆整合
+    │   Stop → 保存状态、教训/commit 沉淀(stop-summary)、成本追踪、任务板维护
     │
-    ├─► Superpowers Process (流程纪律)
-    │   brainstorming → 探索/拷问需求(grill)、生成设计文档
-    │   writing-plans → 拆解为TDD小任务
-    │   test-driven-development → 铁律：先写失败测试
-    │   systematic-debugging → 4阶段根因分析
-    │   verification-before-completion → 跑验证才能说完成
+    ├─► Shared Workflow Kernel (与 Codex 同语义)
+    │   Requirement Confirmation（按条件）
+    │   → Plan → Execute → Review → Verify → Docs Sync → Summary
+    │   Fast 且清晰：Execute → Verify → Summary
+    │   Review 默认一次；只有修复 Critical/High 后允许一次复核
     │
     └─► Agency Agents Expertise (专业视角)
-        按任务类型自动路由到对应领域专家 agent
+        仅在独立、高价值且边界清楚时按需使用
 ```
+
+### 已停用的旧流程层
+
+Superpowers 插件及其活动入口已停用。`using-superpowers`、`subagent-driven-development`、
+逐任务/逐分块 reviewer、强制 TDD、强制 worktree、Heavy 自动 evaluation-loop 和
+`evaluation-gate` commit marker 均不再属于执行流程。文件下方若出现相关事故记录或历史名称，
+只作为历史资料，不构成当前指令。当前唯一交付语义以上述 Shared Workflow Kernel 为准。
 
 ## 优先级
 
 1. **用户显式指令** — 最高优先
 2. **ECC hooks & rules** — 基础设施（100% 可靠）
-3. **Superpowers skills** — 流程/工作流（HOW）
+3. **Shared workflow skills** — 按任务风险启用的流程能力（HOW）
 4. **Agency Agents personas** — 专业知识/角色（WHO）
 
 ## 任务模式路由
@@ -46,10 +52,14 @@ User Request
 
 **推荐命令链**：
 - Fast：直接做 → `/verify`
-- Standard：`/specify` → `/plan` → 实施 → `/verify`（对照 specify 验收条件检查）
-- Heavy：`/specify` → `/plan` → `/tdd` → 实施 → `evaluation-loop` → `/code-review` → `/verify`
+- Standard：必要时 `/specify` → `/plan` → 实施 → 按风险一次 `/code-review` → `/verify`
+- Heavy：确认 Execution Brief → `/plan` → 实施 → 一次 `/code-review` → `/verify`
 
-## Agent 路由（专长 agent，capital 名）
+`evaluation-loop` 只用于有基线、指标、验证命令和守护命令的可度量改进，默认最多 3 轮；
+它不是 Standard/Heavy 的默认步骤。代码审查默认一次，只有修复 Critical/High 后允许一次复核，
+第三次及以后必须由用户明确要求。
+
+## Agent 路由（专长 agent，capital 名，按需）
 
 > Spawn 用 frontmatter 的 canonical name（Capital Phrase 风格）。基础设施 agent（lowercase: `planner`、`tdd-guide` 等）见 `~/.claude/rules/common/agents.md`。
 
@@ -57,7 +67,7 @@ User Request
 |------|-------|------|-------|
 | React/Vue/CSS | `Frontend Developer` | Security audit | `Security Engineer` |
 | API/Database | `Backend Architect` | CI/CD/Docker | `DevOps Automator` |
-| AI/ML | `AI Engineer` | Code review | `code-reviewer` |
+| AI/ML | `AI Engineer` | Code review | 主 agent 单次 Review Gate |
 | Architecture | `Software Architect` | Full project | `Agents Orchestrator` |
 | Prototype | `Rapid Prototyper` | Tests | `API Tester` |
 | DB optimization | `Database Optimizer` | Git workflow | `Git Workflow Master` |
@@ -122,12 +132,12 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型 — 
 | §编码行为准则 重排 | Rule 1 根因优先 > Rule 2 精准改动 > Rule 3 过度设计 |
 | `user-prompt-classify` hook | fix/bug 关键词自动升 standard + 首条 prompt 注入深度评估 |
 | `fix-depth-check` hook | fix-only commit 缺根因 → stderr 软警告 |
-| `set-mode --reset` 加固 | `--reason` ≥10 字符 + 20min cooldown + 可疑词阻断（防 evaluation-gate 绕过） |
-| `evaluation-gate` | Heavy 模式 `git commit/push` 无 pass marker → exit 2 阻断（含 git_head pin 防 forge） |
+| `set-mode --reset` 加固 | `--reason` ≥10 字符 + 20min cooldown + 可疑词阻断（防无理由降档） |
+| Verification Gate | 完成声明必须附最新、相关的验证证据；不能运行的部分明确披露 |
 
 **反模式自警**（说出/做出立刻警觉）：
 - 说"症状级措辞"（详见 `on-demand/coding-discipline.md`）
-- 被 evaluation-gate 阻断 → 第一反应 `--reset` 而非跑 `/evaluation-loop`
+- 为通过流程门而伪造标记或无理由降档
 - bug 报告先想"如何最小修复"而非"为什么这个 bug 可能"
 - 修了 schema 漂移类问题但不查"为什么没被任何检查抓到"
 - 任务切碎成"做一段→报告→等批准"小循环（Discord 格式陷阱）
@@ -138,7 +148,6 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型 — 
 |---------|---------|---------|
 | `/specify` | 定义任务宪法（范围+原则+验收条件） | Standard+ |
 | `/plan` | 规划实现（强制输出 AC） | Standard+ |
-| `/tdd` | 测试驱动开发 | Standard+ |
 | `/verify` | 验证检查 | 所有模式 |
 | `/code-review` | 代码审查 | Standard+ |
 | `/build-fix` | 修复构建 | 所有模式 |
@@ -178,7 +187,7 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型 — 
 
 **三个自动采集触发点**（共享 `extract-lessons.js`）：① Periodic hook 每 30 分钟、② PreCompact hook 压缩前、③ Stop hook 会话结束兜底。门控：无 commits + 无 lessons + 无 decisions → 不记录。
 
-**`promoteLessons()` 关键行为**：扫 `.memory/today.md` / `weekly.md` / `long-term.md`，**出现 2+ 次的教训自动写回 CLAUDE.md**（这是 CLAUDE.md 持续增肥的来源 — 删条目无意义，必须从源头改 promote 策略）。
+**`promoteLessons()` 关键行为**：扫 `.memory/today.md` / `weekly.md` / `long-term.md`，出现 2+ 次的教训自动写入 **`.memory/promoted-lessons.md`**（按需引入，随 memory repo 跨机同步）。〔2026-08-02 T-old-coder B9 从源头改 promote 落点：原写回 CLAUDE.md 是其"持续增肥泵"（项目 CLAUDE.md 曾 197KB 超 155KB 上限），迁出后 CLAUDE.md 停止自动膨胀；遗留已 promote 条目留在 CLAUDE.md，去重仍对照防重复〕。
 
 **Claude 写教训格式**（hook 自动提取依赖此格式，必须保持）：
 ```markdown
@@ -520,7 +529,7 @@ git worktree add ~/<project>-s2 -b dev/session-2
 
 ## 错误教训日志
 
-> 格式：`- [日期] 错误描述 → 正确做法`。完整 11 条历史归档见 `~/.claude/on-demand/lesson-archive.md`。
+> 格式：`- [日期] 错误描述 → 正确做法`。完整 11 条历史归档见 `~/.claude/on-demand/lesson-archive.md`。自动沉淀（≥2 次教训）自 2026-08-02 起落各项目 `.memory/promoted-lessons.md`（B9，不再追加本文件）。
 
 <!-- 新错误追加在此行下方。SessionStart 只保留最多 5 条核心铁律来源；非核心或已被规则吸收的旧条目移到 lesson-archive.md -->
 
@@ -537,4 +546,3 @@ git worktree add ~/<project>-s2 -b dev/session-2
 - [2026-06-06] `pre-tool-escalate × evaluation-gate × careful-guard` 升档死循环根治（[2026-05-03]/[2026-05-20] follow-up 一直未实施，2026-06-05 单 session 触发 4+ 次）→ 三处共享同一深层根因：**对整条命令字符串做无语义子串匹配**。修复：① 新建共享库 `scripts/lib/command-scan.js`（`stripQuotedStrings` / `splitSegments` / `gitSubcommand` / `isSetModeInvocation`，20 单测）；② **pre-tool-escalate** 移除 git VCS 升档信号（commit/push/add 是版控机制非任务性质，routing.md 从未列为升档触发）+ 段级 quote-strip 匹配 + 跳过 `set-mode.js` 段（实施 [2026-05-20] 未做的 follow-up），22 单测；③ **evaluation-gate** `isCommitOrPush` 改 strip-quotes + segment + git-head 匹配，`--reason "...git push..."` 不再被当真 push 拦（+7 单测，含 hermetic subprocess 集成测试验证真 push heavy 无 marker 仍 exit 2）；④ **careful-guard** force-push 正则 `[^|;]*`→`[^|;&\n]*`，`git push && git branch -f` 不再跨命令误关联 `-f`（+5 单测）。**元教训：守卫互锁类 bug，三处独立打补丁不如先找共享根因（命令解析精度）抽一个 SSOT 解析库**。完成门三 utility 全过，无新增 drift/namespace Review。**Codex 对抗审查轮（NEEDS-WORK→已加固）**：发现首版 careful-guard `[^|;]*`→`[^|;&\n]*` 修复**过度矫正**——修了跨 `&&` 关联却漏放 `git push 2>&1 -f`（fd-redirect `2>&1` 的 `&` 截断了 force-flag 扫描，#4 我引入的回归）；set-mode skip + quote-strip 漏过 `--reason "$(terraform apply)"` 命令替换（#6 回归）；外加 2 个预存洞 `git --no-pager/-c push` 漏过 gate（#1）、`git \<换行>push` 行续（#2）。加固：careful-guard 改 redirect-aware `(?:[^|;&\n]|&(?=[\d>]))*`；command-scan `gitSubcommand` 跳 git 全局选项、`splitSegments` 行续 normalize + 命令替换内容提取为独立段 + `&` 重定向感知。#3(`isCrossRepoPush $VAR` 宽松豁免)/#5(`stripQuotes` 抹引号 flag)/#7(CI/deploy 文件无 Heavy 路径) 属我未触碰的路径或策略选择，flag 待独立处理。全 **174 测试**通过（careful-guard 42/command-scan 25/evaluation-gate 31/pre-tool-escalate 23）。**二级元教训：守卫正则收窄边界时，"排除命令分隔符 `&`" 与 "保留同命令内 token（fd-redirect 的 `2>&1`）" 必须同时验证，否则修一个误拦立刻换一个误放——对抗性 review 不可省**
 - [2026-06-13] `pre-tool-escalate` hyphen-as-word-boundary 假阳性（[2026-06-06] 同子串匹配类的新实例，命令解析侧未覆盖路径名）→ 在 `quant-deploy` 仓库内每次 `cd /Users/hi/quant-deploy` / `git -C …/quant-deploy commit` 命令里，JS `\b` 把 `-` 当词边界，`/\bdeploy\b/` 匹配 `quant-deploy` 路径 → standard 被反复假升 heavy → evaluation-gate 拦 commit（单 session 触发 4 次，靠"相对路径 + commit msg 写文件避开 token 子串"绕过才提交成功）。根因：HEAVY_BASH_PATTERNS 单词 verb 用 `\b` 边界，对**含风险关键词子串的路径段**（项目目录名 `quant-deploy`）无免疫。修复：`deploy|terraform|kubectl|helm` 与 `migrate` 两组改 `(?<![\w-])…(?![\w-])` 边界——拒绝相邻 `-`/词字符，放行 `quant-deploy` 路径，仍匹配 `deploy`/`./deploy.sh`/`npm run deploy`/`terraform apply`。+6 单测（5 假阳性回归 + 1 `npm run deploy` 正向守卫不过度矫正），29 用例全过。完成门：M1 D2-D8 全 0（7 项全是 pre-existing D1 orphan 工具）/ M2 Hard 0、Review 未增。**元教训：风险关键词若是常见英文单词（deploy/migrate/auth），词边界必须 hyphen-aware——否则任何项目/路径名含该词就误升档；命令解析精度 SSOT 应把"路径段里的关键词子串"纳入测试矩阵**
 - [2026-06-27] 一类反复 bug：逻辑字段长出第 2 个物理源/表示，新功能接新源不回收旧消费者 → 漂移 → SSOT 违反（单会话连发 4 个同形 bug：市场 bid/ask、腿仓位、entry_threshold、价差）→ §SSOT 单一访问器铁律来源（A）+ 全局 hook `ssot-source-guard.js`（组件层 useMarketMidPrice/proxy- + Rust strategy_configs.get 直读 → 软提醒，23 单测）+ CCHFT 项目级 B（封装 effective_config / useMarketPrice + ESLint）/ C（审计脚本 ssot-single-source.sh 接 pre-commit）。**元教训：SSOT 长期只是"原则"不强制 → 新功能作者不知 canonical 源在哪、顺手抓显眼但错的源；要把"错源不可达/对源不可绕过"做成 hook+lint+audit 三层守，复刻 fix-depth-check"规则 0%→hook 守 100%"**
-- [2026-07-16] `pre-tool-escalate` 跨文件累积计数对批量 docs 任务无免疫（wikimind 单日 3 次：18 个 md 机械编辑约 90 秒打满 6 文件阈值 → 假升 heavy → evaluation-gate 拦 docs-only commit → reset 清计数但任务继续编辑剩余 md 立即重新累积 → 循环，第二次起需 `--force`）→ 根因：计数器是"跨模块代码复杂度"的代理信号，却对文件类型零区分，与 routing.md "写文档 → Fast" 自相矛盾（与 2026-06-13 hyphen 假阳性同类：启发式只按风险形态设计，无合法工作形态免疫）。修复：纯文档扩展名（md/markdown/rst/adoc/asciidoc/txt）不进 filesTracked（`isProseDocPath` + `trackFile` 纯函数 seam）；`.json`/`.yaml`/`.toml`/`.mdx` 仍计数（承载运行时行为，修假阳性不开假阴性）；未知扩展名/无扩展名计数（fail-closed）；风险信号路径检测（auth/ 等目录）不受影响。+6 单测（35 全过），完成门 M1 仅 pre-existing D1×7 / M2 Hard 0 Review 不增。**元教训：凡以数量/子串做代理信号的启发式，测试矩阵必须包含"合法高频工作形态"（批量 docs 编辑、含关键词的路径名）——设计时就要问"什么合法工作天然长这个形状"，而不是等生产假阳性后逐个打补丁**【2026-07-17 扩展：按此元教训主动横扫同 hook 剩余信号路径，发现目录名风险信号（HEAVY/STANDARD_DIR_NAMES）同类暴露——`docs/auth/setup.md`/`docs/deploy/guide.md` 命中 auth/deploy 路径段首次 Edit 即直升 heavy（比计数器更陡，无阈值缓冲）。全 trace 0 实例但暴露面实证（cc/paperclip docs/deploy/ ×9 + docs/api/ ×11）→ `isProseDocPath` 短路 dir-name 检查 +6 单测（41 全过），行为承载文件在风险目录下仍升档。详见 infrastructure.md hook 表】

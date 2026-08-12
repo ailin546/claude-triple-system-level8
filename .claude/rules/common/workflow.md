@@ -1,62 +1,39 @@
 # Development Workflow
 
-> 统一的开发流程文件：Research → Plan → TDD → Code Review → Verify → Commit → Session Memory。
-> 取代原先的 `development-workflow.md`、`git-workflow.md`、`session-memory.md`、`patterns.md` 四个文件。
+> 统一交付语义：Requirement Confirmation（按条件）→ Plan → Execute → Review → Verify →
+> Docs Sync → Summary。Fast 且范围清楚时直接 Execute → Verify → Summary。
 
 ## Feature Implementation Workflow
 
-> 以下流程适用于 **Standard+ 模式**的功能开发。
-> Fast 模式下仅需：直接实现 → `/verify` → commit。
-> 各阶段可按实际需要裁剪，非所有步骤都强制执行。
+> 以下流程适用于 **Standard+ 模式**。Fast 模式下直接实现并运行最相关验证。
 
-0. **Research & Reuse** _(mandatory before any new implementation)_
-   - **GitHub code search first:** Run `gh search repos` and `gh search code` to find existing implementations, templates, and patterns before writing anything new.
-   - **Library docs second:** Use Context7 or primary vendor docs to confirm API behavior, package usage, and version-specific details before implementing.
-   - **Exa only when the first two are insufficient:** Use Exa for broader web research or discovery after GitHub search and primary docs.
-   - **Check package registries:** Search npm, PyPI, crates.io, and other registries before writing utility code. Prefer battle-tested libraries over hand-rolled solutions.
-   - **Search for adaptable implementations:** Look for open-source projects that solve 80%+ of the problem and can be forked, ported, or wrapped.
-   - Prefer adopting or porting a proven approach over writing net-new code when it meets the requirement.
+0. **Requirement Confirmation（按条件）**
+   - Brownfield、存在多种合理理解或 Heavy 新架构任务，先查 Existing Capabilities。
+   - 锁定 Required Delta、Non-goals、Acceptance Checks 和 Change Budget。
+   - Heavy 或新增子系统取得用户确认后再实施。
 
-1. **Plan First**
-   - Use **planner** agent to create implementation plan
-   - Generate planning docs before coding: PRD, architecture, system_design, tech_doc, task_list
-   - Identify dependencies and risks
-   - Break down into phases
+1. **Plan**
+   - 只为多步骤任务制定最小可执行计划；不强制生成 PRD、架构文档或 task_list。
+   - 规划可由主 agent 完成，默认不派 planner 或 plan reviewer。
 
-1.5. **Design Consultation** _(Claude 检测后主动调用，非 hook 级自动化)_
-   - 当任务涉及 UI 组件、页面、布局或视觉变更时：
-     - Claude 主动调用 `design-consultation` skill
-     - Parallel agents: UI Designer + UX Architect + UX Researcher
-     - Accessibility gate (WCAG AA)
-     - Wait for user confirmation on design brief before coding
-   - Skip for backend-only, CLI, or non-visual tasks
+2. **Execute**
+   - 先查项目内已有实现与测试；仅在 API、版本或外部事实不稳定时查官方资料。
+   - 默认做最小充分改动。TDD 是可选技术，不是强制流程；修 bug 优先复现原症状。
+   - 实际规模超过 Change Budget 约两倍或出现预算外子系统时，停止扩张并重新确认。
 
-2. **TDD Approach**
-   - Use **tdd-guide** agent
-   - Write tests first (RED)
-   - Implement to pass tests (GREEN)
-   - Refactor (IMPROVE)
-   - Verify 80%+ coverage
+3. **Review**
+   - 非平凡或高风险改动按风险审查一次；普通改动可由主 agent 自审。
+   - 只有第一次发现 Critical/High 并完成修复后，才允许一次复核；第三次及以后需用户明确要求。
 
-3. **Design Review** _(Claude 检测后主动调用，非 hook 级自动化)_
-   - If implementation touched CSS/styling/component files:
-     - Claude 主动调用 `design-review` skill before code review
-     - Check: design token compliance, accessibility, responsive, visual consistency
-     - Fix CRITICAL/HIGH issues before proceeding
+4. **Verify** (`/verify pre-pr`)
+   - 选择最小但有意义的 build、types、lint、tests 或安全检查，并对照验收条件。
+   - `evaluation-loop` 仅用于有基线、指标、验证命令和守护命令的可度量改进，不由 Heavy 模式自动触发。
 
-4. **Code Review**
-   - Use **code-reviewer** agent immediately after writing code
-   - Address CRITICAL and HIGH issues
-   - Fix MEDIUM issues when possible
+5. **Docs Sync / Summary**
+   - 只有行为、接口、配置或运维方式改变时同步相关文档。
+   - 说明已验证、未验证和剩余风险。
 
-5. **Verify** (`/verify pre-pr`)
-   - Build + types + lint + tests + security scan
-   - **一致性不变量检查**（所有模式）：对照项目 CLAUDE.md §八½ 的 5 条不变量逐条确认
-   - **Standard+ 模式**：若 `.claude/specify.md` 存在 → 对照验收条件逐条检查（MUST 全过才算通过）
-   - **Heavy 模式**：若 `/plan` 定义了 Acceptance Criteria → 触发 `evaluation-loop`（独立 Evaluator 评估）
-   - 评分标准见 `~/.claude/on-demand/evaluation-rubric.md`（按需加载，evaluation-loop skill 启动时引入）
-
-6. **Commit & Push** — 见下方 Git Workflow 段
+6. **Commit & Push** — 用户要求或任务交付流程包含发布时，见下方 Git Workflow 段。
 
 ---
 
@@ -254,14 +231,10 @@ Stop hook 自动采集是底线保障。Claude 也可以主动写入更丰富的
 ### Skeleton Projects
 
 When implementing new functionality:
-1. Search for battle-tested skeleton projects
-2. Use parallel agents to evaluate options:
-   - Security assessment
-   - Extensibility analysis
-   - Relevance scoring
-   - Implementation planning
-3. Clone best match as foundation
-4. Iterate within proven structure
+1. 先检查仓库内已有结构和依赖。
+2. 只有从零创建较大项目且外部选型会显著影响结果时，才搜索成熟 skeleton。
+3. 默认由主 agent 比较少量候选；安全/架构风险高且视角可解耦时才考虑并行评估。
+4. 采用外部 skeleton 前确认许可证、维护状态和 Required Delta，避免为小任务引入整套框架。
 
 ### Design Patterns
 

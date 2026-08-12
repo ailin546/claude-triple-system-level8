@@ -3,7 +3,7 @@ description: Restate requirements, assess risks, and create step-by-step impleme
 mode: Standard / Heavy
 when: 需求清楚但步骤多、跨多模块、需拆给 agent
 not_when: 单文件小修、单次问答、<30 分钟小任务
-next: /verify 或 /tdd
+next: 实施后 /code-review（按风险）或 /verify
 heavy_deps: 无
 ---
 
@@ -145,7 +145,7 @@ If you want changes, respond with:
 ## Integration with Other Commands
 
 After planning:
-- Use `/tdd` to implement with test-driven development
+- Use focused regression tests or test-first development when it materially improves confidence
 - Use `/build-fix` if build errors occur
 - Use `evaluation-loop` skill to run Generator-Evaluator feedback cycle against Acceptance Criteria
 - Use `/code-review` to review completed implementation

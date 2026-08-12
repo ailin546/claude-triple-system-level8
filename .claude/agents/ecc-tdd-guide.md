@@ -77,7 +77,7 @@ npm run test:coverage
 - [ ] Assertions are specific and meaningful
 - [ ] Coverage is 80%+
 
-For detailed mocking patterns and framework-specific examples, see `skill: test-driven-development`.
+For detailed mocking patterns and framework-specific examples, follow the target repository's existing test suite and framework documentation.
 
 ## v1.8 Eval-Driven TDD Addendum
 

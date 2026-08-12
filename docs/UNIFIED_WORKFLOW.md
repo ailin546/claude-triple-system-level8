@@ -14,7 +14,7 @@
 - `shared/workflow/adapters/codex/`：Codex 指令、Hook 和八个 Skill 的唯一源。
 - `adapters/codex/`：由 `scripts/sync_workflow.py` 生成的可安装产物。
 - `docs/CODEX_USAGE.md`：Claude 八阶段生命周期在 Codex 中的原生用法。
-- `.claude/` 与 `CLAUDE.md`：Claude 原生实现，继续保持现有行为。
+- `.claude/` 与 `CLAUDE.md`：Claude 原生适配器，与 Codex 共享轻量交付生命周期。
 - `shared/workflow/claude-baseline.json`：Claude 关键入口的兼容基线。
 
 这种结构允许两端保留原生能力，但路由、澄清、计划、验证、迭代、审查、诊断和
@@ -26,7 +26,7 @@ Codex 的日常调用、Fast/Standard/Heavy 路径和阶段映射见
 
 ## 运行边界
 
-- Claude Code 仍使用现有完整工作流和 Hooks。
+- Claude Code 使用原生 Hooks，但流程层统一为共享生命周期；Superpowers 活动入口已停用。
 - Codex 使用 `adapters/codex/` 中的生成适配器。
 - 两端全局记忆统一到 `~/.memory/`。
 - 两端项目记忆统一到 `PROJECT/.memory/`。
@@ -61,9 +61,11 @@ Codex 的日常调用、Fast/Standard/Heavy 路径和阶段映射见
 
 ## 兼容保证
 
-- 融合本身不修改 Claude 运行文件；初始 baseline 从融合前的 Claude 文件建立。
+- Claude/Codex 收敛修改必须显式刷新 baseline，并通过共享映射检查。
 - Claude 仍可独立演进，但变更必须经过显式 baseline review，避免悄悄破坏 Codex
   映射。
+- 两端均不启用 Superpowers 插件入口；需求确认、计划、审查、验证由共享语义的原生
+  适配器提供。
 - Codex 安装器遇到无效 TOML、无效 JSON 或未知 Hook 事件结构时，在写入前失败。
 - Hook 只按规范化后的完整目标路径识别自身条目，不按脚本文件名误删用户 Hook。
 - 共享的是知识文件和流程语义；锁、日志、transcript、会话与客户端状态继续隔离。

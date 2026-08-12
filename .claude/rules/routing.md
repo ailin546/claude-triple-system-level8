@@ -18,13 +18,17 @@
 
 启用：Fast 全部 + 风险提醒、局部质量门、决策/约束/Open loops 记忆。
 
-条件触发（建议但不强制）：复杂需求 → `/plan`；原因不清 bugfix → `/tdd`；公共接口变更 → `/code-review`。
+条件触发：边界不清或 Brownfield → Requirement Confirmation；多步骤任务 → `/plan`；
+原因不清 bugfix → 根因调查；非平凡或高风险改动 → 一次 `/code-review`。
 
 ### Heavy
 
 适用：认证/支付/权限/PII、数据迁移、部署与基础设施、跨会话任务、架构重构、多 agent 并行。
 
-启用：Standard 全部 + shared-state、sprint memory、冲突检测、严格验证。
+启用：Standard 全部 + Execution Brief 确认、严格验证、按风险一次 Review。
+
+多 agent、shared-state 和可度量 evaluation-loop 均为按需能力，不因 Heavy 自动启用。
+Review 默认一次；只有修复 Critical/High 后允许一次复核，第三次及以后需用户明确要求。
 
 手动触发：`/save-session`、`/resume-session`。
 

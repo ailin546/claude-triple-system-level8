@@ -8,7 +8,8 @@
       "completion claims require fresh verification evidence",
       "Claude and Codex read and write the same memory paths",
       "client runtime state, hook locks, transcripts, and caches stay isolated",
-      "Claude runtime behavior may change only through an explicit compatibility review"
+      "Claude runtime behavior may change only through an explicit compatibility review",
+      "Superpowers plugin entrypoints are inactive on both clients"
     ]
   },
   "memory_protocol": "shared/memory/PROTOCOL.md",
@@ -17,16 +18,34 @@
     "agents_output": "adapters/codex/AGENTS.md",
     "hook_source": "shared/workflow/adapters/codex/scripts/codex-global-hook.py",
     "hook_output": "adapters/codex/scripts/codex-global-hook.py",
+    "doctor_source": "shared/workflow/adapters/codex/scripts/workflow-doctor.py",
+    "doctor_output": "adapters/codex/scripts/workflow-doctor.py",
     "skills_source_root": "shared/workflow/adapters/codex/skills",
     "skills_output_root": "adapters/codex/skills"
   },
   "claude": {
     "baseline": "shared/workflow/claude-baseline.json",
+    "disabled_entrypoints": [
+      ".claude/agents/superpowers-code-reviewer.md",
+      ".claude/commands/tdd.md",
+      ".claude/skills/using-superpowers/SKILL.md",
+      ".claude/skills/subagent-driven-development/SKILL.md",
+      ".claude/skills/dispatching-parallel-agents/SKILL.md",
+      ".claude/skills/finishing-a-development-branch/SKILL.md",
+      ".claude/skills/receiving-code-review/SKILL.md",
+      ".claude/skills/systematic-debugging/SKILL.md",
+      ".claude/skills/test-driven-development/SKILL.md",
+      ".claude/skills/using-git-worktrees/SKILL.md",
+      ".claude/skills/writing-skills/SKILL.md"
+    ],
     "protected_paths": [
       "CLAUDE.md",
       ".claude/CLAUDE.md",
       ".claude/settings.json",
       ".claude/rules/routing.md",
+      ".claude/rules/common/agents.md",
+      ".claude/rules/common/workflow.md",
+      ".claude/rules/common/quality-and-security.md",
       ".claude/skills/brainstorming/SKILL.md",
       ".claude/skills/specify/SKILL.md",
       ".claude/skills/writing-plans/SKILL.md",
@@ -68,7 +87,7 @@
       "claude_evidence": [
         {
           "path": ".claude/skills/brainstorming/SKILL.md",
-          "contains": ["Ask clarifying questions", "success criteria"]
+          "contains": ["Requirement Confirmation", "Existing Capabilities", "Change Budget"]
         },
         {
           "path": ".claude/skills/specify/SKILL.md",
@@ -83,11 +102,11 @@
       "claude_evidence": [
         {
           "path": ".claude/skills/writing-plans/SKILL.md",
-          "contains": ["Writing Plans", "how to test"]
+          "contains": ["# Plan", "每步验证", "Change Budget"]
         },
         {
           "path": ".claude/skills/executing-plans/SKILL.md",
-          "contains": ["Execute Tasks", "Run verifications"]
+          "contains": ["# Execute", "Scope Drift Stop", "默认单 agent"]
         }
       ]
     },
@@ -98,7 +117,7 @@
       "claude_evidence": [
         {
           "path": ".claude/skills/verification-before-completion/SKILL.md",
-          "contains": ["Evidence before claims", "NO COMPLETION CLAIMS"]
+          "contains": ["Verification Gate", "Verified", "Not Verified"]
         }
       ]
     },
@@ -109,7 +128,7 @@
       "claude_evidence": [
         {
           "path": ".claude/skills/evaluation-loop/SKILL.md",
-          "contains": ["Generator-Evaluator", "生成者不评估自己的工作"]
+          "contains": ["Bounded Evaluation Loop", "最多 3 轮", "连续两轮"]
         }
       ]
     },
@@ -120,7 +139,7 @@
       "claude_evidence": [
         {
           "path": ".claude/skills/requesting-code-review/SKILL.md",
-          "contains": ["Requesting Code Review", "Before merge"]
+          "contains": ["Review Gate", "默认一次 Review", "第三次"]
         }
       ]
     },

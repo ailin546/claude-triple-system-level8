@@ -209,8 +209,8 @@ clamp，`scoreChanged` 门对"分数持续上涨"形态失效 → 多 crate work
 
 Active on all PostToolUse events for Edit, Write, and Bash tools.
 Especially valuable during:
-- `dispatching-parallel-agents` workflows
-- `subagent-driven-development` sessions
+- explicitly approved native multi-agent workflows
+- bounded independent reviewer sessions
 - `ecc-autonomous-loops` scenarios
 
 State stored in `.claude/.drift-state/{session-id}.json`. Resets per session.

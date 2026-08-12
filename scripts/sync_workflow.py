@@ -94,6 +94,18 @@ def validate_manifest(repository: Path, manifest: dict[str, object]) -> list[str
     hook_source = repository_path(repository, codex.get("hook_source"))
     if not hook_source.is_file():
         issues.append(f"missing Codex hook source: {hook_source}")
+    doctor_source = repository_path(repository, codex.get("doctor_source"))
+    if not doctor_source.is_file():
+        issues.append(f"missing Codex workflow doctor source: {doctor_source}")
+
+    claude = require_dict(manifest.get("claude"), "claude")
+    disabled_entrypoints = require_list(
+        claude.get("disabled_entrypoints"), "claude disabled_entrypoints"
+    )
+    for raw_entrypoint in disabled_entrypoints:
+        entrypoint = repository_path(repository, raw_entrypoint)
+        if entrypoint.exists():
+            issues.append(f"disabled Claude entrypoint is active: {entrypoint}")
 
     for index, raw_capability in enumerate(capabilities):
         capability = require_dict(raw_capability, f"capabilities[{index}]")
@@ -170,6 +182,8 @@ def sync_codex_outputs(
     agents_output = repository_path(repository, codex.get("agents_output"))
     hook_source = repository_path(repository, codex.get("hook_source"))
     hook_output = repository_path(repository, codex.get("hook_output"))
+    doctor_source = repository_path(repository, codex.get("doctor_source"))
+    doctor_output = repository_path(repository, codex.get("doctor_output"))
     skills_source_root = repository_path(repository, codex.get("skills_source_root"))
     skills_output_root = repository_path(repository, codex.get("skills_output_root"))
 
@@ -196,6 +210,19 @@ def sync_codex_outputs(
                 issues.append(f"stale generated Codex hook: {hook_output}")
             else:
                 atomic_write_text(hook_output, expected_hook)
+
+    if not doctor_source.is_file():
+        issues.append(f"missing Codex workflow doctor source: {doctor_source}")
+    else:
+        expected_doctor = doctor_source.read_text(encoding="utf-8")
+        actual_doctor = (
+            doctor_output.read_text(encoding="utf-8") if doctor_output.is_file() else ""
+        )
+        if actual_doctor != expected_doctor:
+            if check_only:
+                issues.append(f"stale generated Codex workflow doctor: {doctor_output}")
+            else:
+                atomic_write_text(doctor_output, expected_doctor)
 
     capabilities = require_list(manifest.get("capabilities"), "capabilities")
     expected_skills: set[str] = set()

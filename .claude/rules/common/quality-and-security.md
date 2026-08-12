@@ -97,7 +97,7 @@ TDD 流程（当适用时）：
 
 ### Agent Support
 
-- **tdd-guide** - Use PROACTIVELY for new features, enforces write-tests-first
+- **tdd-guide** - 仅在测试先行能显著降低风险或用户明确要求时使用；不自动派发
 
 ---
 

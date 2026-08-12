@@ -85,6 +85,6 @@ Intent: Add OAuth login to user authentication system
 
 This skill is called automatically by:
 - `requesting-code-review` skill — as a pre-check before code review
-- `finishing-a-development-branch` skill — before PR creation
+- one bounded Review Gate — before PR creation when the change is non-trivial or high-risk
 
 Can also be invoked manually during any review session.

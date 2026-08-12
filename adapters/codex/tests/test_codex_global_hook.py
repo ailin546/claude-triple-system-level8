@@ -141,6 +141,46 @@ class RequirementConfirmationHookTests(unittest.TestCase):
         self.assertIn("Required Delta", context)
         self.assertIn("Change Budget", context)
 
+    def test_workflow_health_evaluation_routes_only_to_doctor(self):
+        context = self.additional_context("评估现有系统流程是否完整正常", "/tmp")
+
+        self.assertIn("workflow-doctor", context)
+        self.assertNotIn("Brownfield", context)
+        self.assertNotIn("clarify-scope", context)
+        self.assertNotIn("plan-execute", context)
+
+    def test_diagnostic_intent_wins_over_generic_workflow_word(self):
+        context = self.additional_context("诊断现有工作流是否正常", "/tmp")
+
+        self.assertIn("workflow-doctor", context)
+        self.assertNotIn("clarify-scope", context)
+
+    def test_review_intent_does_not_expand_to_other_workflows(self):
+        context = self.additional_context("审查当前 diff 是否可以合并", "/tmp")
+
+        self.assertIn("code-review-gate", context)
+        self.assertNotIn("clarify-scope", context)
+        self.assertNotIn("autoresearch-lite", context)
+
+    def test_high_risk_review_preserves_heavy_hint(self):
+        context = self.additional_context("security code review before merge", "/tmp")
+
+        self.assertIn("code-review-gate", context)
+        self.assertIn("Heavy", context)
+        self.assertNotIn("clarify-scope", context)
+
+    def test_iterative_intent_does_not_expand_to_clarification(self):
+        context = self.additional_context("继续把测试覆盖率逐步优化", "/tmp")
+
+        self.assertIn("autoresearch-lite", context)
+        self.assertNotIn("clarify-scope", context)
+
+    def test_brownfield_intent_does_not_duplicate_ambiguity_route(self):
+        context = self.additional_context("给现有系统新增一个市场接入方案", "/tmp")
+
+        self.assertIn("Brownfield", context)
+        self.assertNotIn("检测到需求边界不清", context)
+
     def test_failed_command_hook_reminds_without_blocking(self):
         output = HOOK.post_tool_use_output(
             {"exit_code": 1, "stderr": "command failed"}

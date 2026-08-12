@@ -1,105 +1,45 @@
 ---
 name: requesting-code-review
-description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements
+description: Use once before delivery or merge for non-trivial or high-risk changes, or when the user explicitly requests review.
 ---
 
-# Requesting Code Review
+# Review Gate
 
-Dispatch superpowers:code-reviewer subagent to catch issues before they cascade. The reviewer gets precisely crafted context for evaluation — never your session's history. This keeps the reviewer focused on the work product, not your thought process, and preserves your own context for continued work.
+本 Skill 对应共享工作流的单次 Review 阶段。
 
-**Core principle:** Review early, review often.
+## 触发条件
 
-## When to Request Review
+- 跨文件或非平凡改动
+- 认证、权限、支付、迁移、部署、安全、并发等高风险区域
+- 用户明确要求 review
+- 合并前需要独立检查
 
-**Mandatory:**
-- After each task in subagent-driven development
-- After completing major feature
-- Before merge to main
+Fast 文档、小配置或单行修复不默认触发。
 
-**Optional but valuable:**
-- When stuck (fresh perspective)
-- Before refactoring (baseline check)
-- After fixing complex bug
+## 审查维度
 
-## How to Request
+- Correctness
+- Security
+- Architecture
+- Performance
+- Maintainability
+- Verification evidence
 
-**1. Get git SHAs:**
-```bash
-BASE_SHA=$(git rev-parse HEAD~1)  # or origin/main
-HEAD_SHA=$(git rev-parse HEAD)
-```
+Findings 按 Critical、High、Medium、Low 输出，并尽量包含文件行号、风险和具体修复方向。
 
-**2. Dispatch code-reviewer subagent:**
+## 轮次预算
 
-Use Task tool with superpowers:code-reviewer type, fill template at `code-reviewer.md`
+- 默认一次 Review。
+- 只有第一次发现 Critical/High 且完成针对性修复后，才允许一次复核。
+- 默认最多两次；第三次及以后必须由用户明确要求。
+- 不按计划步骤、文件或 reviewer 数量重复审查。
 
-**Placeholders:**
-- `{WHAT_WAS_IMPLEMENTED}` - What you just built
-- `{PLAN_OR_REQUIREMENTS}` - What it should do
-- `{BASE_SHA}` - Starting commit
-- `{HEAD_SHA}` - Ending commit
-- `{DESCRIPTION}` - Brief summary
+审查可以由当前 agent 完成。只有高风险任务确实需要独立视角，或用户明确要求时，才派发一个 reviewer；不得强制使用子 agent。
 
-**3. Act on feedback:**
-- Fix Critical issues immediately
-- Fix Important issues before proceeding
-- Note Minor issues for later
-- Push back if reviewer is wrong (with reasoning)
+## 判定
 
-## Example
+- Critical/High 或架构 BLOCK：REQUEST CHANGES
+- 只有 Medium/Low：COMMENT
+- 无实质问题且证据充分：APPROVE
 
-```
-[Just completed Task 2: Add verification function]
-
-You: Let me request code review before proceeding.
-
-BASE_SHA=$(git log --oneline | grep "Task 1" | head -1 | awk '{print $1}')
-HEAD_SHA=$(git rev-parse HEAD)
-
-[Dispatch superpowers:code-reviewer subagent]
-  WHAT_WAS_IMPLEMENTED: Verification and repair functions for conversation index
-  PLAN_OR_REQUIREMENTS: Task 2 from docs/superpowers/plans/deployment-plan.md
-  BASE_SHA: a7981ec
-  HEAD_SHA: 3df7661
-  DESCRIPTION: Added verifyIndex() and repairIndex() with 4 issue types
-
-[Subagent returns]:
-  Strengths: Clean architecture, real tests
-  Issues:
-    Important: Missing progress indicators
-    Minor: Magic number (100) for reporting interval
-  Assessment: Ready to proceed
-
-You: [Fix progress indicators]
-[Continue to Task 3]
-```
-
-## Integration with Workflows
-
-**Subagent-Driven Development:**
-- Review after EACH task
-- Catch issues before they compound
-- Fix before moving to next task
-
-**Executing Plans:**
-- Review after each batch (3 tasks)
-- Get feedback, apply, continue
-
-**Ad-Hoc Development:**
-- Review before merge
-- Review when stuck
-
-## Red Flags
-
-**Never:**
-- Skip review because "it's simple"
-- Ignore Critical issues
-- Proceed with unfixed Important issues
-- Argue with valid technical feedback
-
-**If reviewer wrong:**
-- Push back with technical reasoning
-- Show code/tests that prove it works
-- Request clarification
-
-See template at: requesting-code-review/code-reviewer.md
+Review 与 Verify 不能互相替代。

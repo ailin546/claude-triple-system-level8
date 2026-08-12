@@ -258,21 +258,19 @@ def user_prompt_submit_output(payload, cwd):
     risk_matches = [pat for pat in HIGH_RISK_PATTERNS if re.search(pat, lowered)]
     multi_step = any(token in lowered for token in ["plan", "refactor", "workflow", "system", "architecture"]) or len(prompt) > 180
     explicit_fast_small = is_explicit_fast_small_task(lowered)
-    brownfield_request = has_brownfield_requirement_signal(lowered) and not explicit_fast_small
-    ambiguous = any(token in lowered for token in [
-        "帮我设计",
-        "怎么做",
-        "方案",
-        "规划",
-        "系统",
-        "工作流",
-        "重构",
-        "优化",
-        "architecture",
-        "workflow",
-        "design",
-        "plan",
-    ]) and not explicit_fast_small
+    doctor_request = any(token in lowered for token in [
+        "doctor",
+        "诊断",
+        "检查安装",
+        "workflow-doctor",
+        "安装是否",
+        "评估现有系统流程",
+        "评估现有工作流",
+        "系统流程是否",
+        "工作流是否",
+        "流程是否完整",
+        "流程是否正常",
+    ])
     review_request = any(token in lowered for token in [
         "review",
         "code review",
@@ -280,13 +278,6 @@ def user_prompt_submit_output(payload, cwd):
         "检查diff",
         "合并前",
         "pre-merge",
-    ])
-    doctor_request = any(token in lowered for token in [
-        "doctor",
-        "诊断",
-        "检查安装",
-        "workflow-doctor",
-        "安装是否",
     ])
     iterative_improve = any(token in lowered for token in [
         "autoresearch",
@@ -306,6 +297,21 @@ def user_prompt_submit_output(payload, cwd):
         "质量门",
         "逐步优化",
     ]) and not any(token in lowered for token in ["不要迭代", "no autoresearch", "no iterate"])
+    brownfield_request = has_brownfield_requirement_signal(lowered) and not explicit_fast_small
+    ambiguous = any(token in lowered for token in [
+        "帮我设计",
+        "怎么做",
+        "方案",
+        "规划",
+        "系统",
+        "工作流",
+        "重构",
+        "优化",
+        "architecture",
+        "workflow",
+        "design",
+        "plan",
+    ]) and not explicit_fast_small
 
     if not risk_matches and not multi_step and not ambiguous and not brownfield_request and not review_request and not doctor_request and not iterative_improve:
         if profile in {"multi-project-ai-workspace", "knowledge-compiler", "rust-platform-with-web"}:
@@ -318,6 +324,36 @@ def user_prompt_submit_output(payload, cwd):
         return None
 
     parts = [build_profile_hint(profile)]
+    if risk_matches:
+        parts.append("检测到高风险信号；按 Heavy 模式思考，并明确验证路径。")
+
+    # Primary workflow intents are mutually exclusive. Diagnostics, review, and
+    # measurable iteration already have a bounded workflow and must not be
+    # inflated by generic words such as “系统”, “工作流”, or “优化”.
+    if doctor_request:
+        parts.append("检测到工作流安装/诊断意图；优先使用 $workflow-doctor。")
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": " ".join(parts),
+            }
+        }
+    if review_request:
+        parts.append("检测到代码审查意图；优先使用 $code-review-gate，并给出严重级别和验证证据。")
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": " ".join(parts),
+            }
+        }
+    if iterative_improve:
+        parts.append("检测到可度量改进/迭代优化意图；若有基线、验证命令和守护命令，可使用 $autoresearch-lite。")
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": " ".join(parts),
+            }
+        }
     if brownfield_request:
         parts.append(
             "检测到 Brownfield 接入/扩展信号；在判断完整性或实施前先使用 "
@@ -325,17 +361,15 @@ def user_prompt_submit_output(payload, cwd):
             "Required Delta、Non-goals、Acceptance Checks 和 Change Budget。区分代码库事实"
             "与用户决策；Hook 只提醒，不代替用户确认。"
         )
-    if doctor_request:
-        parts.append("检测到工作流安装/诊断意图；优先使用 $workflow-doctor。")
-    if review_request:
-        parts.append("检测到代码审查意图；优先使用 $code-review-gate，并给出严重级别和验证证据。")
-    if iterative_improve:
-        parts.append("检测到可度量改进/迭代优化意图；若有基线、验证命令和守护命令，可使用 $autoresearch-lite。")
-    if risk_matches:
-        parts.append("检测到高风险信号；按 Heavy 模式思考，并明确验证路径。")
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": " ".join(parts),
+            }
+        }
     if ambiguous:
         parts.append("检测到需求边界不清；实现前优先使用 $clarify-scope。")
-    if multi_step:
+    elif multi_step:
         parts.append("任务看起来较复杂；大改前优先使用 $system-triage 或 $plan-execute。")
 
     return {
