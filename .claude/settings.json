@@ -4,7 +4,6 @@
   },
   "permissions": {
     "allow": [
-      "Bash",
       "Read",
       "Write",
       "Edit",
@@ -12,7 +11,6 @@
       "Grep",
       "WebFetch",
       "WebSearch",
-      "Agent",
       "NotebookEdit",
       "Skill",
       "Monitor",
@@ -40,7 +38,7 @@
       "EnterWorktree",
       "ExitWorktree"
     ],
-    "defaultMode": "bypassPermissions"
+    "defaultMode": "auto"
   },
   "model": "claude-fable-5[1m]",
   "hooks": {
@@ -287,7 +285,8 @@
     "discord@claude-plugins-official": true,
     "telegram@claude-plugins-official": true,
     "design@knowledge-work-plugins": true,
-    "codex@openai-codex": true
+    "codex@openai-codex": true,
+    "rust-analyzer-lsp@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "knowledge-work-plugins": {
@@ -307,5 +306,39 @@
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "dark",
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "autoMode": {
+    "soft_deny": [
+      "$defaults",
+      "Bash(cargo test:*) on the Linux prod host — CLAUDE.md states debug-profile builds/tests are forbidden there except with explicit per-session user authorization",
+      "Bash(rm -rf target/debug*) — shared cargo target dir is reused across worktrees/sessions per CLAUDE.md Quick Start warning; accidental deletion breaks other sessions",
+      "Bash(git push --force*) to origin `ailin546/celue` main — repo feeds a live production trading deployment"
+    ],
+    "environment": [
+      "### Org-wide",
+      "**Organization**: None configured",
+      "**Cloud provider(s)**: None configured",
+      "**Repository visibility**: Private — `ailin546/celue` (github.com)",
+      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: Encrypted local DB (`celue-main/mm/data/cchft.db`), decrypted at runtime via `CCHFT_MASTER_PASSWORD` / `~/.cchft-secret`; real exchange API keys never in repo files (per CLAUDE.md §3.7 and .env.example)",
+      "**Default / protected branches**: Default branch `main`; no branch protection rules or rulesets listed by gh (protection status not confirmed — treat `main` as sensitive by convention)",
+      "**CI/CD deploy targets**: None configured",
+      "**Network posture**: None configured",
+      "**Source control**: The trusted repo (`ailin546/celue` on github.com) and its remote(s) only — no additional orgs configured",
+      "**Trusted internal domains**: None configured",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: None configured",
+      "**Internal package registry**: None configured",
+      "**Sensitive data locations & audiences**: `.env`, `.env.local`, `.env.*.local`, `*.key`, `api_keys*`, `secrets*`, `credentials*` (gitignored); exchange API keys, worker/master tokens, and `CCHFT_MASTER_PASSWORD` per CLAUDE.md §3.7 — share only with audiences cleared at the [named+specifics] bar",
+      "**Data retention / declassification**: None configured",
+      "**Sensitive remote targets**: any namespace, host, or container whose name carries `prod` or `production` as a whole word or name segment; also the Linux prod trading machine referenced in CLAUDE.md (live trading host, real funds — $100M scale)",
+      "**Protected deployment namespaces / environments**: None configured — fall back to the Sensitive remote targets heuristic (also note: this repo's own `main` branch feeds a live production trading deployment per CLAUDE.md deploy instructions)",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries `prod` or `production` as a whole word or name segment",
+      "### User-specific",
+      "**Primary use of Claude Code**: software development (quantitative crypto trading platform)",
+      "**Trusted repo**: `~/celue` (working directory) and its remote `github.com/ailin546/celue` (private) — confidential material (non-secret) is fine to commit here; secrets/credentials are never cleared into it regardless of visibility",
+      "**Org-specific CLIs**: None configured",
+      "routine under `~/celue/` prefix: cargo build/check/test, npm/vite, restart.sh, deploy.sh, and other repo-local operational scripts described in CLAUDE.md are routine dev/ops actions scoped to this repo and its Linux prod counterpart"
+    ]
+  }
 }
