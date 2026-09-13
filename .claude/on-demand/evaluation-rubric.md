@@ -25,7 +25,8 @@
 |------|---------|---------|
 | Build | 构建退出码 ≠ 0 → FAIL | build log |
 | Type Safety | 类型错误 > 0 → FAIL | tsc/clippy 输出 |
-| Test Coverage | < 项目阈值（默认 80%）→ FAIL | 测试报告 |
+| Changed-line Coverage | 本次改动触碰的行未被测试执行且无正当 skip 理由 → FAIL（skipped ≠ pass，理由必须写明） | diff-cover/cargo-llvm-cov 报告（CCHFT: `scripts/changed-line-cov.sh`）。〔2026-08-02 用户批准 T-old-coder A3/B5：原"全局 <80% → FAIL"退役——该数字从无工具产出其证据"测试报告"，纸面门；覆盖率是探测器不是追逐目标〕 |
+| Mutation Evidence (money-path) | 风控门 / safety-critical trait / dispatch 路径改动，无 `manual mutation: N/N killed` 或 cargo-mutants 报告证据 → FAIL | 证据行含 mutant 描述（翻比较符/删分支/off-by-one）+ 每个被哪个测试杀死；工具版 `scripts/mutants-diff.sh` 输出。〔2026-08-02 用户批准 T-old-coder A1：M-147"测试全绿但机制静默死亡"解药〕 |
 | MUST AC | `/plan` 中 MUST 条目未满足 → FAIL | 逐条对比 |
 | CRITICAL Security | 硬编码密钥、SQL 拼接、明文越权 → FAIL | 扫描结果或代码引用 |
 

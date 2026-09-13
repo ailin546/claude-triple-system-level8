@@ -71,15 +71,15 @@ Review 默认一次；只有修复 Critical/High 后允许一次复核，第三�
 
 **Step 2：写入模式文件**（仅 Standard/Heavy 时需要执行）
 ```bash
-node .claude/scripts/hooks/set-mode.js standard
+node ~/.claude/scripts/hooks/set-mode.js standard
 # 或
-node .claude/scripts/hooks/set-mode.js heavy
+node ~/.claude/scripts/hooks/set-mode.js heavy
 ```
 
 **新任务边界**：同一 session 中切换到不同任务时，先重置再设置：
 ```bash
-node .claude/scripts/hooks/set-mode.js --reset           # 回到 fast
-node .claude/scripts/hooks/set-mode.js --reset standard   # 回到 fast 再升到 standard
+node ~/.claude/scripts/hooks/set-mode.js --reset           # 回到 fast
+node ~/.claude/scripts/hooks/set-mode.js --reset standard   # 回到 fast 再升到 standard
 ```
 
 > Fast 模式是默认值（SessionStart 已写入），无需额外执行。
@@ -90,7 +90,7 @@ node .claude/scripts/hooks/set-mode.js --reset standard   # 回到 fast 再升�
 示例：
 ```text
 [Mode: Standard] 跨 3 个文件，涉及用户可见行为 | 轻量检查 + 局部验证 + 决策记忆 | 建议: /plan
-> node .claude/scripts/hooks/set-mode.js standard
+> node ~/.claude/scripts/hooks/set-mode.js standard
 ```
 
 ## 模型自动选择
@@ -107,9 +107,9 @@ node .claude/scripts/hooks/set-mode.js --reset standard   # 回到 fast 再升�
 
 **查询命令**：
 ```bash
-node .claude/scripts/hooks/get-model.js <agent-name>   # 单个 agent
-node .claude/scripts/hooks/get-model.js --all           # 所有 agent
-node .claude/scripts/hooks/get-model.js --summary       # 分类汇总
+node ~/.claude/scripts/hooks/get-model.js <agent-name>   # 单个 agent
+node ~/.claude/scripts/hooks/get-model.js --all           # 所有 agent
+node ~/.claude/scripts/hooks/get-model.js --summary       # 分类汇总
 ```
 
 **使用规则**：

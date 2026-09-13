@@ -121,8 +121,8 @@ agent 在 model-map.js 里 → spawn 时按表查模型；不在 → 用默认 m
 - [ ] 如 mode 联动 → 加 `requireMode('...')` gate
 - [ ] 如有 stderr 注入文案 → 遵守 §Hook 文案锚点规则（不写裸数字章节号）
 - [ ] 如有状态文件 → 路径 + cleanup 策略（默认 `~/.claude/state/<hook-name>.json`）
-- [ ] 如 hook-enforced schema（如 evaluation-gate marker）→ **必须**同步写 `infrastructure.md` SSOT 段：分开声明"hook 严格校验字段"和"信息字段"，逐字段引用实现行号（2026-05-20 D2 教训：文档凭直觉强于实现）
-- [ ] 不变量 cross-check：与 careful-guard / evaluation-gate / pre-tool-escalate 是否互锁？
+- [ ] 如 hook-enforced schema（如 careful-guard 的 allowlist 形态）→ **必须**同步写 `infrastructure.md` SSOT 段：分开声明"hook 严格校验字段"和"信息字段"，逐字段引用实现行号（2026-05-20 D2 教训：文档凭直觉强于实现）
+- [ ] 不变量 cross-check：与 careful-guard / pre-tool-escalate 是否互锁？
 - [ ] **必测边界**（M4 标杆 2026-05-20）：hook 涉及 ① state file 写入 ② mode gate ③ exit 1/2 阻断 ④ stderr 注入改 Claude context ⑤ regex/parser 解析配置内容 — **任一为真必须配单测**。零依赖模板与 5 类边界详见 `~/.claude/scripts/hooks/__tests__/README.md`（标杆：careful-guard.test.js / evaluation-gate.test.js / fix-depth-check.test.js）
 
 ### 新增 agent

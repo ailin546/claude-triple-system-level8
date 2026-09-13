@@ -218,7 +218,7 @@ function main() {
   emitAdditionalContext(
     `${lines.join('\n')}\n` +
     `[SSOT 单一访问器] 该数据是否已有 canonical 访问器？直接读底层源/新增取数路径前先 grep；引入新源须在同一改动里回收旧消费者。\n` +
-    `[SSOT 单一访问器] 详见 ~/.claude/CLAUDE.md §SSOT 单一访问器铁律（每会话每文件提示一次）。`
+    `[SSOT 单一访问器] 详见 ~/.claude/CLAUDE.md §编码行为准则 Rule 0（每会话每文件提示一次）。`
   );
   process.exit(0);
 }

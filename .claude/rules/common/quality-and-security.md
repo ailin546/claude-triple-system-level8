@@ -86,7 +86,7 @@ TDD 流程（当适用时）：
 3. Write minimal implementation (GREEN)
 4. Run test - it should PASS
 5. Refactor (IMPROVE)
-6. Verify coverage (80%+)
+6. Verify changed-line coverage（见上文 Coverage）
 
 ### Troubleshooting Test Failures
 

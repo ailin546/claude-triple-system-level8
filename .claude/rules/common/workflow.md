@@ -3,6 +3,14 @@
 > 统一交付语义：Requirement Confirmation（按条件）→ Plan → Execute → Review → Verify →
 > Docs Sync → Summary。Fast 且范围清楚时直接 Execute → Verify → Summary。
 
+## 复用优先、先简后繁
+
+- **先查再补**：Required Delta = 当前目标 − 已验证的现有能力。先读实现、调用路径和测试，优先通过既有配置、扩展点与执行链路接入，不因接口不熟就重建。
+- **先完成最小安全闭环**：先让一个明确场景端到端可用，再依据真实重复需求推广。静态配置和受控人工预检能满足当前验收时，不先建设动态编排、通用框架或跨节点接管。
+- **复杂化须有证据**：新增抽象、依赖、服务、状态系统或账本前，说明现有能力及更简单方案为什么无法满足本次验收；“以后可能用到”不构成理由。预算外扩展仍须确认。
+- **超预算先减法**：先检查复用、删减和分期，再讨论扩容；生产逻辑、测试、文档和机械接线分别报告，不用文件数、测试数或原始行数冒充复杂度与完成度。
+- **简化不减安全**：权限、资金正确性、幂等、未知结果、撤单竞态、必要持久恢复和审计不能以首版为由跳过；语义不同的事实不能为去重而强行合并。
+
 ## Feature Implementation Workflow
 
 > 以下流程适用于 **Standard+ 模式**。Fast 模式下直接实现并运行最相关验证。
@@ -20,6 +28,7 @@
    - 先查项目内已有实现与测试；仅在 API、版本或外部事实不稳定时查官方资料。
    - 默认做最小充分改动。TDD 是可选技术，不是强制流程；修 bug 优先复现原症状。
    - 实际规模超过 Change Budget 约两倍或出现预算外子系统时，停止扩张并重新确认。
+   - 重新确认前先检查重复建设、现有接点和可分期范围，优先提出复用、删减或重排方案，不默认申请扩容；已承诺需求的延期或取消仍需用户确认。
 
 3. **Review**
    - 非平凡或高风险改动按风险审查一次；普通改动可由主 agent 自审。
@@ -225,27 +234,3 @@ Stop hook 自动采集是底线保障。Claude 也可以主动写入更丰富的
 - 非 bullet、非空行出现时立即退出 section → 防止后续无关内容被误提取
 
 ---
-
-## Common Patterns
-
-### Skeleton Projects
-
-When implementing new functionality:
-1. 先检查仓库内已有结构和依赖。
-2. 只有从零创建较大项目且外部选型会显著影响结果时，才搜索成熟 skeleton。
-3. 默认由主 agent 比较少量候选；安全/架构风险高且视角可解耦时才考虑并行评估。
-4. 采用外部 skeleton 前确认许可证、维护状态和 Required Delta，避免为小任务引入整套框架。
-
-### Design Patterns
-
-**Repository Pattern** — Encapsulate data access behind a consistent interface:
-- Define standard operations: findAll, findById, create, update, delete
-- Concrete implementations handle storage details (database, API, file, etc.)
-- Business logic depends on the abstract interface, not the storage mechanism
-- Enables easy swapping of data sources and simplifies testing with mocks
-
-**API Response Format** — Use a consistent envelope for all API responses:
-- Include a success/status indicator
-- Include the data payload (nullable on error)
-- Include an error message field (nullable on success)
-- Include metadata for paginated responses (total, page, limit)
