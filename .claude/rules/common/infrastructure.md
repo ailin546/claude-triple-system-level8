@@ -115,10 +115,10 @@ trace 文件在每次 session init 时自动截断（超过 500 行保留最后 
 
 ### architecture-rescue Counter（SSOT）
 
-> 实现：`~/.claude/scripts/hooks/stop-summary.js:718-759`
+> 实现：`~/.claude/scripts/hooks/stop-summary.js:724-770`
 > 状态文件：`~/.claude/state/architecture-rescue.json`（per-project counter + lastRemindedAt）
 
-Stop hook 当前模式 = `heavy` 时，per-project 计数 +1。**触发提醒条件**：① 该项目累计 ≥5 次 Heavy stop ② 距上次提醒 ≥24h。两条件同时满足 → stderr 输出"考虑 /audit 或 spawn architect agent for a deepening pass"，计数归零，更新 lastRemindedAt。
+Stop hook 当前模式 = `heavy` 时，per-project 计数 +1。**触发提醒条件**：① 该项目累计 ≥5 次 Heavy stop ② 距上次提醒 ≥24h。两条件同时满足 → stderr 输出提醒：按 `~/.claude/on-demand/audit-protocol.md` 跑全局审计，或 spawn `Software Architect` agent（`~/.claude/agents/engineering-software-architect.md`）做 deepening pass；计数归零，更新 lastRemindedAt。（2026-09-14 改指：原文案指向的 `/audit` 命令与 `architect` agent 已随 harness 收缩第一步删除，hook 目录当时被排除在扫描外。）
 
 设计动机：Heavy 任务多发期定期触发架构 review，灵感来自 mattpocock/skills `improve-codebase-architecture`，本地化为 passive nudge（不是新流程入口）。
 

@@ -724,7 +724,9 @@ function updateGlobalIndex() {
 // ── Architecture Rescue Counter ──────────────────────────────
 // Every N Heavy-mode stops, nudge user to run a periodic architecture review.
 // Inspired by mattpocock/skills `improve-codebase-architecture` — adapted as
-// a passive reminder (not a new skill entry) so it doesn't compete with /audit.
+// a passive reminder (not a new skill/command entry): the global audit runs per
+// ~/.claude/on-demand/audit-protocol.md, the architecture review via the
+// "Software Architect" agent (~/.claude/agents/engineering-software-architect.md).
 
 const ARCH_RESCUE_STATE_DIR = path.join(require('os').homedir(), '.claude', 'state');
 const ARCH_RESCUE_STATE_FILE = path.join(ARCH_RESCUE_STATE_DIR, 'architecture-rescue.json');
@@ -754,7 +756,8 @@ function checkArchitectureRescue() {
     if (entry.heavyCount >= ARCH_RESCUE_THRESHOLD && sinceLast >= ARCH_RESCUE_COOLDOWN_MS) {
       process.stderr.write(
         `\n[architecture-rescue] ${entry.heavyCount} Heavy tasks in ${path.basename(key)} since last review. ` +
-        `Consider /audit or spawning architect agent for a deepening pass.\n`
+        `Consider running the global audit per ~/.claude/on-demand/audit-protocol.md ` +
+        `or spawning the "Software Architect" agent (~/.claude/agents/engineering-software-architect.md) for a deepening pass.\n`
       );
       entry.lastRemindedAt = now;
       entry.heavyCount = 0;
