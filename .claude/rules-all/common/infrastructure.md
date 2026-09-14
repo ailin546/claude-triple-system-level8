@@ -30,7 +30,6 @@ Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式�
 | Hook | 类型 | 用途 |
 |------|------|------|
 | drift-detector | PostToolUse(Edit\|Write\|Bash) | 漂移检测（WTF-likelihood 评分） |
-| quality-gate | **手动命令**（`/quality-gate`，非自动 hook） | 局部质量门（格式/lint 检查）。2026-08-02 更正：从未注册为 hook，文档降级为真实形态 |
 | post-edit-typecheck | PostToolUse(Edit) | TS 类型检查（tsc --noEmit） |
 | fault-hint | PostToolUse(Edit\|Write) | 容错提示 |
 | cost-tracker | Stop | 成本追踪 |
@@ -99,7 +98,6 @@ A PostToolUse hook (`drift-detector.js`) maintains a suspicion score per session
 
 Active on all PostToolUse events for Edit, Write, and Bash tools.
 Especially valuable during:
-- `dispatching-parallel-agents` workflows
 - `subagent-driven-development` sessions
 - `ecc-autonomous-loops` scenarios
 
@@ -158,7 +156,6 @@ For complex tasks requiring deep reasoning:
 ### Build Troubleshooting
 
 If build fails:
-1. Use **build-error-resolver** agent
-2. Analyze error messages
-3. Fix incrementally
-4. Verify after each fix
+1. Analyze error messages
+2. Fix incrementally
+3. Verify after each fix

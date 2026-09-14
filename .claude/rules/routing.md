@@ -99,11 +99,11 @@ node ~/.claude/scripts/hooks/set-mode.js --reset standard   # 回到 fast 再升
 
 | Agent 类别 | Fast | Standard | Heavy |
 |-----------|------|----------|-------|
-| **critical-reasoning**（planner, architect） | opus | opus | opus |
-| **orchestrator**（agents-orchestrator） | sonnet | opus | opus |
+| **critical-reasoning**（engineering-software-architect） | opus | opus | opus |
+| **orchestrator**（当前无 agent 归类，类别保留供未来使用） | sonnet | opus | opus |
 | **review**（code-reviewer, security-reviewer） | sonnet | opus | opus |
-| **development**（tdd-guide, build-error-resolver, frontend, backend...） | sonnet | sonnet | opus |
-| **worker**（doc-updater, refactor-cleaner, e2e-runner, git-workflow...） | haiku | sonnet | sonnet |
+| **development**（frontend, backend, rapid-prototyper, reality-checker...） | sonnet | sonnet | opus |
+| **worker**（technical-writer） | haiku | sonnet | sonnet |
 
 **查询命令**：
 ```bash

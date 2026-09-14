@@ -18,7 +18,7 @@
    - Prefer adopting or porting a proven approach over writing net-new code when it meets the requirement.
 
 1. **Plan First**
-   - Use **planner** agent to create implementation plan
+   - 由主 agent 直接制定实现计划（默认不派独立 planner 子 agent）
    - Generate planning docs before coding: PRD, architecture, system_design, tech_doc, task_list
    - Identify dependencies and risks
    - Break down into phases
@@ -32,29 +32,22 @@
    - Skip for backend-only, CLI, or non-visual tasks
 
 2. **TDD Approach**
-   - Use **tdd-guide** agent
    - Write tests first (RED)
    - Implement to pass tests (GREEN)
    - Refactor (IMPROVE)
    - Verify 80%+ coverage
 
-3. **Design Review** _(Claude 检测后主动调用，非 hook 级自动化)_
-   - If implementation touched CSS/styling/component files:
-     - Claude 主动调用 `design-review` skill before code review
-     - Check: design token compliance, accessibility, responsive, visual consistency
-     - Fix CRITICAL/HIGH issues before proceeding
-
-4. **Code Review**
+3. **Code Review**
    - Use **code-reviewer** agent immediately after writing code
    - Address CRITICAL and HIGH issues
    - Fix MEDIUM issues when possible
 
-5. **Verify** (`/verify pre-pr`)
+4. **Verify** (`/verify pre-pr`)
    - Build + types + lint + tests + security scan
    - Heavy 模式下，若 `/plan` 定义了 Acceptance Criteria → 触发 `evaluation-loop`（独立 Evaluator 评估）
    - 评分标准见 `~/.claude/on-demand/evaluation-rubric.md`（按需加载，evaluation-loop skill 启动时引入）
 
-6. **Commit & Push** — 见下方 Git Workflow 段
+5. **Commit & Push** — 见下方 Git Workflow 段
 
 ---
 

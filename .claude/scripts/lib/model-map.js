@@ -11,11 +11,11 @@
  *
  * Usage:
  *   const { getModelForAgent, getAllModelAssignments } = require('./model-map');
- *   const model = getModelForAgent('planner');       // reads .task-mode
+ *   const model = getModelForAgent('code-reviewer');  // reads .task-mode
  *   const all   = getAllModelAssignments();           // full table
  *
  * Override: set MODEL_MAP_OVERRIDE=<agent>:<model>,<agent>:<model>
- *   e.g. MODEL_MAP_OVERRIDE=planner:sonnet,doc-updater:opus
+ *   e.g. MODEL_MAP_OVERRIDE=engineering-rapid-prototyper:sonnet,engineering-technical-writer:opus
  */
 
 'use strict';
@@ -41,14 +41,7 @@ const CATEGORY_MODELS = {
  */
 const AGENT_CATEGORY = {
   // critical-reasoning
-  'planner':                    'critical-reasoning',
-  'ecc-planner':                'critical-reasoning',
-  'architect':                  'critical-reasoning',
-  'ecc-architect':              'critical-reasoning',
   'engineering-software-architect': 'critical-reasoning',
-
-  // orchestrator
-  'agents-orchestrator':        'orchestrator',
 
   // review
   'code-reviewer':              'review',
@@ -58,31 +51,13 @@ const AGENT_CATEGORY = {
   'engineering-security-engineer': 'review',
 
   // development
-  'tdd-guide':                  'development',
-  'ecc-tdd-guide':              'development',
-  'build-error-resolver':       'development',
-  'ecc-build-error-resolver':   'development',
   'engineering-frontend-developer':  'development',
   'engineering-backend-architect':   'development',
-  'engineering-ai-engineer':         'development',
   'engineering-rapid-prototyper':    'development',
-  'engineering-database-optimizer':  'development',
-  'ecc-database-reviewer':          'development',
-  'testing-api-tester':             'development',
-  'testing-performance-benchmarker': 'development',
-  'testing-evidence-collector':      'development',
   'testing-reality-checker':         'development',
 
   // worker
-  'doc-updater':                'worker',
-  'ecc-doc-updater':            'worker',
-  'refactor-cleaner':           'worker',
-  'ecc-refactor-cleaner':       'worker',
-  'e2e-runner':                 'worker',
-  'ecc-e2e-runner':             'worker',
-  'engineering-git-workflow-master': 'worker',
   'engineering-technical-writer':    'worker',
-  'engineering-devops-automator':    'worker',
 };
 
 // ── Mode index ──────────────────────────────────────────────

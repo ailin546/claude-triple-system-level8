@@ -52,7 +52,7 @@ Superpowers 插件及其活动入口已停用。`using-superpowers`、`subagent-
 
 **推荐命令链**：
 - Fast：直接做 → `/verify`
-- Standard：必要时 `/specify` → `/plan` → 实施 → 按风险一次 `/code-review` → `/verify`
+- Standard：必要时 `/plan` → 实施 → 按风险一次 `/code-review` → `/verify`
 - Heavy：确认 Execution Brief → `/plan` → 实施 → 一次 `/code-review` → `/verify`
 
 `evaluation-loop` 只用于有基线、指标、验证命令和守护命令的可度量改进，默认最多 3 轮；
@@ -61,18 +61,15 @@ Superpowers 插件及其活动入口已停用。`using-superpowers`、`subagent-
 
 ## Agent 路由（专长 agent，capital 名，按需）
 
-> Spawn 用 frontmatter 的 canonical name（Capital Phrase 风格）。基础设施 agent（lowercase: `planner`、`tdd-guide` 等）见 `~/.claude/rules/common/agents.md`。
+> Spawn 用 frontmatter 的 canonical name（Capital Phrase 风格）。基础设施 agent（lowercase: `code-reviewer`、`security-reviewer` 等）见 `~/.claude/rules/common/agents.md`。
 
 | Task | Agent | Task | Agent |
 |------|-------|------|-------|
 | React/Vue/CSS | `Frontend Developer` | Security audit | `Security Engineer` |
-| API/Database | `Backend Architect` | CI/CD/Docker | `DevOps Automator` |
-| AI/ML | `AI Engineer` | Code review | 主 agent 单次 Review Gate |
-| Architecture | `Software Architect` | Full project | `Agents Orchestrator` |
-| Prototype | `Rapid Prototyper` | Tests | `API Tester` |
-| DB optimization | `Database Optimizer` | Git workflow | `Git Workflow Master` |
-| Technical docs | `Technical Writer` | Performance | `Performance Benchmarker` |
-| Rust | `Rust Engineer` | Reality check | `Reality Checker` / `Systems Reality Checker` |
+| API/Database | `Backend Architect` | Code review | 主 agent 单次 Review Gate |
+| Architecture | `Software Architect` | Prototype | `Rapid Prototyper` |
+| Technical docs | `Technical Writer` | Rust | `Rust Engineer` |
+| Reality check | `Reality Checker` / `Systems Reality Checker` | | |
 
 ## Codex 调用规则（强制）
 
@@ -146,38 +143,17 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型 — 
 
 | Command | Purpose | 适用模式 |
 |---------|---------|---------|
-| `/specify` | 定义任务宪法（范围+原则+验收条件） | Standard+ |
 | `/plan` | 规划实现（强制输出 AC） | Standard+ |
 | `/verify` | 验证检查 | 所有模式 |
 | `/code-review` | 代码审查 | Standard+ |
-| `/build-fix` | 修复构建 | 所有模式 |
 | `/save-session` / `/resume-session` | 保存/恢复会话 | Standard+ |
 | `/careful` | 危险命令守卫开关 | 所有模式 |
 | `/freeze` / `/unfreeze` | 编辑范围锁 | 所有模式 |
-| `/caveman` | 输出压缩模式（~75% token 节省），结构化输出场景自动豁免 | 所有模式 |
 | `/mode-explain` | 显示当前 mode + 历史变更（谁改的/何时/为什么），读 `.claude/logs/mode-trace.jsonl` | 所有模式 |
 | `/codex:rescue` | 委派复杂任务/根因/二次实现给 Codex（详见 §Codex 调用规则） | 所有模式 |
 | `/codex:review` `/codex:adversarial-review` | Codex 视角代码/对抗审查 | Standard+ |
 | `/codex:setup` `/codex:status` `/codex:result` `/codex:cancel` | Codex 运行时管理 | 所有模式 |
-| `/grill` | 对抗审查当前 diff（攻击者视角打破代码：边界/故障/隐式假设；与 /code-review 合规检查互补）。**需求级拷问**用 brainstorming skill 的 Interrogation discipline | Standard+ |
-| `/audit` | Layer 3 多 Agent 全局审计（4 阶段协议；Step 0 先读 `on-demand/audit-protocol.md`） | Heavy |
-| `/audit-crate` | 单个 Rust crate 的 agent team 审计（同 audit-protocol） | Heavy |
 | `/design-consultation` | UI 实施前多视角设计咨询（UI Designer + UX Architect + Researcher 并行） | Standard+ |
-| `/design-review` | UI 改动后设计审查（/code-review 的视觉对应物） | Standard+ |
-| `/e2e` | Playwright 端到端测试：生成 journey + 运行 + 截图/视频/trace | Standard+ |
-| `/test-coverage` | 覆盖率分析 + 补齐缺口到 80%+ | Standard+ |
-| `/refactor-clean` | 死代码识别与安全删除（每步测试验证） | Standard+ |
-| `/quality-gate` | 按需跑 ECC 质量管线（文件或项目范围） | 所有模式 |
-| `/eval` | eval 驱动开发（EDD）工作流管理 | Standard+ |
-| `/harness-audit` | 审计当前 repo 的 agent harness 配置，输出优先级记分卡 | 所有模式 |
-| `/aside` | 不打断当前任务回答旁支问题，答完自动续上 | 所有模式 |
-| `/checkpoint` | 创建/验证工作流 checkpoint | Standard+ |
-| `/sessions` | 管理会话历史（list/load/alias/edit `~/.claude/sessions/`） | 所有模式 |
-| `/memory-status` | 查看双轨记忆（系统级 + 项目级）状态 | 所有模式 |
-| `/learn` / `/learn-eval` | 从当前会话提取可复用模式（learn-eval 含质量自评 + Global/Project 保存位置判定） | 所有模式 |
-| `/restore` | 查看/恢复 `*-archive/` 中的归档组件 | 所有模式 |
-| `/update-docs` | 文档与代码同步（从 source-of-truth 生成） | 所有模式 |
-| `/codex`（本地遗留） | ⚠ 已被插件链取代——一律改用 `/codex:review`（§Codex 调用规则强制） | — |
 
 全部命令见 `~/.claude/commands/` 和 `~/.claude/skills/`（skill 索引：`~/.claude/skills/INDEX.md`）。
 

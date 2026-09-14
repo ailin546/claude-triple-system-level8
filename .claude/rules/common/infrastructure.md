@@ -55,7 +55,6 @@ Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式�
 | Hook | 类型 | 用途 |
 |------|------|------|
 | drift-detector | PostToolUse(*) | 漂移检测：score = 事件分（revert +15 / 连续 3+ 测试失败 +5，跑绿 -10）+ 广度分（最近 30 个 Edit/Write 滑动窗口，封顶 30）。≥20% / ≥40% 经 additionalContext 注入，档位边沿触发一次。单测 36 用例。详见本文件 §Agent Drift Detection |
-| quality-gate | **手动命令**（`/quality-gate`，非自动 hook） | 局部质量门（格式/lint 检查）。2026-08-02 更正：曾标为 PostToolUse hook 但 settings 两层从未注册（daily-trending REPEAT 2 月漂移）——文档降级为真实形态，脚本保留供命令调用 |
 | post-edit-typecheck | PostToolUse(Edit) | TS 类型检查（tsc --noEmit） |
 | fault-hint | PostToolUse(Edit\|Write) | 容错提示。检测错误处理/外部调用/DB/韧性 pattern → 经 **additionalContext 注入**建议 `/verify fault`（2026-06-29 修：原 `log()`=stderr+exit0 模型看不到；同时修正 settings.json matcher `Bash`→`Edit\|Write`——此前注册在 Bash 下读 `file_path` 永远 undefined → 从未真正触发）|
 | cost-tracker | Stop | 成本追踪 |
@@ -196,7 +195,7 @@ State stored in `.claude/.drift-state/{session-id}.json`. Resets per session.
 - `pre-tool-escalate.js`（自动升档）— 升档后输出新模型分配
 
 **查询**：`node .claude/scripts/hooks/get-model.js <agent-name>`
-**覆盖**：`MODEL_MAP_OVERRIDE=planner:sonnet,doc-updater:opus`
+**覆盖**：`MODEL_MAP_OVERRIDE=engineering-rapid-prototyper:sonnet,engineering-technical-writer:opus`
 
 **模型能力参考**（2026-07-12 刷新到 Claude 5 家族）：
 - **Fable 5**（Mythos 级，> Opus）：主会话默认模型，最强判断/裁决。子代理 spawn 不传 `model` 时**默认继承它**（最贵档）——token-heavy 子任务必须显式降档，见 `~/.claude/rules/routing.md §模型自动选择` 使用规则 5

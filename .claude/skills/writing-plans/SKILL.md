@@ -13,7 +13,7 @@ description: Use for multi-step Standard or Heavy work after scope and acceptanc
 - Brownfield 任务已经识别 Existing Capabilities。
 - Heavy 或新架构类 Brief 已得到用户确认。
 
-缺少上述边界时返回 `brainstorming`/`specify`，不能用计划替用户补产品决策。
+缺少上述边界时返回 `brainstorming`，不能用计划替用户补产品决策。
 
 ## 最小计划格式
 
@@ -34,6 +34,6 @@ description: Use for multi-step Standard or Heavy work after scope and acceptanc
 - 不自动创建 worktree、commit 或文档。
 - 不派发 plan reviewer 或 staff reviewer。
 - 不因存在 subagent 能力就默认并行。
-- 计划完成后，在批准条件已满足时直接进入 `executing-plans`。
+- 计划完成后，在批准条件已满足时由主 agent 直接进入实施（Execute）。
 
 需要持久化计划时，使用项目现有约定；没有约定时优先 `docs/plans/`，但只在跨会话或用户要求时创建文件。

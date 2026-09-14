@@ -90,14 +90,9 @@ TDD 流程（当适用时）：
 
 ### Troubleshooting Test Failures
 
-1. Use **tdd-guide** agent
-2. Check test isolation
-3. Verify mocks are correct
-4. Fix implementation, not tests (unless tests are wrong)
-
-### Agent Support
-
-- **tdd-guide** - 仅在测试先行能显著降低风险或用户明确要求时使用；不自动派发
+1. Check test isolation
+2. Verify mocks are correct
+3. Fix implementation, not tests (unless tests are wrong)
 
 ---
 

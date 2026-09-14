@@ -1,6 +1,6 @@
 # Agent Orchestration
 
-> 本文件覆盖**基础设施 agent**（流程纪律：planner/tdd-guide/code-reviewer 等，lowercase frontmatter 名）。**专长 agent**（领域知识：Frontend Developer/Backend Architect 等，Capital Phrase 名）见 `~/.claude/CLAUDE.md` §Agent 路由。spawn 时一律用 frontmatter `name` 字段值。
+> 本文件覆盖**基础设施 agent**（流程纪律：code-reviewer/security-reviewer 等，lowercase frontmatter 名）。**专长 agent**（领域知识：Frontend Developer/Backend Architect 等，Capital Phrase 名）见 `~/.claude/CLAUDE.md` §Agent 路由。spawn 时一律用 frontmatter `name` 字段值。
 
 ## Available Agents (基础设施)
 
@@ -8,16 +8,8 @@ Located in `~/.claude/agents/`:
 
 | Agent | Purpose | When to Use |
 |-------|---------|-------------|
-| planner | Implementation planning | 复杂且边界已确认的任务，需要独立规划视角时 |
-| architect | System design | Heavy 架构决策或用户明确要求时 |
-| tdd-guide | Test-driven development | 测试先行确实能降低风险时 |
 | code-reviewer | Code review | 高风险改动需要独立视角，或用户明确要求时 |
 | security-reviewer | Security analysis | 安全敏感改动或显式安全审计时 |
-| build-error-resolver | Fix build errors | When build fails |
-| e2e-runner | E2E testing | Critical user flows |
-| refactor-cleaner | Dead code cleanup | Code maintenance |
-| doc-updater | Documentation | Updating docs |
-| database-reviewer | DB query/schema review | When writing SQL/migrations |
 
 ## Agent Usage Gate
 
@@ -28,14 +20,13 @@ Located in `~/.claude/agents/`:
 3. 独立视角或并行能明显降低风险或关键路径时间；
 4. 不会把同一 Review/Verify 阶段重复执行。
 
-写了代码、修了 bug、任务较复杂，本身都不是自动派发 reviewer、planner 或 tdd-guide 的理由。
+写了代码、修了 bug、任务较复杂，本身都不是自动派发 reviewer 或其它独立视角 agent 的理由。
 普通 Review 由主 agent 执行一次即可；只有高风险任务确需独立视角或用户明确要求时，才派发一个 reviewer。
 
 ## Design System Routing
 
 小型样式修复和范围明确的组件改动由主 agent 直接处理。只有新页面、关键用户流、信息架构或
-品牌/无障碍风险较高的 UI 工作，才考虑 `design-consultation`；`design-review` 只在风险需要或
-用户明确要求时使用，不因文件扩展名自动触发。
+品牌/无障碍风险较高的 UI 工作，才考虑 `design-consultation`。
 
 ## Parallel Task Execution
 
@@ -49,7 +40,7 @@ Located in `~/.claude/agents/`:
 
 ## Audit Task Routing（强制）
 
-当用户要求全局性审查/审计时，**必须遵循 `~/.claude/on-demand/audit-protocol.md`**（按需加载，不在 common 下自动加载）；走 `/audit` 或 `/audit-crate` 命令时由命令入口显式引入。不可自行编排。
+当用户要求全局性审查/审计时，**必须遵循 `~/.claude/on-demand/audit-protocol.md`**（按需加载，不在 common 下自动加载）；需要时直接按 `~/.claude/on-demand/audit-protocol.md` 执行。不可自行编排。
 
 关键约束：
 1. **Explore agent 不出结论** — 只做信息收集，HIGH+ 判定必须由有 Bash 能力的 agent 或主 agent 验证
@@ -66,7 +57,7 @@ Located in `~/.claude/agents/`:
 ### 必扫目录（含活引用，删错会断路由）
 
 ```
-~/.claude/agents/             # 含 agents-orchestrator.md body 的团队清单
+~/.claude/agents/             # agent 文件间可能互相引用（如团队清单类文件）
 ~/.claude/CLAUDE.md            # §Agent 路由表
 ~/.claude/commands/*.md        # subagent_type: 引用
 ~/.claude/rules/**/*.md        # agent 规则文档
@@ -110,7 +101,7 @@ agent 在 model-map.js 里 → spawn 时按表查模型；不在 → 用默认 m
 
 > 2026-05-20 工程性指标审计：系统可演进性 6/10 缺口 G1（无新增清单）。本节是 §Agent 删除扫描清单 的反方向对应。最小清单，不是流程制度。
 
-加新机制前**先 read 现有最近 3 个同类样本**（grep 找：hook → settings.json 现存条目；agent → agents-orchestrator team list；skill → INDEX.md；mode 入口 → mode-trace.jsonl 现有 trigger 值），避免无意识扩张。
+加新机制前**先 read 现有最近 3 个同类样本**（grep 找：hook → settings.json 现存条目；agent → `agents/` 目录下现有 agent 文件；skill → INDEX.md；mode 入口 → mode-trace.jsonl 现有 trigger 值），避免无意识扩张。
 
 ### 新增 hook
 
@@ -130,7 +121,6 @@ agent 在 model-map.js 里 → spawn 时按表查模型；不在 → 用默认 m
 - [ ] 写 `~/.claude/agents/<scope>-<name>.md`（scope 前缀：ecc-/engineering-/testing-/superpowers-/agents-）
 - [ ] frontmatter `name` 字段**不能与现有任何 agent 同名**（normalize 后比较 lowercase/Capital）
 - [ ] 更新 `~/.claude/scripts/lib/model-map.js`（如按非 default 模型 spawn）
-- [ ] 更新 `~/.claude/agents/agents-orchestrator.md` team list 段
 - [ ] 更新 `~/.claude/CLAUDE.md §Agent 路由` 或 `~/.claude/rules/common/agents.md`
 - [ ] 引用扫描预演：模拟"如果未来要删 X agent"，预扫 §Agent 删除清单 13 目录确认引用最小
 
@@ -158,7 +148,7 @@ agent 在 model-map.js 里 → spawn 时按表查模型；不在 → 用默认 m
 - 删除 hook / agent / skill / command
 - 重命名（含 frontmatter `name` 字段改动 / file-slug 改动）
 - 修 hook stderr 文案锚点
-- 改 manifest（INDEX.md / model-map.js / agents-orchestrator team list / settings.json）
+- 改 manifest（INDEX.md / model-map.js / settings.json）
 - 改 CLAUDE.md / rules/common/ 中的章节结构
 - **改 hook 实现/输出格式/退出码/输入数据契约/加载条件/settings.json schema 字段语义**（即使 stderr 文案不变）— 2026-05-20 Codex M3 反馈：实现/契约变更不应只靠"文案变了才跑"触发
 

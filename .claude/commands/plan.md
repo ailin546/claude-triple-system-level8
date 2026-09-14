@@ -9,11 +9,11 @@ heavy_deps: 无
 
 # Plan Command
 
-This command invokes the **planner** agent to create a comprehensive implementation plan before writing any code.
+由主 agent 直接执行（不再派发独立 planner 子 agent，与 `~/.claude/rules/common/workflow.md` §Feature Implementation Workflow 一致），产出一份完整实现计划后再动代码。
 
 ## What This Command Does
 
-0. **Check Specify** - 如果 `.claude/specify.md` 存在，引用其任务宪法作为约束；如果不存在且任务涉及多模块，建议先跑 `/specify`
+0. **Check Specify** - 如果 `.claude/specify.md` 存在，引用其任务宪法作为约束
 1. **Restate Requirements** - Clarify what needs to be built (What & Why)
 2. **Identify Risks** - Surface potential issues and blockers
 3. **Create Step Plan** - Break down implementation into atomic steps, each with `→ verify:` check
@@ -31,7 +31,7 @@ Use `/plan` when:
 
 ## How It Works
 
-The planner agent will:
+This command will:
 
 1. **Analyze the request** and restate requirements in clear terms
 2. **Break down into phases** with specific, actionable steps
@@ -84,7 +84,7 @@ Planner 的职责是定义产品需求和验收标准，不是规定技术实现
 ```
 User: /plan I need to add real-time notifications when markets resolve
 
-Agent (planner):
+Agent:
 # Implementation Plan: Real-Time Market Resolution Notifications
 
 ## Requirements Restatement
@@ -135,7 +135,7 @@ Agent (planner):
 
 ## Important Notes
 
-**CRITICAL**: The planner agent will **NOT** write any code until you explicitly confirm the plan with "yes" or "proceed" or similar affirmative response.
+**CRITICAL**: This command will **NOT** write any code until you explicitly confirm the plan with "yes" or "proceed" or similar affirmative response.
 
 If you want changes, respond with:
 - "modify: [your changes]"
@@ -146,14 +146,6 @@ If you want changes, respond with:
 
 After planning:
 - Use focused regression tests or test-first development when it materially improves confidence
-- Use `/build-fix` if build errors occur
 - Use `evaluation-loop` skill to run Generator-Evaluator feedback cycle against Acceptance Criteria
 - Use `/code-review` to review completed implementation
 - Use `/verify` for final objective checks
-
-## Related Agents
-
-This command invokes the `planner` agent provided by ECC.
-
-For manual installs, the source file lives at:
-`agents/planner.md`
