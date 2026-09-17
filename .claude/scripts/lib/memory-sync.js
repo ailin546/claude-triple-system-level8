@@ -22,7 +22,16 @@ const { getProjectRoot } = require('./project-root');
 const PROJECT_ROOT = getProjectRoot();
 const MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
 const GLOBAL_MEMORY_DIR = path.join(require('os').homedir(), '.memory');
-const REMOTE_FILE = path.join(PROJECT_ROOT, '.claude', '.memory-remote');
+// Switch file lookup order: per-project override first, then the user-level
+// default that ~/.claude/CLAUDE.md §仓库架构 documents as *the* switch. Reading
+// only the project path meant the documented switch was never found, so pull()
+// and push() silently no-op'd on every machine that used it — the memory repo
+// then moved only when someone ran pull-all/push-all by hand, which is how it
+// drifted far enough to pile up stash-pop conflicts.
+const REMOTE_FILES = [
+  path.join(PROJECT_ROOT, '.claude', '.memory-remote'),
+  path.join(require('os').homedir(), '.claude', '.memory-remote'),
+];
 const MAX_RETRIES = (() => {
   const n = parseInt(process.env.MEMORY_SYNC_MAX_RETRIES ?? '', 10);
   return Number.isInteger(n) && n >= 0 ? n : 3;
@@ -44,12 +53,13 @@ function getRemoteUrl() {
   if (process.env.MEMORY_REMOTE) {
     return process.env.MEMORY_REMOTE.trim();
   }
-  try {
-    const url = fs.readFileSync(REMOTE_FILE, 'utf8').trim();
-    return url || null;
-  } catch {
-    return null;
+  for (const file of REMOTE_FILES) {
+    try {
+      const url = fs.readFileSync(file, 'utf8').trim();
+      if (url) return url;
+    } catch { /* try the next location */ }
   }
+  return null;
 }
 
 /**
@@ -370,6 +380,31 @@ function dirtyFilesWithConflictMarkers(porcelain) {
   return hits;
 }
 
+/**
+ * Sync whatever is already committed: rebase onto the remote, then push.
+ * Single home for the pull-then-push sequence — both the "committed something
+ * just now" and the "clean tree with a backlog" paths go through here.
+ */
+function pushPending(branch) {
+  const pullResult = gitInMemory(['pull', '--rebase', 'origin', branch], { timeout: 20000 });
+  if (!pullResult.ok) {
+    // Rebase conflict — abort and try merge
+    gitInMemory(['rebase', '--abort']);
+    gitInMemory(['pull', 'origin', branch], { timeout: 20000 });
+  }
+
+  const result = withRetry(
+    () => gitInMemory(['push', 'origin', branch], { timeout: 20000 }),
+    'git push'
+  );
+
+  if (result.ok) {
+    log('[MemorySync] Push successful (project)');
+  } else {
+    log(`[MemorySync] Push failed (project): ${result.error || result.stderr}`);
+  }
+}
+
 function push() {
   const remoteUrl = getRemoteUrl();
   if (!remoteUrl) return; // Sync not configured — silent no-op
@@ -386,9 +421,16 @@ function push() {
 
     // Check for changes
     const status = gitInMemory(['status', '--porcelain']);
+    const branch = currentBranchIn(MEMORY_DIR);
+
     if (!status.stdout) {
-      // No changes — skip
-      return;
+      // A clean tree is not the same as nothing to do: commits made outside this
+      // hook (a resolved rebase, a manual fix) or left behind by an earlier failed
+      // push would otherwise sit unpushed forever, which is how machines diverge.
+      const ahead = gitInMemory(['rev-list', '--count', `origin/${branch}..HEAD`]);
+      if (ahead.ok && ahead.stdout.trim() === '0') return;
+      log(`[MemorySync] Clean tree, ${ahead.ok ? ahead.stdout.trim() : 'unknown'} unpushed commit(s) — pushing anyway`);
+      return pushPending(branch);
     }
 
     // Safety gates — this repo is committed and pushed by a hook with no human in
@@ -415,28 +457,7 @@ function push() {
     const host = require('os').hostname();
     gitInMemory(['commit', '-m', `memory: ${today} [${tool}@${host}]`]);
 
-    // Detect current branch (supports project repos on non-main branches)
-    const branch = currentBranchIn(MEMORY_DIR);
-
-    // Pull before push to avoid conflicts
-    const pullResult = gitInMemory(['pull', '--rebase', 'origin', branch], { timeout: 20000 });
-    if (!pullResult.ok) {
-      // Rebase conflict — abort and try merge
-      gitInMemory(['rebase', '--abort']);
-      gitInMemory(['pull', 'origin', branch], { timeout: 20000 });
-    }
-
-    // Push with retry
-    const result = withRetry(
-      () => gitInMemory(['push', 'origin', branch], { timeout: 20000 }),
-      'git push'
-    );
-
-    if (result.ok) {
-      log('[MemorySync] Push successful (project)');
-    } else {
-      log(`[MemorySync] Push failed (project): ${result.error || result.stderr}`);
-    }
+    pushPending(branch);
   } catch (err) {
     log(`[MemorySync] Push error (project, non-blocking): ${err.message}`);
   }

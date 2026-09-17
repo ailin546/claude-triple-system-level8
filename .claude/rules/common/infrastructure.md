@@ -87,9 +87,13 @@ Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式�
 
 只认 `<<<<<<<` / `>>>>>>>` 两种、**不认裸 `=======`**——后者是合法的 markdown setext 下划线，误报会把记忆同步永久堵死（反向对照用例守着这一点）。
 
-`pull()` 与 `push()` 共用 `currentBranchIn()` 探测分支（2026-09-17 修：pull 写死 `origin main`，项目记忆库在 `quant-deploy` 分支上，于是 SessionStart 自动拉取对它**从来没成功过**，`.memory` 长期漂移 → 手动 pull 撞进脏树 → stash pop 冲突堆积）。所有 git 调用剥掉继承来的 `GIT_DIR`/`GIT_WORK_TREE` 等重定向，否则 hook 会操作到别的仓库。
+**同步开关查找顺序**：`MEMORY_REMOTE` 环境变量 → `PROJECT/.claude/.memory-remote` → `~/.claude/.memory-remote`。最后一个是 `~/.claude/CLAUDE.md §仓库架构` 指定的**那个**开关；2026-09-17 前实现只读项目级一个路径，于是文档写的开关永远找不到，`pull()` / `push()` 按"未配置"**静默 no-op** —— 记忆库只在有人手动跑 pull-all / push-all 时才动（那两个脚本走自己的 git 逻辑，不经本模块），这是漂移的最上游源头。
 
-回归测试 `__tests__/memory-sync.test.js`（6 用例，变异 7/7 killed）。
+`pull()` 与 `push()` 共用 `currentBranchIn()` 探测分支（2026-09-17 修：pull 写死 `origin main`，项目记忆库在 `quant-deploy` 分支上，于是自动拉取对它从来没成功过）。所有 git 调用剥掉继承来的 `GIT_DIR`/`GIT_WORK_TREE` 等重定向，否则 hook 会操作到别的仓库。
+
+`push()` 在**工作树干净但有未推 commit** 时照样推（hook 之外产生的 commit ——解决完的 rebase、手工修复、上次失败的 push ——否则永远躺着不出去）；干净且不 ahead 才真正跳过。
+
+回归测试 `__tests__/memory-sync.test.js`（9 用例，变异 10/10 killed）。
 
 ### 模式升档机制
 

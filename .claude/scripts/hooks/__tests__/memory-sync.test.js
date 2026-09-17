@@ -162,3 +162,60 @@ test('push accepts markdown whose setext underline looks like a conflict marker'
     fs.rmSync(f.root, { recursive: true, force: true });
   }
 });
+
+test('push flushes commits that are already committed but never pushed', () => {
+  const f = fixture();
+  try {
+    // clean tree + a local commit the hook did not make (resolved rebase, manual fix,
+    // or an earlier push that failed) — it must not sit unpushed forever
+    fs.appendFileSync(path.join(f.memory, 'today.md'), 'committed-out-of-band\n');
+    git(['add', 'today.md'], f.memory);
+    git(['commit', '-m', 'out of band'], f.memory);
+    assert.equal(git(['status', '--porcelain'], f.memory), '', 'precondition: tree must be clean');
+    const local = git(['rev-parse', 'HEAD'], f.memory);
+
+    const result = runHook(f, 'push');
+    assert.equal(result.status, 0, result.stderr);
+    git(['fetch', 'origin', 'quant-deploy'], f.memory);
+    assert.equal(git(['rev-parse', 'origin/quant-deploy'], f.memory), local, 'remote did not receive the pending commit');
+  } finally {
+    fs.rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('push stays quiet when there is genuinely nothing to do', () => {
+  const f = fixture();
+  try {
+    // positive control for the test above: clean tree AND nothing ahead must not push
+    const result = runHook(f, 'push');
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /Push successful \(project\)/);
+  } finally {
+    fs.rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('remote switch is found at the user-level path CLAUDE.md documents', () => {
+  const f = fixture();
+  try {
+    // No MEMORY_REMOTE env and no project-level switch — only ~/.claude/.memory-remote,
+    // which is the location ~/.claude/CLAUDE.md §仓库架构 calls *the* switch. Reading
+    // the project path alone made pull/push silently no-op.
+    fs.mkdirSync(path.join(f.home, '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(f.home, '.claude', '.memory-remote'), f.bare + '\n');
+    assert.ok(!fs.existsSync(path.join(f.project, '.claude', '.memory-remote')));
+
+    fs.appendFileSync(path.join(f.memory, 'today.md'), 'switch-found\n');
+    const env = { ...process.env, HOME: f.home, CLAUDE_PROJECT_ROOT: f.project, MEMORY_SYNC_MAX_RETRIES: '0' };
+    delete env.MEMORY_REMOTE;
+    const result = spawnSync(process.execPath, ['-e', `require(${JSON.stringify(SCRIPT)}).push()`],
+      { cwd: f.project, encoding: 'utf8', env });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /Push successful \(project\)/, 'switch not resolved — sync silently disabled');
+    git(['fetch', 'origin', 'quant-deploy'], f.memory);
+    assert.match(git(['show', 'origin/quant-deploy:today.md'], f.memory), /switch-found/);
+  } finally {
+    fs.rmSync(f.root, { recursive: true, force: true });
+  }
+});
