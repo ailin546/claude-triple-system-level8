@@ -23,7 +23,10 @@ const PROJECT_ROOT = getProjectRoot();
 const MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
 const GLOBAL_MEMORY_DIR = path.join(require('os').homedir(), '.memory');
 const REMOTE_FILE = path.join(PROJECT_ROOT, '.claude', '.memory-remote');
-const MAX_RETRIES = 3;
+const MAX_RETRIES = (() => {
+  const n = parseInt(process.env.MEMORY_SYNC_MAX_RETRIES ?? '', 10);
+  return Number.isInteger(n) && n >= 0 ? n : 3;
+})();
 const RETRY_DELAYS = [2000, 4000, 8000]; // exponential backoff
 
 function log(msg) {
@@ -60,6 +63,19 @@ function isMemoryGitRepo() {
  * Run a git command in a given directory.
  * Returns { ok, stdout, stderr }.
  */
+// Inherited git env vars override cwd — a hook launched from another repo's
+// context would otherwise operate on THAT repo instead of .memory/.
+const GIT_ENV_REDIRECTS = [
+  'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR',
+  'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+];
+
+function cleanGitEnv() {
+  const env = { ...process.env };
+  for (const k of GIT_ENV_REDIRECTS) delete env[k];
+  return env;
+}
+
 function gitInDir(dir, args, opts = {}) {
   try {
     const stdout = execFileSync('git', args, {
@@ -67,6 +83,7 @@ function gitInDir(dir, args, opts = {}) {
       encoding: 'utf8',
       timeout: opts.timeout || 15000,
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: cleanGitEnv(),
     });
     return { ok: true, stdout: stdout.trim(), stderr: '' };
   } catch (err) {
@@ -84,6 +101,16 @@ function gitInDir(dir, args, opts = {}) {
  */
 function gitInMemory(args, opts = {}) {
   return gitInDir(MEMORY_DIR, args, opts);
+}
+
+/**
+ * Current branch of a memory repo. Single home for branch detection — pull used
+ * to hard-code 'main', which silently never pulled project repos (branch
+ * 'quant-deploy') while push detected the branch correctly.
+ */
+function currentBranchIn(dir) {
+  const r = gitInDir(dir, ['rev-parse', '--abbrev-ref', 'HEAD']);
+  return (r.ok && r.stdout.trim()) || 'main';
 }
 
 /**
@@ -232,8 +259,11 @@ function pull() {
       return;
     }
 
+    const branch = currentBranchIn(MEMORY_DIR);
+    log(`[MemorySync] Pull (project) branch=${branch}`);
+
     const result = withRetry(
-      () => gitInMemory(['pull', '--rebase', 'origin', 'main'], { timeout: 20000 }),
+      () => gitInMemory(['pull', '--rebase', 'origin', branch], { timeout: 20000 }),
       'git pull'
     );
 
@@ -242,7 +272,7 @@ function pull() {
     } else {
       // Rebase conflict — try merge instead
       gitInMemory(['rebase', '--abort']);
-      const mergeResult = gitInMemory(['pull', 'origin', 'main'], { timeout: 20000 });
+      const mergeResult = gitInMemory(['pull', 'origin', branch], { timeout: 20000 });
       if (mergeResult.ok) {
         log('[MemorySync] Pull (merge) successful after rebase conflict');
       } else {
@@ -292,6 +322,54 @@ function pullGlobalMemory() {
  * Call at Stop, after writing memory files.
  * No-op if sync is not configured or no changes.
  */
+/**
+ * Paths from `git status --porcelain`, handling renames and quoted names.
+ */
+function dirtyPathsFrom(porcelain) {
+  const out = [];
+  for (const line of String(porcelain).split('\n')) {
+    if (!line.trim()) continue;
+    // Not a fixed-width slice: gitInDir trims its stdout, so the leading space of
+    // an unstaged-only status (" M weekly.md") is already gone by the time we see
+    // the first line. Match the status column instead of counting characters.
+    const m = line.match(/^\s*([MADRCU?!]{1,2})\s+(.*)$/);
+    if (!m) continue;
+    let p = m[2].trim();
+    if (p.includes(' -> ')) p = p.split(' -> ').pop().trim();
+    if (p.startsWith('"') && p.endsWith('"')) p = p.slice(1, -1);
+    if (p) out.push(p);
+  }
+  return out;
+}
+
+/**
+ * The memory repo holds hand-written markdown only (.gitignore already excludes
+ * runtime state). Anything else in the working tree is not ours to auto-publish.
+ */
+function unsafeDirtyPaths(porcelain) {
+  return dirtyPathsFrom(porcelain).filter((p) => {
+    const lower = p.toLowerCase();
+    return !lower.endsWith('.md') && path.basename(lower) !== '.gitignore';
+  });
+}
+
+/**
+ * Files carrying unresolved conflict markers. Only `<<<<<<< ` / `>>>>>>> ` are
+ * tested — a bare `=======` line is a legitimate markdown setext underline.
+ */
+function dirtyFilesWithConflictMarkers(porcelain) {
+  const hits = [];
+  for (const rel of dirtyPathsFrom(porcelain)) {
+    const abs = path.join(MEMORY_DIR, rel);
+    try {
+      if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) continue;
+      const text = fs.readFileSync(abs, 'utf8');
+      if (/^<<<<<<< /m.test(text) || /^>>>>>>> /m.test(text)) hits.push(rel);
+    } catch { /* unreadable — leave judgement to the human */ }
+  }
+  return hits;
+}
+
 function push() {
   const remoteUrl = getRemoteUrl();
   if (!remoteUrl) return; // Sync not configured — silent no-op
@@ -313,6 +391,22 @@ function push() {
       return;
     }
 
+    // Safety gates — this repo is committed and pushed by a hook with no human in
+    // the loop, so anything wrong in the working tree gets published unseen.
+    // (2026-09-03 a peer machine published weekly.md with unresolved conflict
+    // markers exactly this way; it took a manual cleanup to undo.)
+    const unsafe = unsafeDirtyPaths(status.stdout);
+    if (unsafe.length) {
+      log(`[MemorySync] Push refused (project) — unknown dirty files, memory repo tracks .md only: ${unsafe.join(', ')}`);
+      return;
+    }
+
+    const conflicted = dirtyFilesWithConflictMarkers(status.stdout);
+    if (conflicted.length) {
+      log(`[MemorySync] Push refused (project) — conflict markers present: ${conflicted.join(', ')}`);
+      return;
+    }
+
     // Stage and commit
     gitInMemory(['add', '-A']);
 
@@ -322,8 +416,7 @@ function push() {
     gitInMemory(['commit', '-m', `memory: ${today} [${tool}@${host}]`]);
 
     // Detect current branch (supports project repos on non-main branches)
-    const branchResult = gitInMemory(['rev-parse', '--abbrev-ref', 'HEAD']);
-    const branch = (branchResult.ok && branchResult.stdout.trim()) || 'main';
+    const branch = currentBranchIn(MEMORY_DIR);
 
     // Pull before push to avoid conflicts
     const pullResult = gitInMemory(['pull', '--rebase', 'origin', branch], { timeout: 20000 });

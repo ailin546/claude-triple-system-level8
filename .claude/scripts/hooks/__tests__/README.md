@@ -25,6 +25,8 @@
 | [fix-depth-check.test.js](./fix-depth-check.test.js) | 解析配置 + 改 context | 31 |
 | [pre-tool-escalate.test.js](./pre-tool-escalate.test.js) | 解析配置（命令分段匹配）+ mode 升档 | 23 |
 | [command-scan.test.js](./command-scan.test.js) | 纯函数解析库（strip-quote / segment / git-head / 全局选项 / 重定向 / 命令替换）| 25 |
+| [memory-sync.test.js](./memory-sync.test.js) | 阻断（push 安全闸）+ 解析配置（porcelain）+ 真 git fixture | 6 |
+| [pre-compact.test.js](./pre-compact.test.js) | state file（写 today.md）+ 解析内容（commit 去重）| 2 |
 
 > 2026-06-06：`command-scan.js` 是 `lib/` 下的纯函数解析库（无副作用，README §17 本可豁免），但因它支撑两个阻断 hook（evaluation-gate exit 2 + pre-tool-escalate mode），仍配单测。`evaluation-gate.test.js` 新增 subprocess 集成测试演示如何用 throwaway `HOME` hermetic 跑真实 hook 的 exit-code，不碰真实 marker。
 

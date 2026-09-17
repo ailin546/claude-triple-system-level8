@@ -78,6 +78,9 @@ test('pull detects current quant-deploy branch instead of hard-coded main', () =
     assert.match(fs.readFileSync(path.join(f.memory, 'weekly.md'), 'utf8'), /remote-only/);
     assert.equal(git(['branch', '--show-current'], f.memory), 'quant-deploy');
     assert.match(result.stderr, /branch=quant-deploy/);
+    // The rebase path itself must target the right branch — a wrong branch that
+    // only works because the merge fallback rescues it is a silent degradation.
+    assert.doesNotMatch(result.stderr, /after rebase conflict/);
   } finally {
     fs.rmSync(f.root, { recursive: true, force: true });
   }
@@ -87,9 +90,15 @@ test('pull ignores inherited GIT_DIR redirection', () => {
   const f = fixture();
   try {
     peerAdvance(f, 'weekly.md', 'env-safe\n');
+    const seedHeadBefore = git(['rev-parse', 'HEAD'], f.seed);
     const result = runHook(f, 'pull', { GIT_DIR: path.join(f.seed, '.git') });
     assert.equal(result.status, 0, result.stderr);
     assert.match(fs.readFileSync(path.join(f.memory, 'weekly.md'), 'utf8'), /env-safe/);
+    // Discriminating assertion: without env sanitation git would honour GIT_DIR and
+    // operate on the seed repo instead. Content landing in .memory/ alone does not
+    // prove isolation — the pointed-at repo must be untouched.
+    assert.equal(git(['rev-parse', 'HEAD'], f.seed), seedHeadBefore, 'seed repo was mutated via inherited GIT_DIR');
+    assert.equal(git(['rev-parse', 'HEAD'], f.memory), git(['rev-parse', 'origin/quant-deploy'], f.memory));
   } finally {
     fs.rmSync(f.root, { recursive: true, force: true });
   }
@@ -135,6 +144,20 @@ test('push refuses conflict markers and does not commit', () => {
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stderr, /conflict markers present/);
     assert.equal(git(['rev-parse', 'HEAD'], f.memory), before);
+  } finally {
+    fs.rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('push accepts markdown whose setext underline looks like a conflict marker', () => {
+  const f = fixture();
+  try {
+    const before = git(['rev-parse', 'HEAD'], f.memory);
+    fs.writeFileSync(path.join(f.memory, 'weekly.md'), 'Weekly Summary\n=======\n\nbody\n');
+    const result = runHook(f, 'push');
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /conflict markers present/);
+    assert.notEqual(git(['rev-parse', 'HEAD'], f.memory), before, 'a legitimate setext heading must not block memory sync');
   } finally {
     fs.rmSync(f.root, { recursive: true, force: true });
   }

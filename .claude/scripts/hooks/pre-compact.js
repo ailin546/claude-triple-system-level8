@@ -30,6 +30,7 @@ const {
 } = require('../lib/utils');
 const {
   extractFromTranscript,
+  filterNewCommits,
   lessonKey,
   loadSeenLessonKeys,
   saveSeenLessonKeys,
@@ -141,6 +142,11 @@ function extractAndRecordLessons(stdinJson) {
       }
     } catch { /* ignore */ }
   }
+
+  // Dedupe against what today.md already holds — the --since window is the whole
+  // session, so without this every compact re-appends commits that the [auto] /
+  // [periodic] blocks already recorded (same helper as stop-summary / periodic-memory).
+  commits = filterNewCommits(commits, path.join(MEMORY_DIR, 'today.md'));
 
   const hasCommits = commits.length > 0;
   const hasLessons = lessons.length > 0;

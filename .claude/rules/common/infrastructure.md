@@ -48,7 +48,7 @@ Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式�
 | **ssot-source-guard** | PostToolUse(Edit\|Write) | Edit/Write **新增**已知 SSOT-risk 读取模式（组件层 `useMarketMidPrice` / `/proxy-`、Rust 直读 `strategy_configs.get(`）时经 additionalContext 软提醒，每会话每文件每模式一次，只看真正新增行。规则见 `~/.claude/CLAUDE.md §编码行为准则 Rule 0`。单测 23 用例 |
 | periodic-memory | PostToolUse(*) | 每 30 分钟从 transcript 提取 lessons/decisions（长期会话兜底）；commit 经 `lib/extract-lessons.js::filterNewCommits` 去重（防多触发重复 append today.md） |
 | stop-summary | Stop | today.md 轮转 + ~/.memory/index.md 更新 + 错误教训自动沉淀 + commit 去重（`filterNewCommits`，防多次 Stop 触发重复 append → weekly 曾 86% 冗余）+ architecture-rescue 计数器（详见本文件 §architecture-rescue Counter）|
-| pre-compact | PreCompact | 压缩前保存状态 |
+| pre-compact | PreCompact | 压缩前保存状态 + 从 transcript 提 lessons/decisions 写 today.md（commit 必须过 `filterNewCommits`，见 `rules/common/workflow.md` §记忆系统 反循环与去重） |
 
 #### Standard+（标准模式及以上，模式门控）
 
@@ -75,6 +75,21 @@ Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式�
 
 | Hook | 类型 | 用途 |
 |------|------|------|
+
+### 记忆同步安全闸（`lib/memory-sync.js`）
+
+`.memory` 由 hook 自动 commit + push（SessionStart 拉 / Stop 推），**全程无人过目**，所以推送前有两道 fail-closed 闸，任一命中即拒绝本次 push（exit 0、不 commit、stderr 说明原因）：
+
+| 闸 | 拒绝条件 | 理由 |
+|---|---|---|
+| dirty allowlist | 工作树出现非 `.md`（`.gitignore` 除外）的改动 | 记忆库只存手写 markdown，其余是运行时状态，不该被自动发布 |
+| 冲突标记 | 任一 dirty 文件含 `^<<<<<<< ` 或 `^>>>>>>> ` | 2026-09-03 一台机器就是这样把带未解决冲突的 weekly.md 推上去的，事后靠人工清理 |
+
+只认 `<<<<<<<` / `>>>>>>>` 两种、**不认裸 `=======`**——后者是合法的 markdown setext 下划线，误报会把记忆同步永久堵死（反向对照用例守着这一点）。
+
+`pull()` 与 `push()` 共用 `currentBranchIn()` 探测分支（2026-09-17 修：pull 写死 `origin main`，项目记忆库在 `quant-deploy` 分支上，于是 SessionStart 自动拉取对它**从来没成功过**，`.memory` 长期漂移 → 手动 pull 撞进脏树 → stash pop 冲突堆积）。所有 git 调用剥掉继承来的 `GIT_DIR`/`GIT_WORK_TREE` 等重定向，否则 hook 会操作到别的仓库。
+
+回归测试 `__tests__/memory-sync.test.js`（6 用例，变异 7/7 killed）。
 
 ### 模式升档机制
 
