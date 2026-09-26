@@ -20,6 +20,11 @@ Claude Code、Codex 以及其他开发工具共享相同的知识文件，不创
 - `PROJECT/.memory/today.md`
 - `PROJECT/.memory/promoted-lessons.md`
 
+`PROJECT` 是当前目录所在 git 仓库**主 checkout** 的根目录：linked worktree 与子目录
+共用这一份，不各自新建；当前目录落在某个 `.memory/` 内部时先退到它的上层；不在 git
+里时就是当前目录。实现：Claude `scripts/lib/project-root.js::getProjectMemoryDir()`，
+Codex `codex-global-hook.py::get_project_memory_root()`，两者必须解析到同一目录。
+
 `AGENT_MEMORY_HOME` 可以覆盖全局记忆目录，默认值为 `~/.memory`。
 
 ## 读取顺序

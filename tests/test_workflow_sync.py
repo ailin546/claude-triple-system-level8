@@ -1,6 +1,8 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -164,6 +166,57 @@ class WorkflowSyncTests(unittest.TestCase):
             (REPOSITORY / "CLAUDE.md").read_text(encoding="utf-8"),
             (REPOSITORY / ".claude" / "CLAUDE.md").read_text(encoding="utf-8"),
         )
+
+    def test_claude_and_codex_resolve_the_same_project_memory(self):
+        # Runs both real implementations side by side; the invariant is that
+        # they agree, not that each matches a hand-written expectation.
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("node is required to run Claude's resolver")
+        claude_resolver = REPOSITORY / ".claude" / "scripts" / "lib" / "project-root.js"
+        hook_path = REPOSITORY / "adapters" / "codex" / "scripts" / "codex-global-hook.py"
+        spec = importlib.util.spec_from_file_location("codex_global_hook", hook_path)
+        hook = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(hook)
+        redirects = set(hook.GIT_ENV_REDIRECTS) | {"CLAUDE_PROJECT_ROOT"}
+        env = {key: value for key, value in os.environ.items() if key not in redirects}
+
+        def git(cwd, *args):
+            subprocess.run(
+                ["git", "-c", "user.name=test", "-c", "user.email=test@example.invalid", *args],
+                cwd=cwd, env=env, check=True, capture_output=True,
+            )
+
+        with tempfile.TemporaryDirectory() as temporary_root:
+            root = Path(temporary_root)
+            main = root / "main"
+            (main / "sub").mkdir(parents=True)
+            git(main, "-c", "init.defaultBranch=main", "init", "-q")
+            git(main, "commit", "-q", "--allow-empty", "-m", "init")
+            worktree = root / "linked"
+            git(main, "worktree", "add", "-q", "-b", "linked", str(worktree))
+            stray = worktree / ".memory"
+            stray.mkdir()
+            git(stray, "init", "-q")
+            outside = root / "not-a-repository"
+            outside.mkdir()
+            # Main checkout inside a .memory tree, worktree outside it.
+            nested_main = root / "holder" / ".memory" / "repository"
+            nested_main.mkdir(parents=True)
+            git(nested_main, "init", "-q")
+            git(nested_main, "commit", "-q", "--allow-empty", "-m", "init")
+            nested_worktree = root / "nested-linked"
+            git(nested_main, "worktree", "add", "-q", "-b", "nested", str(nested_worktree))
+
+            for cwd in (main, main / "sub", worktree, stray, outside, nested_worktree):
+                claude = subprocess.run(
+                    [node, "-e", "process.stdout.write(require(process.argv[1]).getProjectMemoryDir())",
+                     str(claude_resolver)],
+                    cwd=cwd, env=env, check=True, capture_output=True, text=True,
+                ).stdout
+                codex = hook.get_project_memory_root(str(cwd))
+                self.assertEqual(Path(claude).resolve(), codex.resolve(), cwd)
 
 
 if __name__ == "__main__":

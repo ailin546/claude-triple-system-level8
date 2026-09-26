@@ -2,12 +2,22 @@
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 
 DEFAULT_MEMORY_FILES = ("long-term.md", "weekly.md", "today.md")
 DEFAULT_MEMORY_EXCERPT_BYTES = 2048
+# Inherited git redirects would make git answer for some other repository.
+GIT_ENV_REDIRECTS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+)
 
 
 HIGH_RISK_PATTERNS = [
@@ -96,6 +106,48 @@ def get_global_memory_root():
     return Path.home() / ".memory"
 
 
+def git_output(cwd, args):
+    env = {key: value for key, value in os.environ.items() if key not in GIT_ENV_REDIRECTS}
+    completed = subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        env=env,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=True,
+    )
+    return completed.stdout.strip()
+
+
+def escape_memory_repo(path):
+    # .memory is its own git repository; nothing inside it is a project root.
+    while ".memory" in path.parts and path != path.parent:
+        path = path.parent
+    return path
+
+
+def get_project_memory_root(cwd):
+    """PROJECT/.memory, resolved the way Claude's getProjectMemoryDir() does.
+
+    PROJECT is the root of the git repository's main checkout, so linked
+    worktrees and subdirectories share one memory; outside git it is cwd.
+    """
+    start = escape_memory_repo(Path(os.path.abspath(cwd)))
+    root = start
+    try:
+        common = Path(os.path.normpath(os.path.join(start, git_output(start, ["rev-parse", "--git-common-dir"]))))
+        if common.name == ".git":
+            root = common.parent
+        else:
+            root = Path(git_output(start, ["rev-parse", "--show-toplevel"]))
+    except (OSError, subprocess.SubprocessError, ValueError):
+        # Not a git checkout, git unavailable, or an undecodable path: keep cwd.
+        pass
+    return escape_memory_repo(root) / ".memory"
+
+
 def read_memory_excerpt(memory_file, max_bytes=DEFAULT_MEMORY_EXCERPT_BYTES):
     try:
         raw = memory_file.read_bytes()
@@ -112,10 +164,10 @@ def read_memory_excerpt(memory_file, max_bytes=DEFAULT_MEMORY_EXCERPT_BYTES):
     return selected.decode("utf-8", errors="replace").strip()
 
 
-def build_shared_memory_context(cwd):
+def build_shared_memory_context(project_memory):
     roots = [
         ("global", get_global_memory_root(), ("long-term.md", "today.md")),
-        ("project", Path(cwd) / ".memory", DEFAULT_MEMORY_FILES),
+        ("project", project_memory, DEFAULT_MEMORY_FILES),
     ]
     sections = []
     for scope, memory_root, filenames in roots:
@@ -192,12 +244,13 @@ def session_start_output(cwd):
         build_profile_hint(profile),
     ]
     project_context = Path(cwd) / ".codex" / "project-context.md"
-    shared_handoff = Path(cwd) / ".memory" / "handoff.md"
+    project_memory = get_project_memory_root(cwd)
+    shared_handoff = project_memory / "handoff.md"
     if project_context.exists():
         lines.append(f"Project context available at {project_context}.")
     if shared_handoff.exists():
         lines.append(f"Shared handoff context available at {shared_handoff}.")
-    memory_context = build_shared_memory_context(cwd)
+    memory_context = build_shared_memory_context(project_memory)
     if memory_context:
         lines.append(memory_context)
     return {
@@ -415,9 +468,10 @@ def post_tool_use_output(payload):
 
 
 def stop_output(payload, cwd):
+    project_memory = get_project_memory_root(cwd)
     message = (
-        "离开中大型任务前，请把高价值交接写入 PROJECT/.memory/handoff.md，"
-        "把决策、约束和教训追加到 PROJECT/.memory/today.md；"
+        f"离开中大型任务前，请把高价值交接写入 {project_memory / 'handoff.md'}，"
+        f"把决策、约束和教训追加到 {project_memory / 'today.md'}；"
         "跨项目信息写入 ~/.memory/。不要记录流水账。"
     )
     return {

@@ -1,6 +1,7 @@
 import importlib.util
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -80,6 +81,86 @@ class SharedMemoryHookTests(unittest.TestCase):
 
             self.assertFalse(global_memory.exists())
             self.assertFalse((project / ".memory").exists())
+
+
+def git(cwd, *args):
+    env = {key: value for key, value in os.environ.items() if key not in HOOK.GIT_ENV_REDIRECTS}
+    subprocess.run(
+        ["git", "-c", "user.name=test", "-c", "user.email=test@example.invalid", *args],
+        cwd=cwd, env=env, check=True, capture_output=True,
+    )
+
+
+class ProjectMemoryLocationTests(unittest.TestCase):
+    """PROJECT/.memory must be the directory Claude's getProjectMemoryDir() resolves."""
+
+    def make_repository(self, root):
+        main = root / "main"
+        main.mkdir()
+        git(main, "-c", "init.defaultBranch=main", "init", "-q")
+        git(main, "commit", "-q", "--allow-empty", "-m", "init")
+        return main
+
+    def test_linked_worktree_and_subdirectory_share_main_checkout_memory(self):
+        with tempfile.TemporaryDirectory() as temporary_root:
+            root = Path(temporary_root)
+            main = self.make_repository(root)
+            (main / ".memory").mkdir()
+            (main / ".memory" / "today.md").write_text("main checkout memory", encoding="utf-8")
+            (main / ".memory" / "handoff.md").write_text("main checkout handoff", encoding="utf-8")
+            (main / "sub").mkdir()
+            worktree = root / "linked"
+            git(main, "worktree", "add", "-q", "-b", "linked", str(worktree))
+
+            expected = (main / ".memory").resolve()
+            for cwd in (main, main / "sub", worktree):
+                self.assertEqual(HOOK.get_project_memory_root(str(cwd)).resolve(), expected, cwd)
+
+            with mock.patch.dict(os.environ, {"AGENT_MEMORY_HOME": str(root / "no-global")}):
+                context = HOOK.session_start_output(str(worktree))["hookSpecificOutput"]["additionalContext"]
+            self.assertIn("main checkout memory", context)
+            self.assertIn("Shared handoff context available", context)
+            stop = HOOK.stop_output({}, str(worktree))["hookSpecificOutput"]["additionalContext"]
+            self.assertIn(str(HOOK.get_project_memory_root(str(worktree)) / "handoff.md"), stop)
+            self.assertFalse((worktree / ".memory").exists())
+
+    def test_cwd_inside_memory_repository_is_not_a_project_root(self):
+        with tempfile.TemporaryDirectory() as temporary_root:
+            project = Path(temporary_root) / "project"
+            memory = project / ".memory"
+            memory.mkdir(parents=True)
+            git(memory, "init", "-q")
+
+            resolved = HOOK.get_project_memory_root(str(memory))
+
+            self.assertEqual(resolved.resolve(), memory.resolve())
+
+    def test_stray_memory_clone_inside_worktree_resolves_to_main_checkout(self):
+        with tempfile.TemporaryDirectory() as temporary_root:
+            root = Path(temporary_root)
+            main = self.make_repository(root)
+            worktree = root / "linked"
+            git(main, "worktree", "add", "-q", "-b", "linked", str(worktree))
+            stray = worktree / ".memory"
+            stray.mkdir()
+            git(stray, "init", "-q")
+
+            resolved = HOOK.get_project_memory_root(str(stray))
+
+            self.assertEqual(resolved.resolve(), (main / ".memory").resolve())
+
+    def test_inherited_git_dir_does_not_redirect_resolution(self):
+        with tempfile.TemporaryDirectory() as temporary_root:
+            root = Path(temporary_root)
+            main = self.make_repository(root)
+            other = root / "other"
+            other.mkdir()
+            git(other, "init", "-q")
+
+            with mock.patch.dict(os.environ, {"GIT_DIR": str(other / ".git")}):
+                resolved = HOOK.get_project_memory_root(str(main))
+
+            self.assertEqual(resolved.resolve(), (main / ".memory").resolve())
 
 
 class RequirementConfirmationHookTests(unittest.TestCase):
