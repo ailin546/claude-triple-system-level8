@@ -123,7 +123,7 @@ function run(stdinJson) {
   const seenKeys = extractLib.loadSeenLessonKeys(sessionStateDir);
 
   // Extract lessons/decisions from transcript
-  const { lessons, decisions } = extractLib.extractFromTranscript(transcriptPath, seenKeys);
+  const { lessons, decisions, keys } = extractLib.extractFromTranscript(transcriptPath, seenKeys);
 
   // Collect git commits since session start
   let commits = [];
@@ -201,9 +201,7 @@ function run(stdinJson) {
   }
 
   // Persist seen keys
-  if (hasLessons) {
-    extractLib.saveSeenLessonKeys(sessionStateDir, lessons.map(l => extractLib.lessonKey(l)));
-  }
+  if (keys.length > 0) extractLib.saveSeenLessonKeys(sessionStateDir, keys);
 
   const parts = [];
   if (hasCommits) parts.push(`${commits.length} commits`);

@@ -160,12 +160,13 @@ Claude 只需在分析问题时自然地使用以下格式，Stop hook 会自动
 **Decisions 提取条件：**
 1. 必须在 `**Decisions:**` 独占一行的 section header 下
 2. 必须是 bullet 项，长度 >= 10 字符
+3. 已记录过的决策（key = `decision:` + 小写文本）不再提取——此前决策不进 seen-lessons，转录尾部的同一段决策每个回合都会重记
 
 ### 反循环与去重
 
 | 机制 | 作用 | 位置 |
 |------|------|------|
-| `seen-lessons.json` | 持久化已提取的 lesson keys（7天TTL），防止 transcript 中同一教训反复提取 | `.claude/.session-state/` |
+| `seen-lessons.json` + 消息时间门控 | 持久化已提取的教训与决策 keys（`SEEN_TTL_MS` = 7 天），防止同一条目反复提取；提取时跳过早于 `SEEN_TTL_MS` 的消息——key 过期时它的消息必然已超龄，所以同一条消息永远不会被提取两次。长会话记录会把旧对话链（原 uuid、原时间戳）原样追加回来，只靠会过期的 key 挡不住（2026-09-26：11 天前的 5 条教训被重记一遍） | `.claude/.session-state/`；`lib/extract-lessons.js`（stop-summary / periodic-memory / pre-compact 共用的唯一提取器） |
 | `lessonKey()` | 取箭头左侧文本做语义去重，"X → A" 和 "X → B" 算同一教训 | 内存中 |
 | `cleanLesson()` | 去 markdown 格式（`**bold**` → `bold`），normalize 空白 | 内存中 |
 | 时间戳+项目名 | `[auto] HH:MM — 项目名` marker 防同一**分钟+marker**重复写入。**仅防同 marker**——跨触发点/跨 marker（`[auto]` vs `[periodic]`）的 commit 不防，见下行 | today.md 文件中 |

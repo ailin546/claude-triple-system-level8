@@ -132,9 +132,6 @@ function autoRecordSessionFacts(stdinJson) {
   commits = lessonLib.filterNewCommits(commits, TODAY_FILE);
 
   // ── 3. Extract lessons and decisions from transcript ──
-  const lessons = [];
-  const decisions = [];
-
   // Parse transcript_path from stdin JSON, then read JSONL for assistant text
   let transcriptPath = null;
   try {
@@ -144,99 +141,13 @@ function autoRecordSessionFacts(stdinJson) {
   if (!transcriptPath) {
     transcriptPath = process.env.CLAUDE_TRANSCRIPT_PATH;
   }
+  if (!transcriptPath) log('[StopSummary] No transcript_path available, skipping lesson extraction');
 
   // Anti-circulation: use persistent state file, not today.md content.
-  // today.md gets cleared/rotated, but seen-lessons.json persists (7 day TTL).
-  const seenKeys = loadSeenLessonKeys();
-
-  // Cap transcript scanning at 10MB to avoid memory issues on long sessions
-  const MAX_TRANSCRIPT_BYTES = 10 * 1024 * 1024;
-
-  if (transcriptPath && fs.existsSync(transcriptPath)) {
-    try {
-      const stat = fs.statSync(transcriptPath);
-      let raw;
-      if (stat.size > MAX_TRANSCRIPT_BYTES) {
-        // Read only the last 10MB (most recent messages, where lessons are likely to be)
-        const fd = fs.openSync(transcriptPath, 'r');
-        const buf = Buffer.alloc(MAX_TRANSCRIPT_BYTES);
-        fs.readSync(fd, buf, 0, MAX_TRANSCRIPT_BYTES, stat.size - MAX_TRANSCRIPT_BYTES);
-        fs.closeSync(fd);
-        // Skip first partial line
-        const text = buf.toString('utf8');
-        raw = text.substring(text.indexOf('\n') + 1);
-        log(`[StopSummary] Transcript ${(stat.size / 1024 / 1024).toFixed(1)}MB, scanning last 10MB`);
-      } else {
-        raw = fs.readFileSync(transcriptPath, 'utf8');
-      }
-      for (const jsonLine of raw.split('\n')) {
-        if (!jsonLine.trim()) continue;
-        let entry;
-        try { entry = JSON.parse(jsonLine); } catch { continue; }
-
-        // Only scan assistant messages (skip system injections)
-        if (entry.type !== 'assistant') continue;
-        const content = entry.message?.content;
-        if (!Array.isArray(content)) continue;
-
-        for (const block of content) {
-          if (block.type !== 'text' || !block.text) continue;
-
-          // Track if we're inside a **Lessons:** or **Decisions:** section
-          let inLessonsSection = false;
-          let inDecisionsSection = false;
-
-          for (const line of block.text.split('\n')) {
-            const trimmed = line.trim();
-
-            // Detect section headers — STRICT matching.
-            // Must be the ENTIRE line: "**Lessons:**" or "### Lessons"
-            // Must NOT match: "...如何确保教训被写入**。增强 promoteLessons()"
-            const isLessonsHdr = /^\*{2}Lessons:?\*{2}$/.test(trimmed)
-              || /^#{1,4}\s+Lessons:?\s*$/.test(trimmed);
-            const isDecisionsHdr = /^\*{2}Decisions?:?\*{2}$/.test(trimmed)
-              || /^\*{2}决策:?\*{2}$/.test(trimmed)
-              || /^#{1,4}\s+Decisions?:?\s*$/.test(trimmed);
-
-            if (isLessonsHdr) { inLessonsSection = true; inDecisionsSection = false; continue; }
-            if (isDecisionsHdr) { inDecisionsSection = true; inLessonsSection = false; continue; }
-
-            // Non-bullet, non-blank line ends the current section
-            if ((inLessonsSection || inDecisionsSection) && trimmed !== '' && !/^[-*]\s/.test(trimmed)) {
-              inLessonsSection = false; inDecisionsSection = false;
-            }
-
-            if (inLessonsSection) {
-              // Match full-width → and ASCII -> / -->
-              const lessonMatch = trimmed.match(/^[-*]\s+(.+(?:→|-{1,2}>).+)$/);
-              if (lessonMatch && lessonMatch[1].length >= 15) {
-                const cleaned = cleanLesson(lessonMatch[1]);
-                const key = lessonKey(cleaned);
-                if (seenKeys.has(key)) continue;
-                if (lessons.some(l => lessonKey(l) === key)) continue;
-                lessons.push(cleaned);
-              }
-            }
-
-            // Extract decisions from **Decisions:** sections
-            if (inDecisionsSection) {
-              const bulletMatch = trimmed.match(/^[-*]\s+(.+)$/);
-              if (bulletMatch) {
-                const d = cleanLesson(bulletMatch[1]);
-                if (d.length >= 10 && !decisions.includes(d)) decisions.push(d);
-              }
-            }
-          }
-        }
-      }
-      if (lessons.length > 0 || decisions.length > 0) {
-        log(`[StopSummary] Transcript scanned: ${lessons.length} new lessons, ${decisions.length} new decisions`);
-      }
-    } catch (err) {
-      log(`[StopSummary] Transcript scan error (non-blocking): ${err.message}`);
-    }
-  } else {
-    log('[StopSummary] No transcript_path available, skipping lesson extraction');
+  // today.md gets cleared/rotated, but seen-lessons.json persists.
+  const { lessons, decisions, keys } = lessonLib.extractFromTranscript(transcriptPath, loadSeenLessonKeys());
+  if (lessons.length > 0 || decisions.length > 0) {
+    log(`[StopSummary] Transcript scanned: ${lessons.length} new lessons, ${decisions.length} new decisions`);
   }
 
   // ── 4. Gate: nothing meaningful → don't record ──
@@ -322,11 +233,8 @@ function autoRecordSessionFacts(stdinJson) {
     writeToTodayFile(GLOBAL_MEMORY_DIR, today, globalLines.join('\n') + '\n', 'global');
   }
 
-  // Persist extracted lesson keys so they won't be re-extracted next time
-  if (hasLessons) {
-    const newKeys = lessons.map(l => lessonKey(l));
-    saveSeenLessonKeys(newKeys);
-  }
+  // Persist extracted keys so neither lessons nor decisions are recorded twice
+  if (keys.length > 0) saveSeenLessonKeys(keys);
 
   const parts = [];
   if (hasCommits) parts.push(`${commits.length} commits`);

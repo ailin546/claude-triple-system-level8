@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Unit tests for lib/extract-lessons.js filterNewCommits().
+ * Unit tests for lib/extract-lessons.js: filterNewCommits() and the
+ * record-once guarantees of extractFromTranscript().
  *
  * filterNewCommits is a regex parser over today.md content (解析配置/内容
  * category per hooks/__tests__/README.md). A parser bug means either dup
@@ -19,7 +20,13 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-const { filterNewCommits } = require(path.join(__dirname, '..', '..', 'lib', 'extract-lessons.js'));
+const {
+  filterNewCommits,
+  extractFromTranscript,
+  loadSeenLessonKeys,
+  saveSeenLessonKeys,
+  SEEN_TTL_MS,
+} = require(path.join(__dirname, '..', '..', 'lib', 'extract-lessons.js'));
 
 let passed = 0;
 let failed = 0;
@@ -100,8 +107,79 @@ test('7-char hash boundary matches', () => {
   assert.deepStrictEqual(filterNewCommits(['1234567 msg', 'aaaaaaa other'], p), ['aaaaaaa other']);
 });
 
+// ── extractFromTranscript: nothing is recorded twice ──
+
+const NOW = Date.parse('2026-09-26T03:10:00Z');
+const DAY = 24 * 60 * 60 * 1000;
+const LESSON_A = '- 旧消息被原样追加回长会话记录 → 按消息时间门控而不是只靠会过期的 key';
+const LESSON_B = '- 新会话里写下的教训要照常提取 → 门控只挡比 key 寿命更老的消息';
+const DECISION = '- 决策也要跨回合去重，否则每次 Stop 都重记一遍';
+
+function assistantAt(ms, uuid, text) {
+  return { type: 'assistant', uuid, timestamp: new Date(ms).toISOString(),
+    message: { role: 'assistant', content: [{ type: 'text', text }] } };
+}
+
+function tmpTranscript(entries) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'extract-lessons-transcript-'));
+  const p = path.join(dir, 'session.jsonl');
+  fs.writeFileSync(p, entries.map((e) => JSON.stringify(e)).join('\n') + '\n', 'utf8');
+  return p;
+}
+
+// 11. A message older than a seen key's lifetime is not extracted, however it
+//     reappears (here: original plus a re-appended copy with the same uuid).
+test('old message and its re-appended copy are not extracted again', () => {
+  const old = NOW - 11 * DAY;
+  const p = tmpTranscript([
+    assistantAt(old, 'u-old', `**Lessons:**\n${LESSON_A}`),
+    assistantAt(NOW - 60 * 1000, 'u-new', `**Lessons:**\n${LESSON_B}`),
+    assistantAt(old, 'u-old', `**Lessons:**\n${LESSON_A}`),
+  ]);
+  const r = extractFromTranscript(p, new Set(), NOW);
+  assert.deepStrictEqual(r.lessons, [LESSON_B.slice(2)]);
+});
+
+// 12. Exactly at the lifetime the key has expired, so the message must be skipped.
+test('message exactly one seen-key lifetime old is skipped', () => {
+  const p = tmpTranscript([assistantAt(NOW - SEEN_TTL_MS, 'u-edge', `**Lessons:**\n${LESSON_A}`)]);
+  assert.deepStrictEqual(extractFromTranscript(p, new Set(), NOW).lessons, []);
+});
+
+// 13. Decisions round-trip through the seen-key store like lessons do.
+test('decisions are not re-extracted once their keys are saved', () => {
+  const state = fs.mkdtempSync(path.join(os.tmpdir(), 'extract-lessons-state-'));
+  const p = tmpTranscript([assistantAt(Date.now() - 60 * 1000, 'u-d', `**Decisions:**\n${DECISION}`)]);
+  const first = extractFromTranscript(p, loadSeenLessonKeys(state));
+  assert.deepStrictEqual(first.decisions, [DECISION.slice(2)]);
+  saveSeenLessonKeys(state, first.keys);
+  assert.deepStrictEqual(extractFromTranscript(p, loadSeenLessonKeys(state)).decisions, []);
+});
+
+// 14. Lessons round-trip too, through the keys the extraction hands back.
+test('lessons are not re-extracted once their keys are saved', () => {
+  const state = fs.mkdtempSync(path.join(os.tmpdir(), 'extract-lessons-state-'));
+  const p = tmpTranscript([assistantAt(Date.now() - 60 * 1000, 'u-l', `**Lessons:**\n${LESSON_B}`)]);
+  const first = extractFromTranscript(p, loadSeenLessonKeys(state));
+  assert.strictEqual(first.lessons.length, 1);
+  saveSeenLessonKeys(state, first.keys);
+  assert.deepStrictEqual(extractFromTranscript(p, loadSeenLessonKeys(state)).lessons, []);
+});
+
+// 15. Every writer extracts through the library and persists the keys it returns.
+test('stop-summary, periodic-memory and pre-compact share the extractor and its keys', () => {
+  for (const f of ['stop-summary.js', 'periodic-memory.js', 'pre-compact.js']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+    assert.ok(/extractFromTranscript\(/.test(src), `${f} does not use extractFromTranscript`);
+    assert.ok(!/isLessonsHdr/.test(src), `${f} carries its own transcript parser`);
+    // A call statement, not the wrapper stop-summary defines around the library.
+    const persistsKeys = /^\s*(?:if \([^)]*\)\s*)?(?:\w+\.)?saveSeenLessonKeys\((?:[\w.]+,\s*)?keys\);/m;
+    assert.ok(persistsKeys.test(src), `${f} does not persist the extraction's keys`);
+  }
+});
+
 // Report
-console.log(`\nfilterNewCommits tests: ${passed} passed, ${failed} failed`);
+console.log(`\nextract-lessons tests: ${passed} passed, ${failed} failed`);
 if (failures.length) {
   console.log('\nFailures:');
   failures.forEach(f => console.log(`  ✗ ${f}`));

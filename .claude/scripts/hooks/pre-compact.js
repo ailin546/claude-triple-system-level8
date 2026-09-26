@@ -31,7 +31,6 @@ const {
 const {
   extractFromTranscript,
   filterNewCommits,
-  lessonKey,
   loadSeenLessonKeys,
   saveSeenLessonKeys,
 } = require('../lib/extract-lessons');
@@ -122,7 +121,7 @@ function extractAndRecordLessons(stdinJson) {
   const seenKeys = loadSeenLessonKeys(SESSION_STATE_DIR);
 
   // Extract from transcript
-  const { lessons, decisions } = extractFromTranscript(transcriptPath, seenKeys);
+  const { lessons, decisions, keys } = extractFromTranscript(transcriptPath, seenKeys);
 
   // Also collect git commits
   let commits = [];
@@ -198,9 +197,7 @@ function extractAndRecordLessons(stdinJson) {
   }
 
   // Persist seen keys — Stop hook will skip these
-  if (hasLessons) {
-    saveSeenLessonKeys(SESSION_STATE_DIR, lessons.map(l => lessonKey(l)));
-  }
+  if (keys.length > 0) saveSeenLessonKeys(SESSION_STATE_DIR, keys);
 
   const parts = [];
   if (hasCommits) parts.push(`${commits.length} commits`);

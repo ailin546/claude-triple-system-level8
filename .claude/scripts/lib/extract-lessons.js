@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 /**
- * Shared lesson/decision extraction from transcript JSONL.
+ * Shared lesson/decision extraction from transcript JSONL — the one
+ * implementation stop-summary.js, periodic-memory.js and pre-compact.js use.
  *
- * Used by both stop-summary.js (Stop hook) and pre-compact.js (PreCompact hook)
- * to avoid duplicating the extraction logic.
- *
- * Dedup is handled by seen-lessons.json (7-day TTL), so extracting at compact
+ * Dedup is handled by seen-lessons.json (SEEN_TTL_MS), so extracting at compact
  * time does NOT cause double-recording at Stop time.
  */
 
@@ -37,7 +35,18 @@ function lessonKey(cleaned) {
   return match[1].trim().toLowerCase();
 }
 
+/**
+ * Dedup key for a decision: its cleaned text, namespaced apart from lesson keys.
+ */
+function decisionKey(cleaned) {
+  return 'decision:' + cleaned.toLowerCase();
+}
+
 // ── Seen-lessons persistence ────────────────────────────────
+
+// Seen keys expire this long after extraction; extractFromTranscript ignores
+// messages older than it, so no message can be extracted twice.
+const SEEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function getSeenLessonsPath(sessionStateDir) {
   return path.join(sessionStateDir, 'seen-lessons.json');
@@ -48,7 +57,7 @@ function loadSeenLessonKeys(sessionStateDir) {
     const file = getSeenLessonsPath(sessionStateDir);
     if (fs.existsSync(file)) {
       const data = JSON.parse(fs.readFileSync(file, 'utf8'));
-      const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const cutoff = Date.now() - SEEN_TTL_MS;
       const valid = (data.entries || []).filter(e => (e.ts || 0) > cutoff);
       return new Set(valid.map(e => e.key));
     }
@@ -68,7 +77,7 @@ function saveSeenLessonKeys(sessionStateDir, keys) {
         existing = data.entries || [];
       } catch { /* ignore */ }
     }
-    const cutoff = now - 7 * 24 * 60 * 60 * 1000;
+    const cutoff = now - SEEN_TTL_MS;
     const merged = new Map();
     for (const e of existing) {
       if ((e.ts || 0) > cutoff) merged.set(e.key, e.ts);
@@ -89,15 +98,23 @@ const MAX_TRANSCRIPT_BYTES = 10 * 1024 * 1024;
  * Extract lessons and decisions from a transcript JSONL file.
  *
  * @param {string} transcriptPath - Path to JSONL transcript file
- * @param {Set<string>} seenKeys - Already-extracted lesson keys (from seen-lessons.json)
- * @returns {{ lessons: string[], decisions: string[] }}
+ * @param {Set<string>} seenKeys - Already-extracted keys (from seen-lessons.json)
+ * @param {number} [now] - Current time in ms (tests inject it)
+ * @returns {{ lessons: string[], decisions: string[], keys: string[] }}
+ *   `keys` is what the caller persists with saveSeenLessonKeys once the entry
+ *   is written, so neither lessons nor decisions are recorded twice.
  */
-function extractFromTranscript(transcriptPath, seenKeys) {
+function extractFromTranscript(transcriptPath, seenKeys, now = Date.now()) {
   const lessons = [];
   const decisions = [];
+  const result = () => ({
+    lessons,
+    decisions,
+    keys: [...lessons.map(lessonKey), ...decisions.map(decisionKey)],
+  });
 
   if (!transcriptPath || !fs.existsSync(transcriptPath)) {
-    return { lessons, decisions };
+    return result();
   }
 
   try {
@@ -120,6 +137,11 @@ function extractFromTranscript(transcriptPath, seenKeys) {
       try { entry = JSON.parse(jsonLine); } catch { continue; }
 
       if (entry.type !== 'assistant') continue;
+      // A seen key outlives its message by at most SEEN_TTL_MS, so an older
+      // message could no longer be recognized as recorded. Long-lived
+      // transcripts do carry such messages again: Claude Code re-appends old
+      // chains with their original uuid and timestamp.
+      if (now - Date.parse(entry.timestamp) >= SEEN_TTL_MS) continue;
       const content = entry.message?.content;
       if (!Array.isArray(content)) continue;
 
@@ -162,7 +184,7 @@ function extractFromTranscript(transcriptPath, seenKeys) {
             const bulletMatch = trimmed.match(/^[-*]\s+(.+)$/);
             if (bulletMatch) {
               const d = cleanLesson(bulletMatch[1]);
-              if (d.length >= 10 && !decisions.includes(d)) decisions.push(d);
+              if (d.length >= 10 && !seenKeys.has(decisionKey(d)) && !decisions.includes(d)) decisions.push(d);
             }
           }
         }
@@ -170,7 +192,7 @@ function extractFromTranscript(transcriptPath, seenKeys) {
     }
   } catch { /* non-blocking */ }
 
-  return { lessons, decisions };
+  return result();
 }
 
 // ── Commit dedup ────────────────────────────────────────────
@@ -223,4 +245,5 @@ module.exports = {
   loadSeenLessonKeys,
   saveSeenLessonKeys,
   extractFromTranscript,
+  SEEN_TTL_MS,
 };
