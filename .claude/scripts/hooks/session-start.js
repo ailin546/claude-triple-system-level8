@@ -140,12 +140,6 @@ function buildStructuredSummary(rawContent) {
     resumeHint: null,
   };
 
-  // Extract goal from headings before iterating (headings are consumed by section detection)
-  const sessionHeadingMatch = rawContent.match(/^#\s+Session:\s+(.+)$/m);
-  if (sessionHeadingMatch) {
-    summary.goal = sessionHeadingMatch[1].trim();
-  }
-
   let currentSection = null;
 
   for (const line of lines) {
@@ -180,9 +174,10 @@ function buildStructuredSummary(rawContent) {
     }
   }
 
-  // Also try to extract goal from **Project:** header
+  // The goal line names the session's project (both session templates open
+  // with a date heading, not a goal).
   const projectMatch = rawContent.match(/\*\*Project:\*\*\s*(.+)/);
-  if (projectMatch && !summary.goal) {
+  if (projectMatch) {
     summary.goal = projectMatch[1].trim();
   }
 
@@ -216,6 +211,7 @@ function buildStructuredSummary(rawContent) {
 // ── Shared Memory ────────────────────────────────────────────
 
 const { getProjectRoot, getProjectMemoryDir } = require('../lib/project-root');
+const { hookSessionId } = require('../lib/utils');
 const MEMORY_DIR = getProjectMemoryDir();
 const GLOBAL_MEMORY_DIR = path.join(
   process.env.HOME || process.env.USERPROFILE || '/tmp',
@@ -321,7 +317,19 @@ function loadSharedMemory() {
 
 // ── Main ─────────────────────────────────────────────────────
 
+function readHookInput() {
+  return new Promise((resolve) => {
+    let d = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', c => { d += c; });
+    process.stdin.on('end', () => {
+      try { resolve(JSON.parse(d)); } catch { resolve({}); }
+    });
+  });
+}
+
 async function main() {
+  const sessionId = hookSessionId(await readHookInput());
   ensureDir(SESSIONS_DIR);
   ensureDir(LEARNED_DIR);
 
@@ -342,8 +350,12 @@ async function main() {
   // Load project-local shared memory (long-term → weekly → today)
   loadSharedMemory();
 
-  // Load most recent session — inject structured summary, not full text
-  const recentSessions = findFiles(SESSIONS_DIR, '-session.tmp', { maxAge: 7 });
+  // Resume this session's own summary (after /compact or a resume). A new
+  // session has none, and another session's summary is never injected.
+  const shortId = sessionId.slice(0, 8);
+  const recentSessions = shortId
+    ? findFiles(SESSIONS_DIR, `-${shortId}-session.tmp`, { maxAge: 7 })
+    : [];
 
   if (recentSessions.length > 0) {
     const latest = recentSessions[0];

@@ -16,7 +16,7 @@
 User Request
     │
     ├─► ECC Infrastructure (自动触发)
-    │   SessionStart → 加载上次会话状态
+    │   SessionStart → 恢复本会话状态（新会话不注入别的会话）
     │   PreToolUse → 危险命令守卫、编辑冻结
     │   PostToolUse → 自动格式化、类型检查、漂移检测
     │   PreCompact → 上下文压缩前保存状态

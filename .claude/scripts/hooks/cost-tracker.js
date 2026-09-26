@@ -23,6 +23,7 @@ const {
   ensureDir,
   appendFile,
   getClaudeDir,
+  hookSessionId,
 } = require('../lib/utils');
 
 const MAX_STDIN = 1024 * 1024;
@@ -66,7 +67,7 @@ process.stdin.on('end', () => {
     const outputTokens = toNumber(usage.output_tokens || usage.completion_tokens || 0);
 
     const model = String(input.model || input._cursor?.model || process.env.CLAUDE_MODEL || 'unknown');
-    const sessionId = String(process.env.CLAUDE_SESSION_ID || 'default');
+    const sessionId = hookSessionId(input) || 'unknown';
 
     const metricsDir = path.join(getClaudeDir(), 'metrics');
     ensureDir(metricsDir);

@@ -12,6 +12,8 @@ Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式�
 
 所有 hook 的项目根只有一个解析点 `lib/project-root.js::getProjectRoot()`（`lib/utils.js` 的同名函数委托给它）：起点是 Claude Code 给 hook 进程设置的 `CLAUDE_PROJECT_DIR`（会话启动目录，不随 shell cwd 漂移；手动跑脚本、测试时没有这个变量，退回 cwd）；再过两个守卫：① 落在 `~/.claude/` 内 → 折返到 HOME；② 落在任何 `.memory/` 内 → walk-up 到第一个非 `.memory` 祖先（不把 `.memory` 自身的 git repo 当项目根，避免 `.memory/.memory/` 嵌套副本和运行时状态污染记忆库）；最后上溯到 git checkout 根（linked worktree 停在自己的根；起点本身含 `.git` 时不调 git）。`CLAUDE_PROJECT_ROOT` 是显式覆盖（测试用），过守卫后原样返回。2026-09-26 前有两套实现：原始 cwd 版让模式 / drift / escalation 状态和会话开始时间随 cwd 散落到子目录（quant-deploy 子目录里积了 27 个 `.claude/`，已移入废纸篓），git 版把 `~/.claude` 内的会话落到 `~/.claude/.claude/`。回归测试 `__tests__/project-root.test.js`（9 用例，变异 12/12）。
 
+hook 的会话身份只取 stdin 输入里的 `session_id`（`lib/utils.js::hookSessionId`，转成可做文件名的形式）；没有它就不记录，不退化成共用一份。Claude Code 不设置 `CLAUDE_SESSION_ID`：2026-09-26 前按它取身份的 4 个 hook（session-end / drift-detector / suggest-compact / cost-tracker）全部落到同一个 `default`，session-end 每次 Stop 新建一个会话文件（积了 4017 个，已移入废纸篓），session-start 把全机最新的那份当"上次会话"注入新会话（跨会话、跨项目串台），drift 分数与压缩计数跨会话混算。回归测试 `__tests__/session-identity.test.js`（6 用例）+ drift 两个会话隔离用例，变异 12/12。
+
 #### Hook 输出渠道 SSOT（2026-06-29 实测确诊）
 
 > 实现：`lib/hook-output.js::emitAdditionalContext(text, hookEventName='PostToolUse')`。
@@ -34,7 +36,7 @@ Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式�
 
 | Hook | 类型 | 用途 |
 |------|------|------|
-| session-start | SessionStart | 加载上次会话上下文、检测包管理器 |
+| session-start | SessionStart | 恢复本会话自己的摘要（resume / compact 后；新会话不注入别的会话）、检测包管理器 |
 | task-router | SessionStart | 重置模式为 fast、清空 escalation-state、截断 trace 日志 |
 | rules-loader | SessionStart | 检测项目语言，动态加载 rules-all/ 中对应语言规则 |
 | careful-guard | PreToolUse(Bash) | 破坏性命令守卫 v2：DENY（fork bomb / mkfs / dd / `rm -rf /`）无条件拦；CONTEXTUAL 按上下文判（clean tree 的 `reset --hard origin/<br>` 放行；`rm -rf` 按每个操作数判定，全部为 build 工件或 `/tmp/` 之下才放行）；force-push 只在 push 自身 segment 内且 redirect-aware；单条 git/cargo/npm/脚本命令走 allowlist。状态 `~/.claude/.careful-enabled`。单测 50 用例。历史修复见 on-demand/lesson-archive.md |
@@ -54,7 +56,7 @@ Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式�
 
 | Hook | 类型 | 用途 |
 |------|------|------|
-| drift-detector | PostToolUse(*) | 漂移检测：score = 事件分（revert +15 / 连续 3+ 测试失败 +5，跑绿 -10）+ 广度分（最近 30 个 Edit/Write 滑动窗口，封顶 30）。≥20% / ≥40% 经 additionalContext 注入，档位边沿触发一次。单测 36 用例。详见本文件 §Agent Drift Detection |
+| drift-detector | PostToolUse(*) | 漂移检测：score = 事件分（revert +15 / 连续 3+ 测试失败 +5，跑绿 -10）+ 广度分（最近 30 个 Edit/Write 滑动窗口，封顶 30）。≥20% / ≥40% 经 additionalContext 注入，档位边沿触发一次。单测 39 用例。详见本文件 §Agent Drift Detection |
 | post-edit-typecheck | PostToolUse(Edit) | TS 类型检查（tsc --noEmit） |
 | fault-hint | PostToolUse(Edit\|Write) | 容错提示。检测错误处理/外部调用/DB/韧性 pattern → 经 **additionalContext 注入**建议 `/verify fault`（2026-06-29 修：原 `log()`=stderr+exit0 模型看不到；同时修正 settings.json matcher `Bash`→`Edit\|Write`——此前注册在 Bash 下读 `file_path` 永远 undefined → 从未真正触发）|
 | cost-tracker | Stop | 成本追踪 |
@@ -193,7 +195,7 @@ Both thresholds inject via `emitAdditionalContext` (visible to the model),
 clamp，`scoreChanged` 门对"分数持续上涨"形态失效 → 多 crate workspace 正常开发
 被推到 150%+、单 session 15+ 次假阳性 CRITICAL、跑绿 cargo test 也不降分。
 2026-06-29 前史：stderr+exit0 模型看不到，见 §Hook 输出渠道 SSOT。）
-单测 36 用例：`__tests__/drift-detector.test.js`。
+单测 39 用例：`__tests__/drift-detector.test.js`。
 
 ### When It Triggers
 
@@ -203,7 +205,7 @@ Especially valuable during:
 - bounded independent reviewer sessions
 - `ecc-autonomous-loops` scenarios
 
-State stored in `.claude/.drift-state/{session-id}.json`. Resets per session.
+State: `.claude/.drift-state/{session_id}.json`, one file per session (`session_id` from the hook input). A session's first save removes state files untouched for 7 days.
 
 ---
 

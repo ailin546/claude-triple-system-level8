@@ -297,8 +297,8 @@ test('state: recentEdits trimmed to window and malformed entries filtered', () =
 
 // ── E2E: subprocess with hermetic project root ───────────────
 
-function runHook({ stdin, seedState = null, mode = 'standard', sessionId = 'driftsess' }) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'drift-root-'));
+function runHook({ stdin, seedState = null, mode = 'standard', sessionId = 'driftsess', root = null }) {
+  root = root || fs.mkdtempSync(path.join(os.tmpdir(), 'drift-root-'));
   fs.mkdirSync(path.join(root, '.claude'), { recursive: true });
   if (mode) fs.writeFileSync(path.join(root, '.claude', '.task-mode'), mode);
   if (seedState) {
@@ -307,9 +307,10 @@ function runHook({ stdin, seedState = null, mode = 'standard', sessionId = 'drif
     fs.writeFileSync(path.join(dir, `${sessionId}.json`), JSON.stringify(seedState));
   }
   const r = spawnSync('node', [HOOK_PATH], {
-    input: JSON.stringify(stdin),
+    input: JSON.stringify({ session_id: sessionId, ...stdin }),
     cwd: root,
-    env: { ...process.env, CLAUDE_PROJECT_ROOT: root, CLAUDE_SESSION_ID: sessionId },
+    // The session comes from the hook input; a stray environment variable must not matter.
+    env: { ...process.env, CLAUDE_PROJECT_ROOT: root, CLAUDE_SESSION_ID: 'not-this-session' },
     encoding: 'utf8',
   });
   let stateOut = null;
@@ -323,6 +324,45 @@ function injectedText(r) {
   if (!r.stdout.trim()) return '';
   return JSON.parse(r.stdout).hookSpecificOutput?.additionalContext || '';
 }
+
+test('e2e: two sessions in one project keep separate drift state', () => {
+  const a = runHook({ stdin: { tool_name: 'Bash', tool_input: { command: 'git revert HEAD' } }, sessionId: 'sess-a' });
+  const b = runHook({ stdin: { tool_name: 'Edit', tool_input: { file_path: '/x/a.ts' } }, sessionId: 'sess-b', root: a.root });
+  assert.strictEqual(a.state.eventScore, 15, 'the revert counts for the session that made it');
+  assert.strictEqual(b.state.eventScore, 0, "another session's revert must not raise this session's score");
+  const files = fs.readdirSync(path.join(a.root, '.claude', '.drift-state')).sort();
+  assert.deepStrictEqual(files, ['sess-a.json', 'sess-b.json']);
+});
+
+test("e2e: a session's first save clears state files untouched for a week", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'drift-root-'));
+  const dir = path.join(root, '.claude', '.drift-state');
+  fs.mkdirSync(dir, { recursive: true });
+  const stale = path.join(dir, 'old-session.json');
+  const recent = path.join(dir, 'live-session.json');
+  fs.writeFileSync(stale, '{}');
+  fs.writeFileSync(recent, '{}');
+  const eightDaysAgo = (Date.now() - 8 * 24 * 60 * 60 * 1000) / 1000;
+  fs.utimesSync(stale, eightDaysAgo, eightDaysAgo);
+  runHook({ stdin: { tool_name: 'Edit', tool_input: { file_path: '/x/a.ts' } }, sessionId: 'new-session', root });
+  assert.ok(!fs.existsSync(stale), 'a state file untouched for 8 days is removed');
+  assert.ok(fs.existsSync(recent), 'a recently used state file is kept');
+  assert.ok(fs.existsSync(path.join(dir, 'new-session.json')));
+});
+
+test('e2e: without a session id nothing is tracked', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'drift-root-'));
+  fs.mkdirSync(path.join(root, '.claude'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.claude', '.task-mode'), 'standard');
+  const r = spawnSync('node', [HOOK_PATH], {
+    input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git revert HEAD' } }),
+    cwd: root,
+    env: { ...process.env, CLAUDE_PROJECT_ROOT: root, CLAUDE_SESSION_ID: 'not-this-session' },
+    encoding: 'utf8',
+  });
+  assert.strictEqual(r.status, 0);
+  assert.ok(!fs.existsSync(path.join(root, '.claude', '.drift-state')), 'no shared fallback state file');
+});
 
 test('e2e: fast mode skips entirely — no output, no state file', () => {
   const r = runHook({ stdin: { tool_name: 'Edit', tool_input: { file_path: '/x/a.ts' } }, mode: null });

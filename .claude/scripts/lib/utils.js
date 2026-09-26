@@ -171,6 +171,18 @@ function getTimeString() {
   return new Date().toTimeString().split(' ')[0];
 }
 
+// ── Hook input ────────────────────────────────────────────────
+
+/**
+ * The session a hook runs for: `session_id` from the hook's stdin JSON, made
+ * safe for file names; '' when the input carries none. Claude Code does not
+ * set CLAUDE_SESSION_ID, so the hook input is the only source.
+ */
+function hookSessionId(input) {
+  const id = input && typeof input.session_id === 'string' ? input.session_id : '';
+  return id.replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
 // ── Logging ───────────────────────────────────────────────────
 
 /** Log a message to stderr (visible in Claude Code hook output). */
@@ -197,5 +209,6 @@ module.exports = {
   getGitModifiedFiles,
   getDateTimeString,
   getTimeString,
+  hookSessionId,
   log,
 };

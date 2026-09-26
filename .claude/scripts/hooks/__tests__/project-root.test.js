@@ -111,8 +111,9 @@ test('modified files are listed from the root checkout, with paths inside it', (
 }));
 
 test('session-end names the project, worktree and branch after the root, not the cwd', () => withFixture((f) => {
-  const env = envFor(f, { CLAUDE_PROJECT_DIR: f.main, CLAUDE_SESSION_ID: 'rootcase1' });
-  const r = spawnSync(process.execPath, [SESSION_END], { cwd: f.wtNested, input: '{}', encoding: 'utf8', env });
+  const env = envFor(f, { CLAUDE_PROJECT_DIR: f.main });
+  const input = JSON.stringify({ session_id: 'rootcase1' });
+  const r = spawnSync(process.execPath, [SESSION_END], { cwd: f.wtNested, input, encoding: 'utf8', env });
   assert.equal(r.status, 0, r.stderr);
   const dir = path.join(f.home, '.claude', 'sessions');
   const files = fs.readdirSync(dir);

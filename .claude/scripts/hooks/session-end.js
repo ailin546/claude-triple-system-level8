@@ -8,14 +8,15 @@
  * from the session transcript (via stdin JSON transcript_path) and updates a
  * session file for cross-session continuity.
  *
- * All dependencies are inlined except the project root, which has one resolver
- * (lib/project-root.js).
+ * All dependencies are inlined except the project root and the session id, which
+ * each have one home (lib/project-root.js, lib/utils.js).
  */
 
 const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
 const { getProjectRoot } = require('../lib/project-root');
+const { hookSessionId } = require('../lib/utils');
 
 // Session snapshots are always-on (session-start reads them for recovery).
 // No mode gate — this hook runs in all modes (Fast/Standard/Heavy).
@@ -59,13 +60,6 @@ function getDateString() {
 function getTimeString() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
-}
-
-function getSessionIdShort() {
-  // Use CLAUDE_SESSION_ID env var if available, otherwise generate from timestamp
-  const sessionId = process.env.CLAUDE_SESSION_ID || '';
-  if (sessionId) return sessionId.slice(0, 8);
-  return Date.now().toString(36).slice(-6);
 }
 
 function getProjectName() {
@@ -240,18 +234,25 @@ function mergeSessionHeader(content, today, currentTime, metadata) {
 }
 
 async function main() {
-  // Parse stdin JSON to get transcript_path
+  // Parse stdin JSON for the session and its transcript
+  let input = {};
   let transcriptPath = null;
   try {
-    const input = JSON.parse(stdinData);
+    input = JSON.parse(stdinData);
     transcriptPath = input.transcript_path;
   } catch {
     transcriptPath = process.env.CLAUDE_TRANSCRIPT_PATH;
   }
+  // One file per session; without an id there is no file to keep up to date.
+  const sessionId = hookSessionId(input);
+  if (!sessionId) {
+    log('[SessionEnd] No session_id in hook input; nothing recorded');
+    return;
+  }
 
   const sessionsDir = SESSIONS_DIR;
   const today = getDateString();
-  const shortId = getSessionIdShort();
+  const shortId = sessionId.slice(0, 8);
   const sessionFile = path.join(sessionsDir, `${today}-${shortId}-session.tmp`);
   const sessionMetadata = getSessionMetadata();
 

@@ -32,14 +32,26 @@ try {
 const {
   getTempDir,
   writeFile,
-  log
+  log,
+  hookSessionId
 } = require('../lib/utils');
 
+function readHookInput() {
+  return new Promise((resolve) => {
+    let d = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', c => { d += c; });
+    process.stdin.on('end', () => {
+      try { resolve(JSON.parse(d)); } catch { resolve({}); }
+    });
+  });
+}
+
 async function main() {
-  // Track tool call count (increment in a temp file)
-  // Use a session-specific counter file based on session ID from environment
-  // or parent PID as fallback
-  const sessionId = (process.env.CLAUDE_SESSION_ID || 'default').replace(/[^a-zA-Z0-9_-]/g, '') || 'default';
+  // Track tool call count (increment in a temp file), one counter per session
+  // (`session_id` from the hook input).
+  const sessionId = hookSessionId(await readHookInput());
+  if (!sessionId) process.exit(0);
   const counterFile = path.join(getTempDir(), `claude-tool-count-${sessionId}`);
   const rawThreshold = parseInt(process.env.COMPACT_THRESHOLD || '50', 10);
   const threshold = Number.isFinite(rawThreshold) && rawThreshold > 0 && rawThreshold <= 10000

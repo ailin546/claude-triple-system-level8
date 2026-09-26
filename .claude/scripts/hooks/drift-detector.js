@@ -47,11 +47,13 @@ const path = require('path');
 const { getProjectRoot } = require('../lib/project-root');
 const { requireMode } = require('../lib/mode-check');
 const { emitAdditionalContext } = require('../lib/hook-output');
+const { hookSessionId } = require('../lib/utils');
 
 const PROJECT_ROOT = getProjectRoot();
-const SESSION_ID = (process.env.CLAUDE_SESSION_ID || 'default').replace(/[^a-zA-Z0-9_-]/g, '') || 'default';
+// One state file per session (`session_id` from the hook input); a session's
+// first save clears files no session has touched for STALE_STATE_MS.
 const STATE_DIR = path.join(PROJECT_ROOT, '.claude', '.drift-state');
-const STATE_FILE = path.join(STATE_DIR, `${SESSION_ID}.json`);
+const STALE_STATE_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ── Tunables ─────────────────────────────────────────────────
 const WINDOW_SIZE = 30;        // recent Edit/Write events kept for breadth
@@ -186,20 +188,32 @@ function normalizeState(raw) {
   };
 }
 
-function loadState() {
+function loadState(file) {
   try {
-    return normalizeState(JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')));
+    return normalizeState(JSON.parse(fs.readFileSync(file, 'utf8')));
   } catch {
     return normalizeState(null);
   }
 }
 
-function saveState(state) {
+function saveState(file, state) {
   try {
+    const first = !fs.existsSync(file);
     fs.mkdirSync(STATE_DIR, { recursive: true });
-    fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+    fs.writeFileSync(file, JSON.stringify(state, null, 2));
+    if (first) pruneStaleStates();
   } catch {
     // Non-critical — if we can't save, we lose tracking but don't break the session
+  }
+}
+
+function pruneStaleStates() {
+  const cutoff = Date.now() - STALE_STATE_MS;
+  for (const name of fs.readdirSync(STATE_DIR)) {
+    const file = path.join(STATE_DIR, name);
+    try {
+      if (fs.statSync(file).mtimeMs < cutoff) fs.unlinkSync(file);
+    } catch { /* another session pruned it first */ }
   }
 }
 
@@ -211,11 +225,15 @@ function processInput(input) {
     return;
   }
 
+  const sessionId = hookSessionId(toolResult);
+  if (!sessionId) return;
+  const stateFile = path.join(STATE_DIR, `${sessionId}.json`);
+
   const toolName = toolResult.tool_name || '';
   const toolInput = toolResult.tool_input || {};
   const toolOutput = toolResult.tool_output || '';
 
-  const state = loadState();
+  const state = loadState(stateFile);
 
   if ((toolName === 'Edit' || toolName === 'Write') && toolInput.file_path) {
     pushEdit(state, toolInput.file_path);
@@ -231,7 +249,7 @@ function processInput(input) {
   const { band, inject } = decideInjection(state.lastInjectedBand, state.score);
   state.lastInjectedBand = band;
 
-  saveState(state);
+  saveState(stateFile, state);
 
   // NOTE: PostToolUse hooks cannot block (tool already executed). Warnings are
   // injected via additionalContext (visible to the model — plain stderr on an
