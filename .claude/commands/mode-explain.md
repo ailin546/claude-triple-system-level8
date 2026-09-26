@@ -25,5 +25,5 @@ node ~/.claude/scripts/hooks/mode-explain.js $ARGUMENTS
 
 ## Reads (no side effects)
 
-- `.claude/.task-mode` (current mode)
-- `.claude/logs/mode-trace.jsonl` (append-only audit log)
+- this session's mode: `.claude/.mode-state/<session id>.mode` (without a session id: `.claude/.task-mode`)
+- `.claude/logs/mode-trace.jsonl` (append-only audit log; rows carry `session_id`, filtered to this session)

@@ -174,13 +174,15 @@ function getTimeString() {
 // ── Hook input ────────────────────────────────────────────────
 
 /**
- * The session a hook runs for: `session_id` from the hook's stdin JSON, made
- * safe for file names; '' when the input carries none. Claude Code does not
- * set CLAUDE_SESSION_ID, so the hook input is the only source.
+ * The session a hook or script acts for, made safe for file names; '' when
+ * there is none. A hook's stdin JSON carries `session_id`. Claude Code also
+ * exports the same id as CLAUDE_CODE_SESSION_ID to hooks and to its Bash tool,
+ * which is all a script Claude runs through Bash (set-mode, get-model) has.
+ * Claude Code never sets CLAUDE_SESSION_ID.
  */
 function hookSessionId(input) {
-  const id = input && typeof input.session_id === 'string' ? input.session_id : '';
-  return id.replace(/[^a-zA-Z0-9_-]/g, '');
+  const fromInput = input && typeof input.session_id === 'string' ? input.session_id : '';
+  return (fromInput || process.env.CLAUDE_CODE_SESSION_ID || '').replace(/[^a-zA-Z0-9_-]/g, '');
 }
 
 // ── Logging ───────────────────────────────────────────────────

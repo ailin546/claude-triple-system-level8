@@ -45,6 +45,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
+const { getCurrentMode } = require('./mode-check');
 
 const STATE_DIR = path.join(os.homedir(), '.claude', 'state');
 const POW_FILE = path.join(STATE_DIR, 'proof-of-work.jsonl');
@@ -113,16 +114,6 @@ function extractCommands(transcriptText) {
   return [...commands].slice(0, 20);
 }
 
-function readMode(cwd) {
-  try {
-    return fs.readFileSync(path.join(cwd, '.claude', '.task-mode'), 'utf8')
-      .trim()
-      .toLowerCase();
-  } catch {
-    return 'fast';
-  }
-}
-
 function readSessionStart(cwd) {
   try {
     const p = path.join(cwd, '.claude', '.session-state', 'last-start.json');
@@ -158,7 +149,7 @@ function append({ projectRoot, stdinJson, truncated }) {
     const sessionStart = readSessionStart(projectRoot);
     const commits = commitsThisSession(projectRoot, sessionStart);
     const evalPass = readEvalLoopPass();
-    const mode = readMode(projectRoot);
+    const mode = getCurrentMode();
     const commands = extractCommands(stdinJson);
 
     const row = {

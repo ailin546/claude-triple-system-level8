@@ -2,7 +2,7 @@
 /**
  * Mode check utility for ECC hooks.
  *
- * Reads the current task mode from .claude/.task-mode
+ * Reads the current session's task mode (state layout below)
  * and provides helpers for hooks to decide whether to run.
  *
  * Usage in hooks:
@@ -13,26 +13,43 @@
 'use strict';
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const { getProjectRoot } = require('./project-root');
+const { hookSessionId } = require('./utils');
 const PROJECT_ROOT = getProjectRoot();
-const MODE_FILE = path.join(PROJECT_ROOT, '.claude', '.task-mode');
+const CLAUDE_DIR = path.join(PROJECT_ROOT, '.claude');
+
+// Mode, escalation state and the set-mode cooldown belong to one session:
+// `.claude/.mode-state/<session id>.*`. Without a session id (a script run in a
+// plain terminal, another agent) the project-level files are used.
+const SESSION_ID = hookSessionId(null);
+const MODE_STATE_DIR = path.join(CLAUDE_DIR, '.mode-state');
+const PROJECT_MODE_FILE = path.join(CLAUDE_DIR, '.task-mode');
+const sessionFile = (suffix, projectLevel) =>
+  (SESSION_ID ? path.join(MODE_STATE_DIR, `${SESSION_ID}${suffix}`) : projectLevel);
+const MODE_FILE = sessionFile('.mode', PROJECT_MODE_FILE);
+const STALE_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 
 const MODE_LEVELS = { fast: 0, standard: 1, heavy: 2 };
 
+function readModeFile(file) {
+  try {
+    const mode = fs.readFileSync(file, 'utf8').trim().toLowerCase();
+    return mode in MODE_LEVELS ? mode : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Get current task mode. Defaults to 'fast' if file missing.
+ * Get the session's task mode. A session that has not set one yet (it started
+ * before modes were per session) reads the project-level mode; default 'fast'.
  * @returns {'fast' | 'standard' | 'heavy'}
  */
 function getCurrentMode() {
-  try {
-    const mode = fs.readFileSync(MODE_FILE, 'utf8').trim().toLowerCase();
-    if (mode in MODE_LEVELS) return mode;
-    return 'fast';
-  } catch {
-    return 'fast';
-  }
+  return readModeFile(MODE_FILE) || readModeFile(PROJECT_MODE_FILE) || 'fast';
 }
 
 /**
@@ -53,13 +70,32 @@ function requireMode(minMode) {
  */
 function setMode(mode) {
   try {
-    const dir = path.dirname(MODE_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+    const first = !fs.existsSync(MODE_FILE);
+    fs.mkdirSync(path.dirname(MODE_FILE), { recursive: true });
     fs.writeFileSync(MODE_FILE, mode, 'utf8');
+    if (first && SESSION_ID) pruneStaleSessions();
   } catch {
     // Non-blocking
+  }
+}
+
+// Remove the state of sessions that have touched none of their files for
+// STALE_SESSION_MS (an active session refreshes its escalation state on every
+// tool call).
+function pruneStaleSessions() {
+  const names = fs.readdirSync(MODE_STATE_DIR);
+  const newest = new Map();
+  for (const name of names) {
+    const id = name.split('.')[0];
+    try {
+      const mtime = fs.statSync(path.join(MODE_STATE_DIR, name)).mtimeMs;
+      newest.set(id, Math.max(newest.get(id) || 0, mtime));
+    } catch { /* removed meanwhile */ }
+  }
+  const cutoff = Date.now() - STALE_SESSION_MS;
+  for (const name of names) {
+    if ((newest.get(name.split('.')[0]) || 0) >= cutoff) continue;
+    try { fs.unlinkSync(path.join(MODE_STATE_DIR, name)); } catch { /* another session pruned it */ }
   }
 }
 
@@ -79,6 +115,7 @@ function appendModeTrace({ trigger, prev_mode, next_mode, reason, matched_signal
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const line = JSON.stringify({
       timestamp: new Date().toISOString(),
+      session_id: SESSION_ID || null,
       trigger,
       prev_mode,
       next_mode,
@@ -114,7 +151,8 @@ function truncateModeTrace(maxLines = 500, keepLines = 200) {
 
 // ── Escalation State ─────────────────────────────────────────
 
-const ESCALATION_STATE_PATH = path.join(PROJECT_ROOT, '.claude', '.escalation-state.json');
+const ESCALATION_STATE_PATH = sessionFile('.escalation.json', path.join(CLAUDE_DIR, '.escalation-state.json'));
+const SET_MODE_COOLDOWN_PATH = sessionFile('.cooldown.json', path.join(os.homedir(), '.claude', 'state', 'set-mode-cooldown.json'));
 
 /**
  * Read the escalation state (file tracking, last tool use time).
@@ -156,5 +194,6 @@ function clearEscalationState() {
 module.exports = {
   getCurrentMode, requireMode, setMode, MODE_LEVELS,
   appendModeTrace, truncateModeTrace, MODE_TRACE_PATH,
-  getEscalationState, setEscalationState, clearEscalationState, ESCALATION_STATE_PATH
+  getEscalationState, setEscalationState, clearEscalationState, ESCALATION_STATE_PATH,
+  SESSION_ID, SET_MODE_COOLDOWN_PATH
 };

@@ -20,6 +20,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { isGitRepo, getGitModifiedFiles, readFile, log, getProjectRoot, getGlobalMemoryDir, ensureDir } = require('../lib/utils');
 const lessonLib = require('../lib/extract-lessons');
+const { getCurrentMode } = require('../lib/mode-check');
 
 const PROJECT_ROOT = getProjectRoot();
 const MEMORY_DIR = require('../lib/project-root').getProjectMemoryDir();
@@ -643,10 +644,7 @@ const ARCH_RESCUE_COOLDOWN_MS = 24 * 60 * 60 * 1000;  // 24h between nudges
 
 function checkArchitectureRescue() {
   try {
-    const modeFile = path.join(PROJECT_ROOT, '.claude', '.task-mode');
-    if (!fs.existsSync(modeFile)) return;
-    const mode = fs.readFileSync(modeFile, 'utf8').trim();
-    if (mode !== 'heavy') return;
+    if (getCurrentMode() !== 'heavy') return;
 
     ensureDir(ARCH_RESCUE_STATE_DIR);
     let state = { byProject: {} };

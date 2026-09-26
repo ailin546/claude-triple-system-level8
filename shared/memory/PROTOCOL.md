@@ -50,7 +50,7 @@ Codex `codex-global-hook.py::get_project_memory_root()`，两者必须解析到�
 
 以下内容不属于共享记忆，也不应跨工具同步：
 
-- `.task-mode`
+- `.task-mode` 与按会话存放的 `.claude/.mode-state/`（模式、升档累积、重置冷却）
 - hook 锁文件和定时器状态
 - transcript、日志、缓存和成本统计
 - Claude 的 `~/.claude/memory/` sprint 状态

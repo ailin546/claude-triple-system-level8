@@ -2,8 +2,9 @@
 /**
  * SessionStart Hook: Task Mode Router
  *
- * Resets mode to Fast at session start, clears escalation state,
- * truncates mode-trace log, and outputs routing instructions.
+ * Resets this session's mode to Fast and clears its escalation state when a
+ * session starts or is cleared; resume and /compact keep the mode. Truncates
+ * the mode-trace log and outputs routing instructions.
  *
  * Mode escalation happens through three mechanisms:
  * 1. Claude evaluates routing signals and calls set-mode.js (CLAUDE.md rule)
@@ -16,24 +17,20 @@
 
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
-
-const { getProjectRoot } = require('../lib/project-root');
-const PROJECT_ROOT = getProjectRoot();
-const MODE_FILE = path.join(PROJECT_ROOT, '.claude', '.task-mode');
+const {
+  getCurrentMode, setMode, appendModeTrace, truncateModeTrace, clearEscalationState, SESSION_ID,
+} = require('../lib/mode-check');
+const { hookSessionId } = require('../lib/utils');
 const DEFAULT_MODE = 'fast';
 
-function writeMode(mode) {
-  try {
-    const dir = path.dirname(MODE_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(MODE_FILE, mode, 'utf8');
-  } catch (err) {
-    console.error(`[TaskRouter] Failed to write mode file: ${err.message}`);
-  }
+// The hook input and the environment must name the same session; otherwise
+// mode state is not per session (as when the missing CLAUDE_SESSION_ID once
+// silently shared every session's state).
+function sessionIdWarning(input) {
+  const fromInput = hookSessionId({ session_id: input.session_id });
+  if (fromInput === SESSION_ID) return '';
+  return `[TaskRouter] WARNING: hook input names session ${fromInput.slice(0, 8)} but CLAUDE_CODE_SESSION_ID `
+    + `${SESSION_ID ? `names ${SESSION_ID.slice(0, 8)}` : 'is unset'}; mode state is not per session.`;
 }
 
 function output(msg) {
@@ -44,39 +41,38 @@ function log(msg) {
   console.error(msg);
 }
 
-function main() {
-  // Always reset to Fast at session start
-  writeMode(DEFAULT_MODE);
-
-  // Clear escalation state and truncate trace log
-  try {
-    const { appendModeTrace, truncateModeTrace, clearEscalationState } = require('../lib/mode-check');
-    clearEscalationState();
-    truncateModeTrace();
-    appendModeTrace({
-      trigger: 'task-router',
-      prev_mode: '',
-      next_mode: 'fast',
-      reason: 'session-init',
-      matched_signal: null,
-      overridden_by_user: false
-    });
-  } catch {
-    // mode-check not available — continue without trace
-  }
+function main(input) {
+  // Resume and /compact continue the same session; only a new session or /clear
+  // starts from Fast. Writing the kept mode pins it to this session.
+  const continuing = input.source === 'resume' || input.source === 'compact';
+  const mode = continuing ? getCurrentMode() : DEFAULT_MODE;
+  const warning = sessionIdWarning(input);
+  setMode(mode);
+  if (!continuing) clearEscalationState();
+  truncateModeTrace();
+  appendModeTrace({
+    trigger: 'task-router',
+    prev_mode: '',
+    next_mode: mode,
+    reason: continuing ? `session-${input.source}` : 'session-init',
+    matched_signal: null,
+    overridden_by_user: false
+  });
 
   // Build model hint
   let modelHint = '';
   try {
     const { getModelSummary } = require('../lib/model-map');
-    modelHint = '\n' + getModelSummary({ mode: 'fast' }) +
+    modelHint = '\n' + getModelSummary({ mode }) +
       '\nWhen spawning agents, pass the `model` parameter matching the current mode. ' +
       'Query: node .claude/scripts/hooks/get-model.js <agent-name>';
   } catch { /* model-map not available */ }
 
   // Output routing instructions into Claude's context
+  const label = mode.charAt(0).toUpperCase() + mode.slice(1);
   output([
-    '[TaskRouter] Mode: Fast (default)',
+    continuing ? `[TaskRouter] Mode: ${label} (kept after ${input.source})` : '[TaskRouter] Mode: Fast (default)',
+    ...(warning ? [warning] : []),
     '',
     'ROUTING REMINDER: Before starting work, evaluate the task against these signals:',
     '→ Heavy: auth, oauth, payment, billing, permission, deploy, migration, secret, PII, multi-agent',
@@ -89,7 +85,8 @@ function main() {
     modelHint,
   ].join('\n'));
 
-  log('[TaskRouter] Initialized mode: fast, escalation state cleared, trace truncated');
+  log(`[TaskRouter] Mode ${mode}${continuing ? ` kept after ${input.source}` : ', escalation state cleared'}; trace truncated`);
+  if (warning) log(warning);
 }
 
 // ── stdin entry point (hook protocol) ────────────────────────
@@ -103,11 +100,13 @@ process.stdin.on('data', chunk => {
   }
 });
 process.stdin.on('end', () => {
+  let input = {};
+  try { input = JSON.parse(stdinData) || {}; } catch { /* no hook input */ }
   try {
-    main();
+    main(input);
   } catch (err) {
     log(`[TaskRouter] Error: ${err.message}`);
-    writeMode(DEFAULT_MODE);
+    setMode(DEFAULT_MODE);
   }
   process.exit(0);
 });

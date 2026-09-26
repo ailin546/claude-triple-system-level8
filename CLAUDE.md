@@ -132,7 +132,7 @@ Spawn 子 agent 时根据当前模式（`.claude/.task-mode`）选择模型 — 
 | §编码行为准则 重排 | Rule 1 根因优先 > Rule 2 精准改动 > Rule 3 过度设计 |
 | `user-prompt-classify` hook | fix/bug 关键词自动升 standard + 首条 prompt 注入深度评估 |
 | `fix-depth-check` hook | fix-only commit 缺根因 → stderr 软警告 |
-| `set-mode --reset` 加固 | `--reason` ≥10 字符 + 20min cooldown + 可疑词阻断（防无理由降档） |
+| `set-mode --reset` 加固 | `--reason` ≥10 字符 + 20min cooldown（按会话）+ 可疑词阻断（防无理由降档） |
 | Verification Gate | 完成声明必须附最新、相关的验证证据；不能运行的部分明确披露 |
 
 **反模式自警**（说出/做出立刻警觉）：

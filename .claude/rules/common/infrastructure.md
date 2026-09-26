@@ -12,7 +12,7 @@ Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式�
 
 所有 hook 的项目根只有一个解析点 `lib/project-root.js::getProjectRoot()`（`lib/utils.js` 的同名函数委托给它）：起点是 Claude Code 给 hook 进程设置的 `CLAUDE_PROJECT_DIR`（会话启动目录，不随 shell cwd 漂移；手动跑脚本、测试时没有这个变量，退回 cwd）；再过两个守卫：① 落在 `~/.claude/` 内 → 折返到 HOME；② 落在任何 `.memory/` 内 → walk-up 到第一个非 `.memory` 祖先（不把 `.memory` 自身的 git repo 当项目根，避免 `.memory/.memory/` 嵌套副本和运行时状态污染记忆库）；最后上溯到 git checkout 根（linked worktree 停在自己的根；起点本身含 `.git` 时不调 git）。`CLAUDE_PROJECT_ROOT` 是显式覆盖（测试用），过守卫后原样返回。2026-09-26 前有两套实现：原始 cwd 版让模式 / drift / escalation 状态和会话开始时间随 cwd 散落到子目录（quant-deploy 子目录里积了 27 个 `.claude/`，已移入废纸篓），git 版把 `~/.claude` 内的会话落到 `~/.claude/.claude/`。回归测试 `__tests__/project-root.test.js`（9 用例，变异 12/12）。
 
-hook 的会话身份只取 stdin 输入里的 `session_id`（`lib/utils.js::hookSessionId`，转成可做文件名的形式）；没有它就不记录，不退化成共用一份。Claude Code 不设置 `CLAUDE_SESSION_ID`：2026-09-26 前按它取身份的 4 个 hook（session-end / drift-detector / suggest-compact / cost-tracker）全部落到同一个 `default`，session-end 每次 Stop 新建一个会话文件（积了 4017 个，已移入废纸篓），session-start 把全机最新的那份当"上次会话"注入新会话（跨会话、跨项目串台），drift 分数与压缩计数跨会话混算。回归测试 `__tests__/session-identity.test.js`（5 用例）+ drift 两个会话隔离用例，变异 12/12。
+hook 与脚本的会话身份只有一个解析点 `lib/utils.js::hookSessionId`：先取 stdin 输入里的 `session_id`，没有时取 `CLAUDE_CODE_SESSION_ID`（Claude Code 给 hook 进程和 Bash 工具都设了同一个值；Claude 从 Bash 调的 set-mode / get-model 只有它），转成可做文件名的形式；两者都没有就不记录，不退化成共用一份。Claude Code 不设置 `CLAUDE_SESSION_ID`：2026-09-26 前按它取身份的 4 个 hook（session-end / drift-detector / suggest-compact / cost-tracker）全部落到同一个 `default`，session-end 每次 Stop 新建一个会话文件（积了 4017 个，已移入废纸篓），session-start 把全机最新的那份当"上次会话"注入新会话（跨会话、跨项目串台），drift 分数与压缩计数跨会话混算。回归测试 `__tests__/session-identity.test.js`（5 用例）+ drift 两个会话隔离用例，变异 12/12。
 
 #### Hook 输出渠道 SSOT（2026-06-29 实测确诊）
 
@@ -37,7 +37,7 @@ hook 的会话身份只取 stdin 输入里的 `session_id`（`lib/utils.js::hook
 | Hook | 类型 | 用途 |
 |------|------|------|
 | session-start | SessionStart | 恢复本会话自己的摘要（resume / compact 后；新会话不注入别的会话）、检测包管理器 |
-| task-router | SessionStart | 重置模式为 fast、清空 escalation-state、截断 trace 日志 |
+| task-router | SessionStart | 新会话与 /clear 时把本会话模式重置为 fast 并清空其升档累积（resume / compact 保留）；截断 trace 日志；hook 输入与 `CLAUDE_CODE_SESSION_ID` 不一致时告警 |
 | rules-loader | SessionStart | 检测项目语言，动态加载 rules-all/ 中对应语言规则 |
 | careful-guard | PreToolUse(Bash) | 破坏性命令守卫 v2：DENY（fork bomb / mkfs / dd / `rm -rf /`）无条件拦；CONTEXTUAL 按上下文判（clean tree 的 `reset --hard origin/<br>` 放行；`rm -rf` 按每个操作数判定，全部为 build 工件或 `/tmp/` 之下才放行）；force-push 只在 push 自身 segment 内且 redirect-aware；单条 git/cargo/npm/脚本命令走 allowlist。状态 `~/.claude/.careful-enabled`。单测 50 用例。历史修复见 on-demand/lesson-archive.md |
 | freeze-guard | PreToolUse(Edit\|Write) | 编辑范围冻结守卫（/freeze 机制） |
@@ -112,12 +112,14 @@ hook 的会话身份只取 stdin 输入里的 `session_id`（`lib/utils.js::hook
 2. **user-prompt-classify.js**（自动）— UserPromptSubmit 检测 fix/bug 关键词 → fast 升 standard
 3. **set-mode.js**（手动）— Claude 主动调用：
    - 升档：`node .claude/scripts/hooks/set-mode.js <mode>`
-   - 重置：`node .claude/scripts/hooks/set-mode.js --reset --reason "..."` — **必须提供 reason ≥10 字符**，且 20 分钟内只允许重置一次（除非 `--force`）
+   - 重置：`node .claude/scripts/hooks/set-mode.js --reset --reason "..."` — **必须提供 reason ≥10 字符**，且同一会话 20 分钟内只允许重置一次（除非 `--force`）
    - 重置 reason 含 "evaluation"/"gate"/"bypass"/"just a quick" 等可疑词 → 自动阻断（历史原因：原为防 evaluation-gate 绕过，该门已退役）。如确为新任务，传 `--force`
    - 2026-05-01 调参：cooldown 1h→20min（实战发现单 session 多任务边界是常态）；过滤词移除 "commit"（太通用，误伤合法 doc/refactor commit reason）
-4. **任务边界自动 reset** — pre-tool-escalate.js 检测到 5 分钟空闲间隔时自动 reset 到 fast（不受手动 cooldown 约束）
+4. **任务边界自动 reset** — pre-tool-escalate.js 检测到本会话 5 分钟空闲间隔时自动 reset 到 fast（不受手动 cooldown 约束）
 
 规则：只升不降（除非任务边界 reset 或 `set-mode.js --reset --reason "..."`）。
+
+**按会话存**：模式、升档累积、set-mode 重置冷却都存在 `.claude/.mode-state/<会话 id>.{mode,escalation.json,cooldown.json}`，读写唯一经 `lib/mode-check.js`（会话 id 同 `hookSessionId`），同一项目的并发会话互不重置、互不累加。会话还没写过自己的模式时读项目级 `.claude/.task-mode`（改动前已在运行的会话由此过渡）；没有会话 id（终端里手动跑、其它 agent）时全部回退到项目级文件。会话首次写模式时，清掉 7 天内没动过任何文件的会话。2026-09-26 前三样都是项目级（冷却甚至全机一份）：任一会话启动 / 恢复 / 压缩都把同项目其它会话降回 fast，自己 /compact 也会掉回 fast。回归测试 `__tests__/mode-state.test.js`（12 用例，变异 15/15）。
 
 **Reset cooldown**：沿用，防反射式降档；原始动机 evaluation-gate 已于 2026-08-02 退役。
 
@@ -125,6 +127,7 @@ hook 的会话身份只取 stdin 输入里的 `session_id`（`lib/utils.js::hook
 
 所有模式变化记录到 `.claude/logs/mode-trace.jsonl`，每行包含：
 - `timestamp` — ISO 时间戳
+- `session_id` — 所属会话（没有会话 id 时为 null）
 - `trigger` — 触发源（task-router / pre-tool-escalate / set-mode）
 - `prev_mode` / `next_mode` — 变化前后的模式
 - `reason` — 人可读原因
@@ -133,7 +136,7 @@ hook 的会话身份只取 stdin 输入里的 `session_id`（`lib/utils.js::hook
 
 trace 文件在每次 session init 时自动截断（超过 500 行保留最后 200 行）。
 
-**查询入口**：`/mode-explain` 或 `node ~/.claude/scripts/hooks/mode-explain.js [-n N | --all]` — 显示当前 mode + 最近 N 条变更（who/when/why），不需手动读 JSONL。2026-05-20 新增（Codex N1: 5 个入口可改 mode 但状态不可解释）。
+**查询入口**：`/mode-explain` 或 `node ~/.claude/scripts/hooks/mode-explain.js [-n N | --all]` — 显示本会话当前 mode + 本会话最近 N 条变更（who/when/why），不需手动读 JSONL。2026-05-20 新增（Codex N1: 5 个入口可改 mode 但状态不可解释）。
 
 ### 降级行为
 

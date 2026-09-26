@@ -1,7 +1,7 @@
 'use strict';
-// Which session a hook acts for: `session_id` from the hook's stdin JSON
-// (lib/utils.js::hookSessionId). Claude Code does not set CLAUDE_SESSION_ID;
-// every case sets it to a decoy to prove it is ignored.
+// Which session a hook acts for (lib/utils.js::hookSessionId): `session_id`
+// from the hook's stdin JSON, else CLAUDE_CODE_SESSION_ID. Claude Code never
+// sets CLAUDE_SESSION_ID; every case sets it to a decoy to prove it is ignored.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -35,6 +35,9 @@ function withSandbox(fn) {
 function runHook(s, hook, input, extraEnv = {}) {
   const env = { ...process.env, HOME: s.home, CLAUDE_PROJECT_ROOT: s.project, CLAUDE_SESSION_ID: 'decoy-env-id', ...extraEnv };
   delete env.CLAUDE_PROJECT_DIR;
+  // Production parity: CLAUDE_CODE_SESSION_ID names the same session as the input.
+  if (input.session_id) env.CLAUDE_CODE_SESSION_ID = input.session_id;
+  else delete env.CLAUDE_CODE_SESSION_ID;
   const r = spawnSync(process.execPath, [path.join(HOOKS, hook)], {
     cwd: s.project, input: JSON.stringify(input), encoding: 'utf8', env,
   });
@@ -45,17 +48,23 @@ function runHook(s, hook, input, extraEnv = {}) {
 const A = 'aaaa1111-2222-3333-4444-555566667777';
 const B = 'bbbb1111-2222-3333-4444-555566667777';
 
-test('hookSessionId reads the hook input only, made safe for file names', () => {
-  const saved = process.env.CLAUDE_SESSION_ID;
+test('hookSessionId: the hook input, else CLAUDE_CODE_SESSION_ID, made safe for file names', () => {
+  const saved = { legacy: process.env.CLAUDE_SESSION_ID, code: process.env.CLAUDE_CODE_SESSION_ID };
   process.env.CLAUDE_SESSION_ID = 'decoy-env-id';
   try {
+    delete process.env.CLAUDE_CODE_SESSION_ID;
     assert.equal(hookSessionId({ session_id: A }), A);
-    assert.equal(hookSessionId({}), '');
+    assert.equal(hookSessionId({}), '', 'CLAUDE_SESSION_ID is never a source');
     assert.equal(hookSessionId(null), '');
     assert.equal(hookSessionId({ session_id: '../x y' }), 'xy');
+    process.env.CLAUDE_CODE_SESSION_ID = B;
+    assert.equal(hookSessionId(null), B, 'a script run through Bash has only the environment');
+    assert.equal(hookSessionId({ session_id: A }), A, 'the hook input wins');
   } finally {
-    if (saved === undefined) delete process.env.CLAUDE_SESSION_ID;
-    else process.env.CLAUDE_SESSION_ID = saved;
+    for (const [k, v] of [['CLAUDE_SESSION_ID', saved.legacy], ['CLAUDE_CODE_SESSION_ID', saved.code]]) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
   }
 });
 

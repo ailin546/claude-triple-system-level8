@@ -27,10 +27,10 @@
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-const { getCurrentMode, setMode, MODE_LEVELS, appendModeTrace, clearEscalationState } = require('../lib/mode-check');
+const { getCurrentMode, setMode, MODE_LEVELS, appendModeTrace, clearEscalationState, SET_MODE_COOLDOWN_PATH } = require('../lib/mode-check');
 
-const COOLDOWN_FILE = path.join(os.homedir(), '.claude', 'state', 'set-mode-cooldown.json');
+// Per session, like the mode it guards (lib/mode-check.js).
+const COOLDOWN_FILE = SET_MODE_COOLDOWN_PATH;
 const COOLDOWN_MS = 20 * 60 * 1000; // 20 min — calibrated from 2026-05-01 observation:
 //   1h was too long for single-session multi-task work (3+ task boundaries within 1h is common).
 //   20min still blocks reflex "reset → commit → reset" cycles within one task arc,

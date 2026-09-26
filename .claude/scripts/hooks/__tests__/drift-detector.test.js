@@ -309,8 +309,9 @@ function runHook({ stdin, seedState = null, mode = 'standard', sessionId = 'drif
   const r = spawnSync('node', [HOOK_PATH], {
     input: JSON.stringify({ session_id: sessionId, ...stdin }),
     cwd: root,
-    // The session comes from the hook input; a stray environment variable must not matter.
-    env: { ...process.env, CLAUDE_PROJECT_ROOT: root, CLAUDE_SESSION_ID: 'not-this-session' },
+    // Production parity: the hook input and CLAUDE_CODE_SESSION_ID name the same
+    // session; CLAUDE_SESSION_ID is never set by Claude Code and must not matter.
+    env: { ...process.env, CLAUDE_PROJECT_ROOT: root, CLAUDE_CODE_SESSION_ID: sessionId, CLAUDE_SESSION_ID: 'not-this-session' },
     encoding: 'utf8',
   });
   let stateOut = null;
@@ -357,7 +358,11 @@ test('e2e: without a session id nothing is tracked', () => {
   const r = spawnSync('node', [HOOK_PATH], {
     input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git revert HEAD' } }),
     cwd: root,
-    env: { ...process.env, CLAUDE_PROJECT_ROOT: root, CLAUDE_SESSION_ID: 'not-this-session' },
+    env: (() => {
+      const env = { ...process.env, CLAUDE_PROJECT_ROOT: root, CLAUDE_SESSION_ID: 'not-this-session' };
+      delete env.CLAUDE_CODE_SESSION_ID;
+      return env;
+    })(),
     encoding: 'utf8',
   });
   assert.strictEqual(r.status, 0);

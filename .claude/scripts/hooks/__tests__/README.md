@@ -27,7 +27,8 @@
 | [command-scan.test.js](./command-scan.test.js) | 纯函数解析库（strip-quote / segment / git-head / 全局选项 / 重定向 / 命令替换）| 25 |
 | [memory-sync.test.js](./memory-sync.test.js) | 阻断（push 安全闸 / 全局分支闸）+ 解析配置（porcelain）+ 记忆定位（worktree / 子目录）+ 真 git fixture | 16 |
 | [pre-compact.test.js](./pre-compact.test.js) | state file（写 today.md）+ 解析内容（commit 去重）| 2 |
-| [session-identity.test.js](./session-identity.test.js) | state file 落点：会话身份只取 hook 输入的 session_id（session-end 每会话一个文件 / session-start 只恢复本会话 / suggest-compact 按会话计数）| 5 |
+| [mode-state.test.js](./mode-state.test.js) | state file + mode gate：模式 / 升档累积 / 重置冷却按会话存（并发会话互不重置、resume 与 compact 保留、无 id 回退项目级、7 天清理、只经 mode-check 读写）| 12 |
+| [session-identity.test.js](./session-identity.test.js) | state file 落点：会话身份取 hook 输入的 session_id，否则 CLAUDE_CODE_SESSION_ID（session-end 每会话一个文件 / session-start 只恢复本会话 / suggest-compact 按会话计数）| 5 |
 | [project-root.test.js](./project-root.test.js) | state file 落点：hook 项目根唯一解析点（启动目录 / 守卫 / checkout 根 / 两个入口同解）+ session-end 元数据 + 真 git fixture | 9 |
 
 > 2026-06-06：`command-scan.js` 是 `lib/` 下的纯函数解析库（无副作用，README §17 本可豁免），但因它支撑两个阻断 hook（evaluation-gate exit 2 + pre-tool-escalate mode），仍配单测。`evaluation-gate.test.js` 新增 subprocess 集成测试演示如何用 throwaway `HOME` hermetic 跑真实 hook 的 exit-code，不碰真实 marker。

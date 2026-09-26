@@ -2,9 +2,9 @@
 /**
  * mode-explain.js — Show current task mode + recent mode change history.
  *
- * Reads:
- *   - .claude/.task-mode (current mode)
- *   - .claude/logs/mode-trace.jsonl (audit log of all mode changes)
+ * Reads, through lib/mode-check.js:
+ *   - this session's mode (.claude/.mode-state/<session id>.mode)
+ *   - .claude/logs/mode-trace.jsonl, filtered to this session's changes
  *
  * Usage:
  *   node ~/.claude/scripts/hooks/mode-explain.js          # last 5 changes
@@ -18,12 +18,10 @@
  */
 
 const fs = require('fs');
-const path = require('path');
 const { getProjectRoot } = require('../lib/project-root');
+const { getCurrentMode, MODE_TRACE_PATH: TRACE_FILE, SESSION_ID } = require('../lib/mode-check');
 
 const PROJECT_ROOT = getProjectRoot();
-const MODE_FILE = path.join(PROJECT_ROOT, '.claude', '.task-mode');
-const TRACE_FILE = path.join(PROJECT_ROOT, '.claude', 'logs', 'mode-trace.jsonl');
 
 function parseArgs(argv) {
   const args = { n: 5, all: false };
@@ -34,15 +32,11 @@ function parseArgs(argv) {
   return args;
 }
 
-function readCurrentMode() {
-  try { return fs.readFileSync(MODE_FILE, 'utf8').trim(); }
-  catch { return '(unset → fast default)'; }
-}
-
 function readTrace() {
   if (!fs.existsSync(TRACE_FILE)) return [];
   const lines = fs.readFileSync(TRACE_FILE, 'utf8').split('\n').filter(Boolean);
-  return lines.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  const rows = lines.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  return SESSION_ID ? rows.filter(r => r.session_id === SESSION_ID) : rows;
 }
 
 function formatRow(entry) {
@@ -59,16 +53,17 @@ function formatRow(entry) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
-  const current = readCurrentMode();
+  const current = getCurrentMode();
   const trace = readTrace();
 
   console.log(`## Current mode: ${current}`);
   console.log(`Project root: ${PROJECT_ROOT}`);
+  console.log(`Session:      ${SESSION_ID || '(none: project-level state)'}`);
   console.log(`Trace file:   ${TRACE_FILE} (${trace.length} entries)`);
   console.log('');
 
   if (!trace.length) {
-    console.log('No mode-trace entries yet. SessionStart will populate it.');
+    console.log(SESSION_ID ? 'No mode changes recorded for this session yet.' : 'No mode-trace entries yet. SessionStart will populate it.');
     return;
   }
 
@@ -80,7 +75,7 @@ function main() {
   }
   console.log('');
   console.log('## How to read');
-  console.log('  trigger=task-router        → SessionStart reset to fast');
+  console.log('  trigger=task-router        → new session or /clear resets to fast; resume / compact keep the mode');
   console.log('  trigger=set-mode           → manual via Claude/user');
   console.log('  trigger=pre-tool-escalate  → auto upgrade from risk signal');
   console.log('  trigger=user-prompt-classify → fix/bug keyword auto-upgrade');

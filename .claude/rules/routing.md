@@ -83,10 +83,10 @@ node ~/.claude/scripts/hooks/set-mode.js --reset           # 回到 fast
 node ~/.claude/scripts/hooks/set-mode.js --reset standard   # 回到 fast 再升到 standard
 ```
 
-> Fast 模式是默认值（SessionStart 已写入），无需额外执行。
+> Fast 模式是默认值（新会话与 /clear 时写入；resume / compact 保留本会话原模式），无需额外执行。模式按会话存，同项目的其它会话不受影响。
 > `pre-tool-escalate.js` 在高风险操作时自动升档，并追踪跨文件累积（3 文件 → Standard，6 文件 → Heavy；纯文档 `.md`/`.txt`/`.rst`/`.adoc` 不计入——写文档按本文件模式定义属 Fast，2026-07-16 修）。目录名风险信号（auth/ deploy/ api/ 等路径段）对纯文档同样豁免——`docs/deploy/guide.md` 不升档，2026-07-17 修。
-> 5 分钟空闲间隔自动触发任务边界 reset（模式回到 fast，文件追踪清空）。
-> 所有模式变化记录到 `.claude/logs/mode-trace.jsonl`。
+> 本会话 5 分钟空闲间隔自动触发任务边界 reset（模式回到 fast，文件追踪清空）。
+> 所有模式变化记录到 `.claude/logs/mode-trace.jsonl`（每行带 session_id）。
 
 示例：
 ```text
