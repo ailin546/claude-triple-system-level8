@@ -53,7 +53,7 @@ Superpowers 插件及其活动入口已停用。`using-superpowers`、`subagent-
 **推荐命令链**：
 - Fast：直接做 → `/verify`
 - Standard：必要时 `/plan` → 实施 → 按风险一次 `/code-review` → `/verify`
-- Heavy：确认 Execution Brief → `/plan` → 实施 → 一次 `/code-review` → `/verify`
+- Heavy：确认 Execution Brief → `/plan` → 实施 → 一次 `/code-review` → `/verify`；资金路径提交后另派一次 Codex 对抗审查（§Codex 调用规则「资金路径自动对抗审查」）
 
 `evaluation-loop` 只用于有基线、指标、验证命令和守护命令的可度量改进，默认最多 3 轮；
 它不是 Standard/Heavy 的默认步骤。代码审查默认一次，只有修复 Critical/High 后允许一次复核，
@@ -80,10 +80,12 @@ Superpowers 插件及其活动入口已停用。`using-superpowers`、`subagent-
 | 用户意图 | 入口 | 链路 |
 |---------|------|------|
 | 卡住/二次实现/深度根因/委派复杂改动 | `Agent(subagent_type="codex:codex-rescue")` 或 `/codex:rescue` | rescue agent → `codex-cli-runtime` skill → `codex-companion.mjs task` |
-| 代码审查（Codex 视角） | `/codex:review` | helper `review` 子命令 |
-| 对抗性审查 | `/codex:adversarial-review` | helper `adversarial-review` 子命令 |
+| 代码审查 / 对抗性审查（用户手动） | `/codex:review` `/codex:adversarial-review` | helper `review` / `adversarial-review` 子命令 |
+| 资金路径改动的对抗审查（模型自动） | `Agent(subagent_type="codex:codex-rescue")` | rescue agent → 只读 `task`（不加 `--write`） |
 | 检查/安装/认证 Codex | `/codex:setup` | helper `setup` 子命令 |
 | 查询、取回、取消运行 | `/codex:status` `/codex:result` `/codex:cancel` | helper 对应子命令 |
+
+`review` / `adversarial-review` / `status` / `result` / `cancel` 在插件里标了 `disable-model-invocation: true`：只有用户能调，模型经 Skill 调用一律被拒。模型侧的 Codex 审查只有 rescue 的只读 `task` 这一条路。
 
 ### 强制约束
 
@@ -92,6 +94,7 @@ Superpowers 插件及其活动入口已停用。`using-superpowers`、`subagent-
 3. **结果呈现**：拿到 helper stdout 后**必须**应用 `codex:codex-result-handling` skill（保留 verdict/findings/severity 顺序、不自动应用 review 修复、失败不补刀重写）。
 4. **Forwarder 纪律**：rescue agent 是转发器**不是**编排器 — 一次 `task` 调用，原样返回 stdout，禁止自己改代码、做独立分析、或在 task 失败时切换到 Claude 侧实现。
 5. **不重新发明**：不要写新 hook/script 去包装 Codex；插件 helper 已经处理 runtime、auth、session 复用。
+6. **资金路径自动对抗审查**：Heavy 模式下改到资金路径（下单 / 撤单 / 成交入账 / 结算 / 风控门 / 余额与预留 / 对冲执行）的代码，在最后一次代码提交之后（独立审查的整改也已提交）、推送或合并之前，主 agent 自动派一次 `codex:codex-rescue` 做只读对抗审查：task 写明被审 worktree 的绝对路径与提交范围，只读、不改文件。结果按第 3 条原样呈现后停下，修哪些由用户定。Codex 不可用（额度 / 认证 / 运行失败）时如实报告，不拿 Claude 侧审查顶替。
 
 ### 反模式（禁止）
 

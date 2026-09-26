@@ -33,6 +33,7 @@
 3. **Review**
    - 非平凡或高风险改动按风险审查一次；普通改动可由主 agent 自审。
    - 只有第一次发现 Critical/High 并完成修复后，才允许一次复核；第三次及以后需用户明确要求。
+   - 资金路径（Heavy）另加一次 Codex 对抗审查，不占上述次数；何时派、怎么派见 `~/.claude/CLAUDE.md §Codex 调用规则`「资金路径自动对抗审查」。
 
 4. **Verify** (`/verify pre-pr`)
    - 选择最小但有意义的 build、types、lint、tests 或安全检查，并对照验收条件。

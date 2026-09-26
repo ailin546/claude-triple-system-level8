@@ -29,6 +29,7 @@
 
 多 agent、shared-state 和可度量 evaluation-loop 均为按需能力，不因 Heavy 自动启用。
 Review 默认一次；只有修复 Critical/High 后允许一次复核，第三次及以后需用户明确要求。
+资金路径另加一次 Codex 对抗审查，不占上述次数（`~/.claude/CLAUDE.md §Codex 调用规则`「资金路径自动对抗审查」）。
 
 手动触发：`/save-session`、`/resume-session`。
 
