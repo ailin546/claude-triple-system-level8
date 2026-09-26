@@ -12,7 +12,7 @@ Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式�
 
 所有 hook 的项目根只有一个解析点 `lib/project-root.js::getProjectRoot()`（`lib/utils.js` 的同名函数委托给它）：起点是 Claude Code 给 hook 进程设置的 `CLAUDE_PROJECT_DIR`（会话启动目录，不随 shell cwd 漂移；手动跑脚本、测试时没有这个变量，退回 cwd）；再过两个守卫：① 落在 `~/.claude/` 内 → 折返到 HOME；② 落在任何 `.memory/` 内 → walk-up 到第一个非 `.memory` 祖先（不把 `.memory` 自身的 git repo 当项目根，避免 `.memory/.memory/` 嵌套副本和运行时状态污染记忆库）；最后上溯到 git checkout 根（linked worktree 停在自己的根；起点本身含 `.git` 时不调 git）。`CLAUDE_PROJECT_ROOT` 是显式覆盖（测试用），过守卫后原样返回。2026-09-26 前有两套实现：原始 cwd 版让模式 / drift / escalation 状态和会话开始时间随 cwd 散落到子目录（quant-deploy 子目录里积了 27 个 `.claude/`，已移入废纸篓），git 版把 `~/.claude` 内的会话落到 `~/.claude/.claude/`。回归测试 `__tests__/project-root.test.js`（9 用例，变异 12/12）。
 
-hook 的会话身份只取 stdin 输入里的 `session_id`（`lib/utils.js::hookSessionId`，转成可做文件名的形式）；没有它就不记录，不退化成共用一份。Claude Code 不设置 `CLAUDE_SESSION_ID`：2026-09-26 前按它取身份的 4 个 hook（session-end / drift-detector / suggest-compact / cost-tracker）全部落到同一个 `default`，session-end 每次 Stop 新建一个会话文件（积了 4017 个，已移入废纸篓），session-start 把全机最新的那份当"上次会话"注入新会话（跨会话、跨项目串台），drift 分数与压缩计数跨会话混算。回归测试 `__tests__/session-identity.test.js`（6 用例）+ drift 两个会话隔离用例，变异 12/12。
+hook 的会话身份只取 stdin 输入里的 `session_id`（`lib/utils.js::hookSessionId`，转成可做文件名的形式）；没有它就不记录，不退化成共用一份。Claude Code 不设置 `CLAUDE_SESSION_ID`：2026-09-26 前按它取身份的 4 个 hook（session-end / drift-detector / suggest-compact / cost-tracker）全部落到同一个 `default`，session-end 每次 Stop 新建一个会话文件（积了 4017 个，已移入废纸篓），session-start 把全机最新的那份当"上次会话"注入新会话（跨会话、跨项目串台），drift 分数与压缩计数跨会话混算。回归测试 `__tests__/session-identity.test.js`（5 用例）+ drift 两个会话隔离用例，变异 12/12。
 
 #### Hook 输出渠道 SSOT（2026-06-29 实测确诊）
 
@@ -59,7 +59,6 @@ hook 的会话身份只取 stdin 输入里的 `session_id`（`lib/utils.js::hook
 | drift-detector | PostToolUse(*) | 漂移检测：score = 事件分（revert +15 / 连续 3+ 测试失败 +5，跑绿 -10）+ 广度分（最近 30 个 Edit/Write 滑动窗口，封顶 30）。≥20% / ≥40% 经 additionalContext 注入，档位边沿触发一次。单测 39 用例。详见本文件 §Agent Drift Detection |
 | post-edit-typecheck | PostToolUse(Edit) | TS 类型检查（tsc --noEmit） |
 | fault-hint | PostToolUse(Edit\|Write) | 容错提示。检测错误处理/外部调用/DB/韧性 pattern → 经 **additionalContext 注入**建议 `/verify fault`（2026-06-29 修：原 `log()`=stderr+exit0 模型看不到；同时修正 settings.json matcher `Bash`→`Edit\|Write`——此前注册在 Bash 下读 `file_path` 永远 undefined → 从未真正触发）|
-| cost-tracker | Stop | 成本追踪 |
 | suggest-compact | PreToolUse(Edit\|Write) | 压缩建议 |
 | session-end | Stop | 持久化会话状态 |
 <!-- auto-tmux-dev 已归档 2026-08-02（T-old-coder B1）：文档声称注册但 settings 两层 0 注册（永不触发），文件移 scripts/hooks-archive/ -->
@@ -71,8 +70,9 @@ hook 的会话身份只取 stdin 输入里的 `session_id`（`lib/utils.js::hook
 > （sprint-memory / memory-consolidate / evaluate-session / shared-memory-sync / memory-promote）
 > 全部退役归档（`scripts/hooks-archive/`）。依据：与 stop-summary 职责重叠（轮转+沉淀+promote
 > 已由 stop-summary 单点承担），且 [2026-06-05] 记忆系统曾静默失效一月无人察觉 = 低信号证据。
-> Stop 段现存 4 hook：stop-summary（记忆主干）/ cost-tracker / shared-state-sync（多 session
-> 任务板，非记忆）/ session-end（会话状态持久化）。/save-session /resume-session 的 sprint
+> Stop 段现存 3 hook：stop-summary（记忆主干）/ shared-state-sync（多 session
+> 任务板，非记忆）/ session-end（会话状态持久化）。cost-tracker 已于 2026-09-26 删除：Stop 输入不带用量，
+> 它记下的 2435 行全是 0 token。/save-session /resume-session 的 sprint
 > 文件读取是 if-exists 优雅降级，不受影响。
 
 | Hook | 类型 | 用途 |

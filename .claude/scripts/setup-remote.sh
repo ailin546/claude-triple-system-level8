@@ -230,11 +230,6 @@ cat > "$SETTINGS_FILE" << 'SETTINGSEOF'
       },
       {
         "matcher": "",
-        "hooks": [{ "type": "command", "command": "node \"${HOME}/.claude/scripts/hooks/cost-tracker.js\"", "async": true, "timeout": 10 }],
-        "description": "Track token costs"
-      },
-      {
-        "matcher": "",
         "hooks": [{ "type": "command", "command": "node \"${HOME}/.claude/scripts/hooks/shared-state-sync.js\"", "async": true, "timeout": 10 }],
         "description": "Shared state sync"
       }

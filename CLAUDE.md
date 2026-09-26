@@ -20,7 +20,7 @@ User Request
     │   PreToolUse → 危险命令守卫、编辑冻结
     │   PostToolUse → 自动格式化、类型检查、漂移检测
     │   PreCompact → 上下文压缩前保存状态
-    │   Stop → 保存状态、教训/commit 沉淀(stop-summary)、成本追踪、任务板维护
+    │   Stop → 保存状态、教训/commit 沉淀(stop-summary)、任务板维护
     │
     ├─► Shared Workflow Kernel (与 Codex 同语义)
     │   Requirement Confirmation（按条件）

@@ -111,11 +111,3 @@ test('suggest-compact counts tool calls per session', () => withSandbox((s) => {
     for (const id of [a, b]) fs.rmSync(path.join(os.tmpdir(), `claude-tool-count-${id}`), { force: true });
   }
 }));
-
-test('cost-tracker attributes each row to its session', () => withSandbox((s) => {
-  runHook(s, 'cost-tracker.js', { session_id: A });
-  runHook(s, 'cost-tracker.js', {});
-  const rows = fs.readFileSync(path.join(s.home, '.claude', 'metrics', 'costs.jsonl'), 'utf8')
-    .trim().split('\n').map((l) => JSON.parse(l));
-  assert.deepEqual(rows.map((r) => r.session_id), [A, 'unknown']);
-}));

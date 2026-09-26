@@ -251,17 +251,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ~/.claude/scripts/hooks/cost-tracker.js",
-            "timeout": 5000,
-            "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
             "command": "node ~/.claude/scripts/hooks/shared-state-sync.js",
             "timeout": 10000,
             "async": true
