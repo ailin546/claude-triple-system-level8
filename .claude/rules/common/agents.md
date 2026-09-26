@@ -152,10 +152,10 @@ agent 在 model-map.js 里 → spawn 时按表查模型；不在 → 用默认 m
 - 改 CLAUDE.md / rules/common/ 中的章节结构
 - **改 hook 实现/输出格式/退出码/输入数据契约/加载条件/settings.json schema 字段语义**（即使 stderr 文案不变）— 2026-05-20 Codex M3 反馈：实现/契约变更不应只靠"文案变了才跑"触发
 
-**三 utility 串联**（按顺序跑，**全部**只读无副作用）：
+**完成门检查串联**（按顺序跑，**全部**只读无副作用）：
 
 ```bash
-# 1. 系统级 drift 扫 (M1, 含 D1-D5 五类)
+# 1. 系统级 drift 扫 (M1)
 node ~/.claude/scripts/utils/manifest-generate.js --drift-only
 
 # 2. 跨命名空间冲突 (M2, 含 N1-N4 四层 severity)
@@ -163,12 +163,16 @@ node ~/.claude/scripts/utils/namespace-check.js
 
 # 3. SessionStart 上下文影响 (仅在改了 CLAUDE.md / rules/common 时跑)
 node ~/.claude/scripts/utils/rules-load-snapshot.js
+
+# 4. Claude/Codex 统一工作流清单 (M4；本机有 ~/.claude-system 时，改动同步进该仓库后跑)
+python3 ~/.claude-system/scripts/sync_workflow.py --check
 ```
 
 **接受标准**（任一不达不算完成）：
-- M1 `Total drift items` 仅含 follow-up 已记录的 D1（其他 D2-D5 必须 0）
+- M1 `Total drift items` 仅含 follow-up 已记录的 D1（其余各类必须 0）
 - M2 `Hard: 0` 强制；`Review` 数不增加 — **基线制度**：变更前跑 `namespace-check.js > /tmp/nscheck-pre.txt`，变更后跑 `namespace-check.js > /tmp/nscheck-post.txt` + `diff` 对比 Review 列表。新增 Review 项必须在本次 PR/commit message 写明"acked 理由"或解决后才算通过（防"口头判断 Review 没增"）
 - M3 仅当改 SessionStart 加载内容时，验证 token 变化与变更预期一致（不要求"必减"，要求"有意识 trade-off"）
+- M4 exit 0。`missing Claude evidence file` / `disabled Claude entrypoint is active` → 改 `shared/workflow/manifest.json`，让证据指向该语义现在的家；`protected Claude file changed without baseline review` → 按 `~/.claude-system/docs/UNIFIED_WORKFLOW.md` §更新纪律 做兼容评审（Codex 侧映射是否仍成立），结论写进 commit，再 `--refresh-claude-baseline`，同一改动提交。系统仓库 CI 只跑这一条，但没人看 CI（2026-08-17 起连红 6 周），所以它必须在本地完成门里跑
 
 **违反检测 + 具体回填动作**（成本 = 漏跑 → 系统漂移）：
 
@@ -178,8 +182,8 @@ node ~/.claude/scripts/utils/rules-load-snapshot.js
 
 | 漂移类型 | 必填动作 |
 |---|---|
-| 本可由三 utility 检出但漏跑 | 更新完成门接受标准（提高严格度） + 在 lesson-archive 加 entry |
-| 三 utility 现有检测不覆盖 | 登记为新 **detection gap**：选择 ① 纳入 M5a/M6 扩展 detection 范围 ② 明确豁免并说明理由（不能两边都选） |
+| 本可由完成门检查检出但漏跑 | 更新完成门接受标准（提高严格度） + 在 lesson-archive 加 entry |
+| 完成门检查现有检测不覆盖 | 登记为新 **detection gap**：选择 ① 纳入 M5a/M6 扩展 detection 范围 ② 明确豁免并说明理由（不能两边都选） |
 | 完成门已跑但仍有遗漏 | 修补 utility 检测面（M1/M2 加新 Dx/Nx）+ lesson-archive 加 entry |
 | 触发场景未识别 | 补本节"触发场景"列表 |
 

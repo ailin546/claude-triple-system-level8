@@ -149,7 +149,6 @@ bash .claude-system/install.sh --update
 | `/plan` | 分析需求，生成分步实现计划，等待确认后再动手 | Standard+ |
 | `/verify` | 运行 lint、类型检查、测试，用实际输出验证结果 | 所有模式 |
 | `/code-review` | 对已写代码进行安全和质量审查 | Standard+ |
-| `/build-fix` | 分析构建错误并修复 | 所有模式 |
 
 #### 会话管理
 
@@ -157,7 +156,6 @@ bash .claude-system/install.sh --update
 |------|------|---------|
 | `/save-session` | 保存当前会话状态到文件，便于日后恢复 | Standard+ |
 | `/resume-session` | 加载上次保存的会话，恢复完整上下文 | Standard+ |
-| `/learn` | 从当前会话提取可复用模式，保存为 instinct | Standard+ |
 
 #### 安全与控制
 
@@ -166,16 +164,13 @@ bash .claude-system/install.sh --update
 | `/careful` | 开关危险命令守卫（拦截 `rm -rf` 等） | 所有模式 |
 | `/freeze` | 锁定编辑范围到指定目录，防止越界修改 | 所有模式 |
 | `/unfreeze` | 解除编辑范围锁 | 所有模式 |
-| `/harness-audit` | 审计当前 Hook 和配置状态 | 所有模式 |
 
 #### 设计与审查
 
 | 命令 | 说明 | 适用模式 |
 |------|------|---------|
 | `/design-consultation` | 多角度设计咨询（UI + UX + 无障碍） | Standard+ |
-| `/design-review` | 实现完成后的设计审查 | Standard+ |
 | `/codex:review` / `/codex:adversarial-review` / `/codex:rescue` | 通过官方 [codex-plugin-cc](https://github.com/openai/codex-plugin-cc) 插件进行跨 AI 代码审查与任务委派（首次使用 `/codex:setup`） | Standard+ |
-| `/e2e` | 生成并运行 Playwright E2E 测试 | Standard+ |
 
 #### 推荐工作流
 
@@ -381,7 +376,6 @@ These commands are invoked via `/command-name` within a Claude Code conversation
 | `/plan` | Analyze requirements, generate step-by-step plan, wait for confirmation | Standard+ |
 | `/verify` | Run lint, type check, tests; verify with actual output | All modes |
 | `/code-review` | Security and quality review of written code | Standard+ |
-| `/build-fix` | Analyze and fix build errors | All modes |
 
 #### Session Management
 
@@ -389,7 +383,6 @@ These commands are invoked via `/command-name` within a Claude Code conversation
 |---------|-------------|------|
 | `/save-session` | Save current session state for later restoration | Standard+ |
 | `/resume-session` | Load last saved session with full context | Standard+ |
-| `/learn` | Extract reusable patterns from current session | Standard+ |
 
 #### Safety & Control
 
@@ -398,16 +391,13 @@ These commands are invoked via `/command-name` within a Claude Code conversation
 | `/careful` | Toggle dangerous command guard (blocks `rm -rf`, etc.) | All modes |
 | `/freeze` | Lock edits to a specific directory | All modes |
 | `/unfreeze` | Remove edit scope lock | All modes |
-| `/harness-audit` | Audit current hook and config status | All modes |
 
 #### Design & Review
 
 | Command | Description | Mode |
 |---------|-------------|------|
 | `/design-consultation` | Multi-perspective design consultation (UI + UX + a11y) | Standard+ |
-| `/design-review` | Post-implementation design review | Standard+ |
 | `/codex:review` / `/codex:adversarial-review` / `/codex:rescue` | Cross-AI code review and task delegation via the official [codex-plugin-cc](https://github.com/openai/codex-plugin-cc) plugin (first-time: `/codex:setup`) | Standard+ |
-| `/e2e` | Generate and run Playwright E2E tests | Standard+ |
 
 #### Recommended Workflows
 

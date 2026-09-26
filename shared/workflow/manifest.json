@@ -40,26 +40,21 @@
     ],
     "protected_paths": [
       "CLAUDE.md",
-      ".claude/CLAUDE.md",
       ".claude/settings.json",
       ".claude/rules/routing.md",
       ".claude/rules/common/agents.md",
       ".claude/rules/common/workflow.md",
       ".claude/rules/common/quality-and-security.md",
       ".claude/skills/brainstorming/SKILL.md",
-      ".claude/skills/specify/SKILL.md",
       ".claude/skills/writing-plans/SKILL.md",
-      ".claude/skills/executing-plans/SKILL.md",
-      ".claude/skills/verification-before-completion/SKILL.md",
       ".claude/skills/evaluation-loop/SKILL.md",
-      ".claude/skills/requesting-code-review/SKILL.md",
-      ".claude/skills/ecc-configure-ecc/SKILL.md",
+      ".claude/agents/ecc-code-reviewer.md",
       ".claude/commands/plan.md",
       ".claude/commands/verify.md",
       ".claude/commands/code-review.md",
-      ".claude/commands/harness-audit.md",
       ".claude/commands/save-session.md",
       ".claude/commands/resume-session.md",
+      ".claude/scripts/lib/project-root.js",
       ".claude/scripts/hooks/session-start.js",
       ".claude/scripts/hooks/periodic-memory.js",
       ".claude/scripts/hooks/stop-summary.js",
@@ -88,10 +83,6 @@
         {
           "path": ".claude/skills/brainstorming/SKILL.md",
           "contains": ["Requirement Confirmation", "Existing Capabilities", "Change Budget"]
-        },
-        {
-          "path": ".claude/skills/specify/SKILL.md",
-          "contains": ["范围", "验收"]
         }
       ]
     },
@@ -105,8 +96,12 @@
           "contains": ["# Plan", "每步验证", "Change Budget"]
         },
         {
-          "path": ".claude/skills/executing-plans/SKILL.md",
-          "contains": ["# Execute", "Scope Drift Stop", "默认单 agent"]
+          "path": ".claude/rules/common/workflow.md",
+          "contains": ["2. **Execute**", "停止扩张并重新确认"]
+        },
+        {
+          "path": ".claude/rules/common/agents.md",
+          "contains": ["默认单 agent 直接完成任务"]
         }
       ]
     },
@@ -116,8 +111,12 @@
       "codex_skill": "verification-gate",
       "claude_evidence": [
         {
-          "path": ".claude/skills/verification-before-completion/SKILL.md",
-          "contains": ["Verification Gate", "Verified", "Not Verified"]
+          "path": "CLAUDE.md",
+          "contains": ["Verification Gate", "完成声明必须附最新、相关的验证证据"]
+        },
+        {
+          "path": ".claude/rules/common/workflow.md",
+          "contains": ["4. **Verify**", "说明已验证、未验证和剩余风险"]
         }
       ]
     },
@@ -138,8 +137,12 @@
       "codex_skill": "code-review-gate",
       "claude_evidence": [
         {
-          "path": ".claude/skills/requesting-code-review/SKILL.md",
-          "contains": ["Review Gate", "默认一次 Review", "第三次"]
+          "path": ".claude/rules/common/workflow.md",
+          "contains": ["3. **Review**", "按风险审查一次", "第三次及以后需用户明确要求"]
+        },
+        {
+          "path": ".claude/agents/ecc-code-reviewer.md",
+          "contains": ["name: code-reviewer", "Critical|High|Medium|Low", "REQUEST CHANGES"]
         }
       ]
     },
@@ -149,12 +152,12 @@
       "codex_skill": "workflow-doctor",
       "claude_evidence": [
         {
-          "path": ".claude/skills/ecc-configure-ecc/SKILL.md",
-          "contains": ["verifying ECC installation", "verifies correctness"]
+          "path": ".claude/rules/common/agents.md",
+          "contains": ["机制变更完成门", "只读无副作用", "sync_workflow.py --check"]
         },
         {
-          "path": ".claude/commands/harness-audit.md",
-          "contains": ["Harness Audit", "Quality Gates"]
+          "path": ".claude/scripts/utils/manifest-generate.js",
+          "contains": ["--drift-only"]
         }
       ]
     },
