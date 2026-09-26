@@ -10,7 +10,7 @@
 Hooks 按模式分层，Fast 模式仅运行 Always-on hooks，减少开销。
 Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式下自动跳过。
 
-所有 hook 的项目根只有一个解析点 `lib/project-root.js::getProjectRoot()`（`lib/utils.js` 的同名函数委托给它）：起点是 Claude Code 给 hook 进程设置的 `CLAUDE_PROJECT_DIR`（会话启动目录，不随 shell cwd 漂移；手动跑脚本、测试时没有这个变量，退回 cwd）；再过两个守卫：① 落在 `~/.claude/` 内 → 折返到 HOME；② 落在任何 `.memory/` 内 → walk-up 到第一个非 `.memory` 祖先（不把 `.memory` 自身的 git repo 当项目根，避免 `.memory/.memory/` 嵌套副本和运行时状态污染记忆库）；最后上溯到 git checkout 根（linked worktree 停在自己的根；起点本身含 `.git` 时不调 git）。`CLAUDE_PROJECT_ROOT` 是显式覆盖（测试用），过守卫后原样返回。2026-09-26 前有两套实现：原始 cwd 版让模式 / drift / escalation 状态和会话开始时间随 cwd 散落到子目录（quant-deploy 下 10 个 `.claude/`），git 版把 `~/.claude` 内的会话落到 `~/.claude/.claude/`。回归测试 `__tests__/project-root.test.js`（9 用例，变异 12/12）。
+所有 hook 的项目根只有一个解析点 `lib/project-root.js::getProjectRoot()`（`lib/utils.js` 的同名函数委托给它）：起点是 Claude Code 给 hook 进程设置的 `CLAUDE_PROJECT_DIR`（会话启动目录，不随 shell cwd 漂移；手动跑脚本、测试时没有这个变量，退回 cwd）；再过两个守卫：① 落在 `~/.claude/` 内 → 折返到 HOME；② 落在任何 `.memory/` 内 → walk-up 到第一个非 `.memory` 祖先（不把 `.memory` 自身的 git repo 当项目根，避免 `.memory/.memory/` 嵌套副本和运行时状态污染记忆库）；最后上溯到 git checkout 根（linked worktree 停在自己的根；起点本身含 `.git` 时不调 git）。`CLAUDE_PROJECT_ROOT` 是显式覆盖（测试用），过守卫后原样返回。2026-09-26 前有两套实现：原始 cwd 版让模式 / drift / escalation 状态和会话开始时间随 cwd 散落到子目录（quant-deploy 子目录里积了 27 个 `.claude/`，已移入废纸篓），git 版把 `~/.claude` 内的会话落到 `~/.claude/.claude/`。回归测试 `__tests__/project-root.test.js`（9 用例，变异 12/12）。
 
 #### Hook 输出渠道 SSOT（2026-06-29 实测确诊）
 
