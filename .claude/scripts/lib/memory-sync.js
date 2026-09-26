@@ -18,10 +18,18 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
-const { getProjectRoot } = require('./project-root');
-const PROJECT_ROOT = getProjectRoot();
-const MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
+const { getProjectMemoryDir, cleanGitEnv } = require('./project-root');
+const MEMORY_DIR = getProjectMemoryDir();
+const PROJECT_ROOT = path.dirname(MEMORY_DIR);
 const GLOBAL_MEMORY_DIR = path.join(require('os').homedir(), '.memory');
+// The memory remote keeps global memory on GLOBAL_BRANCH and each project on a
+// branch named after the project. Project memory must never ride the global
+// branch: its today.md is the same file as ~/.memory/today.md there, so syncing
+// merges project logs into global memory and serves global memory back as the
+// project's (rules/common/infrastructure.md §记忆同步安全闸).
+const GLOBAL_BRANCH = 'main';
+const IS_GLOBAL_DIR = path.resolve(MEMORY_DIR) === path.resolve(GLOBAL_MEMORY_DIR);
+const PROJECT_BRANCH = IS_GLOBAL_DIR ? GLOBAL_BRANCH : path.basename(PROJECT_ROOT);
 // Switch file lookup order: per-project override first, then the user-level
 // default that ~/.claude/CLAUDE.md §仓库架构 documents as *the* switch. Reading
 // only the project path meant the documented switch was never found, so pull()
@@ -73,19 +81,6 @@ function isMemoryGitRepo() {
  * Run a git command in a given directory.
  * Returns { ok, stdout, stderr }.
  */
-// Inherited git env vars override cwd — a hook launched from another repo's
-// context would otherwise operate on THAT repo instead of .memory/.
-const GIT_ENV_REDIRECTS = [
-  'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR',
-  'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES',
-];
-
-function cleanGitEnv() {
-  const env = { ...process.env };
-  for (const k of GIT_ENV_REDIRECTS) delete env[k];
-  return env;
-}
-
 function gitInDir(dir, args, opts = {}) {
   try {
     const stdout = execFileSync('git', args, {
@@ -120,7 +115,7 @@ function gitInMemory(args, opts = {}) {
  */
 function currentBranchIn(dir) {
   const r = gitInDir(dir, ['rev-parse', '--abbrev-ref', 'HEAD']);
-  return (r.ok && r.stdout.trim()) || 'main';
+  return (r.ok && r.stdout.trim()) || GLOBAL_BRANCH;
 }
 
 /**
@@ -142,14 +137,14 @@ function withRetry(fn, label) {
 }
 
 /**
- * Initialize .memory/ as a git repo if not already.
- * Called internally, not directly by users.
+ * Make .memory/ a clone of this project's own memory branch.
+ * Returns true when .memory/ is (now) a git repo.
+ *
+ * Never falls back to the remote's default branch or to `git init` + push:
+ * both put project memory on the global branch. A project whose branch does
+ * not exist on the remote keeps its memory local until someone creates it.
  */
 function ensureMemoryRepo(remoteUrl) {
-  if (!fs.existsSync(MEMORY_DIR)) {
-    fs.mkdirSync(MEMORY_DIR, { recursive: true });
-  }
-
   if (isMemoryGitRepo()) {
     // Verify remote is correct
     const result = gitInMemory(['remote', 'get-url', 'origin']);
@@ -160,92 +155,61 @@ function ensureMemoryRepo(remoteUrl) {
     return true;
   }
 
-  // Try cloning first (repo may already exist remotely)
-  log(`[MemorySync] Initializing memory repo from ${remoteUrl}`);
+  const probe = gitInDir(PROJECT_ROOT, ['ls-remote', '--heads', remoteUrl, PROJECT_BRANCH], { timeout: 20000 });
+  if (!probe.ok) {
+    log(`[MemorySync] Memory remote unreachable, project memory not initialized: ${probe.stderr || probe.error}`);
+    return false;
+  }
+  if (!probe.stdout) {
+    log(`[MemorySync] No memory branch '${PROJECT_BRANCH}' on the remote — project memory stays local`);
+    return false;
+  }
 
-  // Back up existing files
+  log(`[MemorySync] Initializing memory repo from ${remoteUrl} (branch ${PROJECT_BRANCH})`);
+
+  // Back up existing markdown; the clone needs an empty target.
   const existingFiles = [];
   try {
-    const files = fs.readdirSync(MEMORY_DIR);
-    for (const f of files) {
+    for (const f of fs.readdirSync(MEMORY_DIR)) {
       if (f.endsWith('.md')) {
-        const content = fs.readFileSync(path.join(MEMORY_DIR, f), 'utf8');
-        existingFiles.push({ name: f, content });
+        existingFiles.push({ name: f, content: fs.readFileSync(path.join(MEMORY_DIR, f), 'utf8') });
       }
     }
-  } catch {}
+  } catch { /* no .memory/ yet */ }
+  const tmpBackup = MEMORY_DIR + '.backup-' + Date.now();
+  if (existingFiles.length > 0) fs.renameSync(MEMORY_DIR, tmpBackup);
 
-  // Try to clone
-  try {
-    // Remove .memory/ temporarily for clone
-    const tmpBackup = MEMORY_DIR + '.backup-' + Date.now();
-    if (existingFiles.length > 0) {
-      fs.renameSync(MEMORY_DIR, tmpBackup);
-    }
-
-    const cloneResult = execFileSync('git', ['clone', remoteUrl, MEMORY_DIR], {
-      encoding: 'utf8',
-      timeout: 30000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    log(`[MemorySync] Cloned memory repo successfully`);
-
-    // Merge back any local files that don't exist in remote
-    if (existingFiles.length > 0) {
-      for (const { name, content } of existingFiles) {
-        const target = path.join(MEMORY_DIR, name);
-        if (!fs.existsSync(target)) {
-          fs.writeFileSync(target, content, 'utf8');
-          log(`[MemorySync] Restored local file: ${name}`);
-        }
-      }
-      // Clean up backup
-      try { fs.rmSync(tmpBackup, { recursive: true, force: true }); } catch {}
-    }
-
-    return true;
-  } catch (cloneErr) {
-    // Clone failed — init new repo
-    log(`[MemorySync] Clone failed (${cloneErr.message}), initializing new repo`);
-
-    // Restore backup if it exists
-    const tmpBackup = MEMORY_DIR + '.backup-' + Date.now();
-    // Check for any backup directory
-    try {
-      const parent = path.dirname(MEMORY_DIR);
-      const backups = fs.readdirSync(parent).filter(f => f.startsWith('.memory.backup-'));
-      if (backups.length > 0 && !fs.existsSync(MEMORY_DIR)) {
-        fs.renameSync(path.join(parent, backups[0]), MEMORY_DIR);
-      }
-    } catch {}
-
-    if (!fs.existsSync(MEMORY_DIR)) {
-      fs.mkdirSync(MEMORY_DIR, { recursive: true });
-    }
-
-    gitInMemory(['init']);
-    gitInMemory(['remote', 'add', 'origin', remoteUrl]);
-
-    // Restore existing files
-    for (const { name, content } of existingFiles) {
-      const target = path.join(MEMORY_DIR, name);
-      if (!fs.existsSync(target)) {
-        fs.writeFileSync(target, content, 'utf8');
-      }
-    }
-
-    // Initial commit if files exist
-    const files = fs.readdirSync(MEMORY_DIR).filter(f => f.endsWith('.md'));
-    if (files.length > 0) {
-      gitInMemory(['add', '-A']);
-      gitInMemory(['commit', '-m', 'init: memory repo']);
-      // Try to push (may fail if remote is empty, that's ok)
-      gitInMemory(['push', '-u', 'origin', 'main']);
-    }
-
-    log(`[MemorySync] Initialized new memory repo`);
-    return true;
+  const clone = gitInDir(PROJECT_ROOT, ['clone', '--branch', PROJECT_BRANCH, remoteUrl, MEMORY_DIR], { timeout: 30000 });
+  if (!clone.ok) {
+    if (existingFiles.length > 0 && !fs.existsSync(MEMORY_DIR)) fs.renameSync(tmpBackup, MEMORY_DIR);
+    log(`[MemorySync] Clone failed, project memory not initialized: ${clone.stderr || clone.error}`);
+    return false;
   }
+
+  // Merge back any local files that don't exist in remote
+  for (const { name, content } of existingFiles) {
+    const target = path.join(MEMORY_DIR, name);
+    if (!fs.existsSync(target)) {
+      fs.writeFileSync(target, content, 'utf8');
+      log(`[MemorySync] Restored local file: ${name}`);
+    }
+  }
+  if (existingFiles.length > 0) {
+    try { fs.rmSync(tmpBackup, { recursive: true, force: true }); } catch {}
+  }
+  log(`[MemorySync] Cloned memory repo successfully`);
+  return true;
+}
+
+/**
+ * Project memory checked out on the global branch shares today.md & co. with
+ * ~/.memory, so syncing it would merge the two. Refuse rather than guess.
+ */
+function projectOnGlobalBranch() {
+  if (IS_GLOBAL_DIR) return false;
+  if (currentBranchIn(MEMORY_DIR) !== GLOBAL_BRANCH) return false;
+  log(`[MemorySync] Sync refused (project) — ${MEMORY_DIR} is on the global branch '${GLOBAL_BRANCH}'; give the project its own branch`);
+  return true;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -261,13 +225,14 @@ function pull() {
   const remoteUrl = getRemoteUrl();
   if (!remoteUrl) return; // Sync not configured — silent no-op
 
-  try {
-    ensureMemoryRepo(remoteUrl);
+  pullProjectMemory(remoteUrl);
+  // Global memory syncs on its own, whether or not this project has memory.
+  pullGlobalMemory();
+}
 
-    if (!isMemoryGitRepo()) {
-      log('[MemorySync] .memory/ is not a git repo after init, skipping pull');
-      return;
-    }
+function pullProjectMemory(remoteUrl) {
+  try {
+    if (!ensureMemoryRepo(remoteUrl) || projectOnGlobalBranch()) return;
 
     const branch = currentBranchIn(MEMORY_DIR);
     log(`[MemorySync] Pull (project) branch=${branch}`);
@@ -292,9 +257,6 @@ function pull() {
   } catch (err) {
     log(`[MemorySync] Pull error (project, non-blocking): ${err.message}`);
   }
-
-  // Also pull global ~/.memory/ if it's a separate git repo
-  pullGlobalMemory();
 }
 
 /**
@@ -307,7 +269,7 @@ function pullGlobalMemory() {
     if (!fs.existsSync(path.join(GLOBAL_MEMORY_DIR, '.git'))) return;
 
     const result = withRetry(
-      () => gitInDir(GLOBAL_MEMORY_DIR, ['pull', '--rebase', 'origin', 'main'], { timeout: 20000 }),
+      () => gitInDir(GLOBAL_MEMORY_DIR, ['pull', '--rebase', 'origin', GLOBAL_BRANCH], { timeout: 20000 }),
       'global git pull'
     );
 
@@ -315,7 +277,7 @@ function pullGlobalMemory() {
       log('[MemorySync] Pull successful (global ~/.memory/)');
     } else {
       gitInDir(GLOBAL_MEMORY_DIR, ['rebase', '--abort']);
-      const mergeResult = gitInDir(GLOBAL_MEMORY_DIR, ['pull', 'origin', 'main'], { timeout: 20000 });
+      const mergeResult = gitInDir(GLOBAL_MEMORY_DIR, ['pull', 'origin', GLOBAL_BRANCH], { timeout: 20000 });
       if (mergeResult.ok) {
         log('[MemorySync] Pull (merge) successful (global) after rebase conflict');
       } else {
@@ -409,15 +371,16 @@ function push() {
   const remoteUrl = getRemoteUrl();
   if (!remoteUrl) return; // Sync not configured — silent no-op
 
-  try {
-    if (!isMemoryGitRepo()) {
-      ensureMemoryRepo(remoteUrl);
-    }
+  pushProjectMemory();
+  // Global memory syncs on its own, whether or not this project has memory.
+  pushGlobalMemory();
+}
 
-    if (!isMemoryGitRepo()) {
-      log('[MemorySync] .memory/ is not a git repo, skipping push');
-      return;
-    }
+function pushProjectMemory() {
+  try {
+    // Initialization belongs to pull() at SessionStart; probing the remote on
+    // every Stop would tax each turn of a project that has no memory branch.
+    if (!isMemoryGitRepo() || projectOnGlobalBranch()) return;
 
     // Check for changes
     const status = gitInMemory(['status', '--porcelain']);
@@ -461,9 +424,6 @@ function push() {
   } catch (err) {
     log(`[MemorySync] Push error (project, non-blocking): ${err.message}`);
   }
-
-  // Also sync global ~/.memory/ if it's a separate git repo
-  pushGlobalMemory();
 }
 
 /**
@@ -490,14 +450,14 @@ function pushGlobalMemory() {
     const host = require('os').hostname();
     gitInDir(GLOBAL_MEMORY_DIR, ['commit', '-m', `memory: ${today} [${tool}@${host}]`]);
 
-    const pullResult = gitInDir(GLOBAL_MEMORY_DIR, ['pull', '--rebase', 'origin', 'main'], { timeout: 20000 });
+    const pullResult = gitInDir(GLOBAL_MEMORY_DIR, ['pull', '--rebase', 'origin', GLOBAL_BRANCH], { timeout: 20000 });
     if (!pullResult.ok) {
       gitInDir(GLOBAL_MEMORY_DIR, ['rebase', '--abort']);
-      gitInDir(GLOBAL_MEMORY_DIR, ['pull', 'origin', 'main'], { timeout: 20000 });
+      gitInDir(GLOBAL_MEMORY_DIR, ['pull', 'origin', GLOBAL_BRANCH], { timeout: 20000 });
     }
 
     const result = withRetry(
-      () => gitInDir(GLOBAL_MEMORY_DIR, ['push', 'origin', 'main'], { timeout: 20000 }),
+      () => gitInDir(GLOBAL_MEMORY_DIR, ['push', 'origin', GLOBAL_BRANCH], { timeout: 20000 }),
       'global git push'
     );
 

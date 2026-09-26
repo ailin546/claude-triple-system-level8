@@ -37,7 +37,7 @@ const {
 } = require('../lib/extract-lessons');
 
 const PROJECT_ROOT = getProjectRoot();
-const MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
+const MEMORY_DIR = require('../lib/project-root').getProjectMemoryDir();
 const GLOBAL_MEMORY_DIR = getGlobalMemoryDir();
 const SESSION_STATE_DIR = path.join(PROJECT_ROOT, '.claude', '.session-state');
 const SESSION_STATE_FILE = path.join(SESSION_STATE_DIR, 'stop-summary.json');

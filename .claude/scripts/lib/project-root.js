@@ -30,6 +30,7 @@
 
 const path = require('path');
 const os = require('os');
+const { execFileSync } = require('child_process');
 
 const HOME_CLAUDE_DIR = path.join(os.homedir(), '.claude');
 
@@ -109,8 +110,56 @@ function escapeMemoryRepo(p) {
   return cur;
 }
 
+// Inherited git env vars override cwd — a hook launched from another repo's
+// context would otherwise resolve, or operate on, THAT repo.
+const GIT_ENV_REDIRECTS = [
+  'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR',
+  'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+];
+
+function cleanGitEnv() {
+  const env = { ...process.env };
+  for (const k of GIT_ENV_REDIRECTS) delete env[k];
+  return env;
+}
+
+function gitOutput(cwd, args) {
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+    env: cleanGitEnv(),
+    timeout: 5000,
+  }).trim();
+}
+
+/**
+ * The project's `.memory/` — the one place memory readers, writers and the
+ * syncer resolve it.
+ *
+ * It sits at the root of the git repository's *main* checkout, so linked
+ * worktrees and subdirectories share one memory instead of each growing a
+ * clone of their own. Outside git it stays under the guarded project root.
+ *
+ * @returns {string} absolute path to the project memory directory
+ */
+function getProjectMemoryDir() {
+  const start = getProjectRoot();
+  let root = start;
+  try {
+    const common = path.resolve(start, gitOutput(start, ['rev-parse', '--git-common-dir']));
+    root = path.basename(common) === '.git'
+      ? path.dirname(common)
+      : gitOutput(start, ['rev-parse', '--show-toplevel']);
+  } catch { /* not inside a git checkout — keep the guarded root */ }
+  if (isInsideMemoryRepo(root)) root = escapeMemoryRepo(root);
+  return path.join(root, '.memory');
+}
+
 module.exports = {
   getProjectRoot,
+  getProjectMemoryDir,
+  cleanGitEnv,
   isInsideHomeClaude,
   isInsideMemoryRepo,
   escapeMemoryRepo,

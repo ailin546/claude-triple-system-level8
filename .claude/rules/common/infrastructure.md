@@ -87,13 +87,20 @@ Standard+/Heavy hooks 内置模式检查（`lib/mode-check.js`），Fast 模式�
 
 只认 `<<<<<<<` / `>>>>>>>` 两种、**不认裸 `=======`**——后者是合法的 markdown setext 下划线，误报会把记忆同步永久堵死（反向对照用例守着这一点）。
 
-**同步开关查找顺序**：`MEMORY_REMOTE` 环境变量 → `PROJECT/.claude/.memory-remote` → `~/.claude/.memory-remote`。最后一个是 `~/.claude/CLAUDE.md §仓库架构` 指定的**那个**开关；2026-09-17 前实现只读项目级一个路径，于是文档写的开关永远找不到，`pull()` / `push()` 按"未配置"**静默 no-op** —— 记忆库只在有人手动跑 pull-all / push-all 时才动（那两个脚本走自己的 git 逻辑，不经本模块），这是漂移的最上游源头。
+**同步开关查找顺序**：`MEMORY_REMOTE` 环境变量 → `PROJECT/.claude/.memory-remote`（PROJECT 按下文的主 checkout 解析）→ `~/.claude/.memory-remote`。最后一个是 `~/.claude/CLAUDE.md §仓库架构` 指定的**那个**开关；2026-09-17 前实现只读项目级一个路径，于是文档写的开关永远找不到，`pull()` / `push()` 按"未配置"**静默 no-op** —— 记忆库只在有人手动跑 pull-all / push-all 时才动（那两个脚本走自己的 git 逻辑，不经本模块），这是漂移的最上游源头。
 
 `pull()` 与 `push()` 共用 `currentBranchIn()` 探测分支（2026-09-17 修：pull 写死 `origin main`，项目记忆库在 `quant-deploy` 分支上，于是自动拉取对它从来没成功过）。所有 git 调用剥掉继承来的 `GIT_DIR`/`GIT_WORK_TREE` 等重定向，否则 hook 会操作到别的仓库。
 
 `push()` 在**工作树干净但有未推 commit** 时照样推（hook 之外产生的 commit ——解决完的 rebase、手工修复、上次失败的 push ——否则永远躺着不出去）；干净且不 ahead 才真正跳过。
 
-回归测试 `__tests__/memory-sync.test.js`（9 用例，变异 10/10 killed）。
+**项目记忆放在哪、走哪个分支**（2026-09-26）：
+
+- **位置**：唯一解析点是 `lib/project-root.js::getProjectMemoryDir()` = 所在 git 仓库**主 checkout** 根目录下的 `.memory/`（经 `git rev-parse --git-common-dir`）；linked worktree 与任何子目录共用这一份，不在 git 里时仍是受守卫的 cwd。读（session-start）、写（stop-summary / pre-compact / periodic-memory）、同步（本模块）一律经它，测试逐文件钉死。此前同步与注入按 cwd、写入按 `--show-toplevel`，两套根：worktree 各长一份 clone，cwd 漂进子目录又长一份。
+- **分支**：远端 `main` 是全局记忆（`~/.memory`），每个项目用以项目目录名命名的分支（quant-deploy → `quant-deploy`）。自动初始化（只在 SessionStart 的 `pull()`；`push()` 每回合都跑，不探测远端）只 `clone -b <项目名>`，且仅当远端已有该分支；否则项目记忆留在本地、不同步。不再有"clone 默认分支"或"`git init` 后 `push origin main`"的兜底——两者都把项目记忆接到全局分支上。
+- **全局分支闸**：非 `~/.memory` 的记忆库签出的是 `main` 时，`pull()` / `push()` 拒绝项目同步（stderr `Sync refused (project)`）。在全局分支上，项目 today.md 与全局 today.md 是同一个文件：同步会把项目流水并进全局，又把全局内容当项目记忆注入。2026-09-26 盘点本机有 9 份这样的 clone（其它项目 5、quant-deploy 子目录 3、worktree 1）；给项目开同名分支、删掉旧 clone 即可恢复同步。
+- **项目同步与全局同步互不牵连**：项目这边无记忆、被拒或出错，全局照样拉 / 推。此前项目工作树干净时 `push()` 提前 return，连全局推送一起跳过。
+
+回归测试 `__tests__/memory-sync.test.js`（16 用例；变异 2026-09-17 10/10、2026-09-26 8/8 killed）。
 
 ### 模式升档机制
 

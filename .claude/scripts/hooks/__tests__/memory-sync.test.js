@@ -219,3 +219,203 @@ test('remote switch is found at the user-level path CLAUDE.md documents', () => 
     fs.rmSync(f.root, { recursive: true, force: true });
   }
 });
+
+// ── Which memory a session uses, and which branch it may sync ──────────────
+
+const RESOLVER = path.resolve(__dirname, '../../lib/project-root.js');
+const HOOKS_DIR = path.resolve(__dirname, '..');
+
+function tmpRoot(prefix) {
+  return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));
+}
+
+// Remote whose default branch is the global memory, plus the listed branches.
+function remoteWithBranches(root, branches) {
+  const bare = path.join(root, 'remote.git');
+  const seed = path.join(root, 'seed');
+  git(['init', '--bare', bare], root);
+  git(['clone', bare, seed], root);
+  configure(seed, 'Seed');
+  fs.writeFileSync(path.join(seed, 'today.md'), '# Today — global\n');
+  git(['add', 'today.md'], seed);
+  git(['commit', '-m', 'initial'], seed);
+  for (const branch of branches) git(['push', 'origin', `HEAD:refs/heads/${branch}`], seed);
+  git(['symbolic-ref', 'HEAD', 'refs/heads/main'], bare);
+  return bare;
+}
+
+function runSync(method, project, home, bare) {
+  return spawnSync(process.execPath, ['-e', `require(${JSON.stringify(SCRIPT)}).${method}()`], {
+    cwd: project,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      HOME: home,
+      CLAUDE_PROJECT_ROOT: project,
+      MEMORY_REMOTE: bare,
+      MEMORY_SYNC_MAX_RETRIES: '0',
+    },
+  });
+}
+
+function resolveMemoryDir(cwd, home) {
+  const env = { ...process.env, HOME: home };
+  delete env.CLAUDE_PROJECT_ROOT;
+  const r = spawnSync(process.execPath,
+    ['-e', `process.stdout.write(require(${JSON.stringify(RESOLVER)}).getProjectMemoryDir())`],
+    { cwd, encoding: 'utf8', env });
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout;
+}
+
+test('memory dir resolves to the main checkout from linked worktrees and subdirectories', () => {
+  const root = tmpRoot('memory-root-test-');
+  try {
+    const home = path.join(root, 'home');
+    const main = path.join(root, 'proj');
+    fs.mkdirSync(path.join(main, 'nested', 'deeper'), { recursive: true });
+    git(['init'], main);
+    configure(main);
+    fs.writeFileSync(path.join(main, 'nested', 'deeper', 'f.txt'), 'x\n');
+    git(['add', '.'], main);
+    git(['commit', '-m', 'init'], main);
+    const wt = path.join(root, 'wt');
+    git(['worktree', 'add', '-b', 'feature', wt], main);
+    for (const cwd of [main, path.join(main, 'nested', 'deeper'), wt, path.join(wt, 'nested', 'deeper')]) {
+      assert.equal(resolveMemoryDir(cwd, home), path.join(main, '.memory'), `resolved from ${cwd}`);
+    }
+    const plain = path.join(root, 'plain');
+    fs.mkdirSync(plain);
+    assert.equal(resolveMemoryDir(plain, home), path.join(plain, '.memory'));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a project without its own memory branch is never put on the global branch', () => {
+  const root = tmpRoot('memory-branch-test-');
+  try {
+    const bare = remoteWithBranches(root, ['main']);
+    const project = path.join(root, 'alpha');
+    const home = path.join(root, 'home');
+    fs.mkdirSync(project);
+    fs.mkdirSync(home);
+    const globalBefore = git(['rev-parse', 'refs/heads/main'], bare);
+    const pulled = runSync('pull', project, home, bare);
+    assert.equal(pulled.status, 0, pulled.stderr);
+    assert.equal(fs.existsSync(path.join(project, '.memory', '.git')), false, 'project memory was cloned from the global branch');
+    const pushed = runSync('push', project, home, bare);
+    assert.equal(pushed.status, 0, pushed.stderr);
+    assert.equal(fs.existsSync(path.join(project, '.memory', '.git')), false, 'project memory was initialized onto the global branch');
+    assert.equal(git(['rev-parse', 'refs/heads/main'], bare), globalBefore);
+    assert.match(pulled.stderr, /No memory branch 'alpha'/);
+    // Stop runs push() every turn; initialization is pull()'s job at SessionStart.
+    assert.doesNotMatch(pushed.stderr, /No memory branch|Memory remote unreachable/, 'push probed the remote');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a project with its own memory branch is cloned onto that branch', () => {
+  const root = tmpRoot('memory-branch-test-');
+  try {
+    const bare = remoteWithBranches(root, ['main', 'alpha']);
+    const project = path.join(root, 'alpha');
+    const home = path.join(root, 'home');
+    fs.mkdirSync(project);
+    fs.mkdirSync(home);
+    const r = runSync('pull', project, home, bare);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(git(['branch', '--show-current'], path.join(project, '.memory')), 'alpha');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('project memory checked out on the global branch refuses to sync either way', () => {
+  const root = tmpRoot('memory-branch-test-');
+  try {
+    const bare = remoteWithBranches(root, ['main']);
+    const project = path.join(root, 'alpha');
+    const memory = path.join(project, '.memory');
+    const home = path.join(root, 'home');
+    fs.mkdirSync(home, { recursive: true });
+    git(['clone', '-b', 'main', bare, memory], root);
+    configure(memory, 'Local');
+    const localHead = git(['rev-parse', 'HEAD'], memory);
+    fs.appendFileSync(path.join(memory, 'today.md'), 'project-local\n');
+    const peer = path.join(root, 'peer');
+    git(['clone', '-b', 'main', bare, peer], root);
+    configure(peer, 'Peer');
+    fs.appendFileSync(path.join(peer, 'today.md'), 'global-peer\n');
+    git(['commit', '-am', 'peer'], peer);
+    git(['push'], peer);
+    const globalAfterPeer = git(['rev-parse', 'refs/heads/main'], bare);
+
+    const pushed = runSync('push', project, home, bare);
+    assert.equal(pushed.status, 0, pushed.stderr);
+    assert.equal(git(['rev-parse', 'refs/heads/main'], bare), globalAfterPeer, 'project log was published into global memory');
+    const pulled = runSync('pull', project, home, bare);
+    assert.equal(pulled.status, 0, pulled.stderr);
+    assert.equal(git(['rev-parse', 'HEAD'], memory), localHead, 'global memory was pulled in as project memory');
+    assert.match(pushed.stderr, /Sync refused \(project\)/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('global memory still syncs when the project has no memory of its own', () => {
+  const root = tmpRoot('memory-branch-test-');
+  try {
+    const bare = remoteWithBranches(root, ['main']);
+    const project = path.join(root, 'alpha');
+    const home = path.join(root, 'home');
+    fs.mkdirSync(project);
+    fs.mkdirSync(home);
+    const globalMemory = path.join(home, '.memory');
+    git(['clone', '-b', 'main', bare, globalMemory], root);
+    configure(globalMemory, 'Global');
+    fs.appendFileSync(path.join(globalMemory, 'today.md'), 'global-lesson\n');
+    const r = runSync('push', project, home, bare);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(git(['show', 'refs/heads/main:today.md'], bare), /global-lesson/, r.stderr);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('memory readers, writers and the syncer resolve the project memory dir the same way', () => {
+  const files = ['session-start.js', 'stop-summary.js', 'pre-compact.js', 'periodic-memory.js']
+    .map((f) => path.join(HOOKS_DIR, f))
+    .concat(SCRIPT);
+  for (const file of files) {
+    const src = fs.readFileSync(file, 'utf8');
+    assert.match(src, /getProjectMemoryDir\(\)/, `${path.basename(file)} does not use getProjectMemoryDir()`);
+    const ownJoins = (src.match(/join\([^;]*?['"]\.memory['"]\s*\)/g) || []).filter((j) => !/HOME|homedir/.test(j));
+    assert.deepEqual(ownJoins, [], `${path.basename(file)} builds its own project .memory path`);
+  }
+});
+
+test('a session inside ~/.claude syncs global memory as its own memory', () => {
+  const root = tmpRoot('memory-branch-test-');
+  try {
+    const bare = remoteWithBranches(root, ['main']);
+    const home = path.join(root, 'home');
+    const inClaude = path.join(home, '.claude', 'rules');
+    fs.mkdirSync(inClaude, { recursive: true });
+    const globalMemory = path.join(home, '.memory');
+    git(['clone', '-b', 'main', bare, globalMemory], root);
+    configure(globalMemory, 'Global');
+    const peer = path.join(root, 'peer');
+    git(['clone', '-b', 'main', bare, peer], root);
+    configure(peer, 'Peer');
+    fs.appendFileSync(path.join(peer, 'today.md'), 'global-peer\n');
+    git(['commit', '-am', 'peer'], peer);
+    git(['push'], peer);
+    const r = runSync('pull', inClaude, home, bare);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(fs.readFileSync(path.join(globalMemory, 'today.md'), 'utf8'), /global-peer/, r.stderr);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

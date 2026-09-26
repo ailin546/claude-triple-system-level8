@@ -111,7 +111,7 @@ When creating PRs:
     ├─ 门控判断：commits + lessons + decisions 全为 0？
     │   ├─ 是 → 不记录任何内容（纯聊天/纯阅读/编辑未提交）
     │   └─ 否 → 写入 today.md
-    │       ├─ 项目级：PROJECT/.memory/today.md（完整 entry）
+    │       ├─ 项目级：PROJECT/.memory/today.md（完整 entry；PROJECT = git 主 checkout，worktree/子目录共用，见 infrastructure.md §记忆同步安全闸）
     │       └─ 全局级：~/.memory/today.md（仅 lessons + decisions）
     │
     ├─ 轮转：today.md 日期非今日 → 归档到 weekly.md → 重置 today.md

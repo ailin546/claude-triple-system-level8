@@ -22,7 +22,7 @@ const { isGitRepo, getGitModifiedFiles, readFile, log, getProjectRoot, getGlobal
 const lessonLib = require('../lib/extract-lessons');
 
 const PROJECT_ROOT = getProjectRoot();
-const MEMORY_DIR = path.join(PROJECT_ROOT, '.memory');
+const MEMORY_DIR = require('../lib/project-root').getProjectMemoryDir();
 const TODAY_FILE = path.join(MEMORY_DIR, 'today.md');
 const WEEKLY_FILE = path.join(MEMORY_DIR, 'weekly.md');
 const GLOBAL_MEMORY_DIR = getGlobalMemoryDir();

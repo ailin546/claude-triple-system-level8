@@ -215,8 +215,8 @@ function buildStructuredSummary(rawContent) {
 
 // ── Shared Memory ────────────────────────────────────────────
 
-const { getProjectRoot } = require('../lib/project-root');
-const MEMORY_DIR = path.join(getProjectRoot(), '.memory');
+const { getProjectRoot, getProjectMemoryDir } = require('../lib/project-root');
+const MEMORY_DIR = getProjectMemoryDir();
 const GLOBAL_MEMORY_DIR = path.join(
   process.env.HOME || process.env.USERPROFILE || '/tmp',
   '.memory'

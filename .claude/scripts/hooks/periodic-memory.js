@@ -115,7 +115,7 @@ function run(stdinJson) {
 
   const projectRoot = utils.getProjectRoot();
   const projectName = path.basename(projectRoot);
-  const memDir = path.join(projectRoot, '.memory');
+  const memDir = require('../lib/project-root').getProjectMemoryDir();
   const globalMemDir = utils.getGlobalMemoryDir();
   const sessionStateDir = path.join(projectRoot, '.claude', '.session-state');
 
