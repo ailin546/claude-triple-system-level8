@@ -45,7 +45,7 @@ const AGENT_CATEGORY = {
 
   // review
   'code-reviewer':              'review',
-  'superpowers-code-reviewer':  'review',
+  'ecc-code-reviewer':          'review',
   'security-reviewer':          'review',
   'ecc-security-reviewer':      'review',
   'engineering-security-engineer': 'review',

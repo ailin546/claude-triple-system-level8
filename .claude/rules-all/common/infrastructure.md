@@ -98,7 +98,8 @@ A PostToolUse hook (`drift-detector.js`) maintains a suspicion score per session
 
 Active on all PostToolUse events for Edit, Write, and Bash tools.
 Especially valuable during:
-- `subagent-driven-development` sessions
+- explicitly approved native multi-agent workflows
+- bounded independent reviewer sessions
 - `ecc-autonomous-loops` scenarios
 
 State stored in `.claude/.drift-state/{session-id}.json`. Resets per session.
