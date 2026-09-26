@@ -8,12 +8,14 @@
  * from the session transcript (via stdin JSON transcript_path) and updates a
  * session file for cross-session continuity.
  *
- * All dependencies are inlined — no external lib/ required.
+ * All dependencies are inlined except the project root, which has one resolver
+ * (lib/project-root.js).
  */
 
 const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
+const { getProjectRoot } = require('../lib/project-root');
 
 // Session snapshots are always-on (session-start reads them for recovery).
 // No mode gate — this hook runs in all modes (Fast/Standard/Heavy).
@@ -67,12 +69,13 @@ function getSessionIdShort() {
 }
 
 function getProjectName() {
-  return path.basename(process.cwd());
+  return path.basename(getProjectRoot());
 }
 
 function getGitBranch() {
   try {
     return execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+      cwd: getProjectRoot(),
       encoding: 'utf8',
       timeout: 5000,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -193,7 +196,7 @@ function getSessionMetadata() {
   return {
     project: getProjectName() || 'unknown',
     branch: getGitBranch(),
-    worktree: process.cwd()
+    worktree: getProjectRoot()
   };
 }
 

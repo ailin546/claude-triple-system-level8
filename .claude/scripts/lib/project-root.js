@@ -28,6 +28,7 @@
 
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
@@ -35,14 +36,22 @@ const { execFileSync } = require('child_process');
 const HOME_CLAUDE_DIR = path.join(os.homedir(), '.claude');
 
 /**
- * Get the project root, guarding against cwd being inside ~/.claude.
+ * The project root every hook keys its state by — the only resolver
+ * (`utils.getProjectRoot` delegates here).
  *
- * Priority:
- * 1. process.env.CLAUDE_PROJECT_ROOT (if set and not inside ~/.claude)
- * 2. process.cwd() (if not inside ~/.claude)
- * 3. HOME (parent of ~/.claude) when cwd IS inside ~/.claude
+ * 1. Start from `CLAUDE_PROJECT_DIR`: Claude Code sets it for hook processes to
+ *    the directory the session was launched in, and unlike the cwd it does not
+ *    follow the shell into subdirectories. Without it (scripts run by hand,
+ *    tests), start from the cwd.
+ * 2. Apply the two nesting guards (~/.claude → HOME, `.memory` → its parent).
+ * 3. Climb to the git checkout root, so a start inside a subdirectory keeps the
+ *    same state as the root. A linked worktree is its own checkout root; only
+ *    memory is shared through the main checkout (getProjectMemoryDir).
  *
- * Rationale: hooks typically build state paths as
+ * `CLAUDE_PROJECT_ROOT` is an explicit override: it passes the guards and is
+ * returned as-is.
+ *
+ * Rationale for the ~/.claude guard: hooks typically build state paths as
  *     path.join(PROJECT_ROOT, '.claude', 'whatever')
  * If PROJECT_ROOT were ~/.claude itself, the result would be
  *     ~/.claude/.claude/whatever        ← nested, wrong
@@ -54,14 +63,25 @@ const HOME_CLAUDE_DIR = path.join(os.homedir(), '.claude');
  * @returns {string} absolute path to project root
  */
 function getProjectRoot() {
-  const raw = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
+  const explicit = process.env.CLAUDE_PROJECT_ROOT;
+  const raw = explicit || process.env.CLAUDE_PROJECT_DIR || process.cwd();
   if (isInsideHomeClaude(raw)) {
     return path.dirname(HOME_CLAUDE_DIR);
   }
-  if (isInsideMemoryRepo(raw)) {
-    return escapeMemoryRepo(raw);
+  const start = isInsideMemoryRepo(raw) ? escapeMemoryRepo(raw) : raw;
+  return explicit ? start : checkoutRoot(start);
+}
+
+// A directory holding `.git` (a directory, or a linked worktree's file) is its
+// own checkout root: the common case, answered without spawning git in every
+// hook process.
+function checkoutRoot(dir) {
+  if (fs.existsSync(path.join(dir, '.git'))) return dir;
+  try {
+    return gitOutput(dir, ['rev-parse', '--show-toplevel']);
+  } catch {
+    return dir; // not inside a git checkout
   }
-  return raw;
 }
 
 /**

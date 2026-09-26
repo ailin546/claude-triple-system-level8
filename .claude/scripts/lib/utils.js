@@ -15,35 +15,9 @@ const { execFileSync } = require('child_process');
 
 // ── Path helpers ──────────────────────────────────────────────
 
-/**
- * Return the project root via CLAUDE_PROJECT_ROOT or git.
- * Falls back to process.cwd(). Guards against two nesting traps:
- *   - ~/.claude (collapse to HOME)
- *   - any `.memory/` (walk up to first non-`.memory` ancestor)
- * See scripts/lib/project-root.js for rationale.
- */
+/** The project root; the one resolver is scripts/lib/project-root.js. */
 function getProjectRoot() {
-  const {
-    isInsideHomeClaude, HOME_CLAUDE_DIR,
-    isInsideMemoryRepo, escapeMemoryRepo,
-  } = require('./project-root');
-  const collapse = (p) => {
-    if (isInsideHomeClaude(p)) return HOME_CLAUDE_DIR;
-    if (isInsideMemoryRepo(p)) return escapeMemoryRepo(p);
-    return p;
-  };
-  if (process.env.CLAUDE_PROJECT_ROOT) {
-    return collapse(process.env.CLAUDE_PROJECT_ROOT);
-  }
-  try {
-    const gitRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-    return collapse(gitRoot);
-  } catch {
-    return collapse(process.cwd());
-  }
+  return require('./project-root').getProjectRoot();
 }
 
 /** ~/.claude directory */
@@ -170,7 +144,7 @@ function getGitModifiedFiles(extPatterns) {
     const raw = execFileSync(
       'git',
       ['diff', '--name-only', '--diff-filter=ACMR', 'HEAD'],
-      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+      { cwd: root, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
     ).trim();
     let files = raw ? raw.split('\n').map(f => path.resolve(root, f)) : [];
 

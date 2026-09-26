@@ -261,6 +261,7 @@ function runSync(method, project, home, bare) {
 function resolveMemoryDir(cwd, home) {
   const env = { ...process.env, HOME: home };
   delete env.CLAUDE_PROJECT_ROOT;
+  delete env.CLAUDE_PROJECT_DIR;
   const r = spawnSync(process.execPath,
     ['-e', `process.stdout.write(require(${JSON.stringify(RESOLVER)}).getProjectMemoryDir())`],
     { cwd, encoding: 'utf8', env });
