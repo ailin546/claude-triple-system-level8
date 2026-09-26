@@ -26,6 +26,11 @@ Codex 的日常调用、Fast/Standard/Heavy 路径和阶段映射见
 
 ## 运行边界
 
+两端共同遵循“复用优先、先简后繁”：先核实已有能力并完成最小安全闭环，复杂化必须
+证明必要性；超预算先做复用、删减和分期审查，不默认扩容，也不省略资金安全与恢复。
+执行规则分别落在 Codex 全局 AGENTS 和 Claude `rules/common/workflow.md`；已承诺
+需求的延期或取消仍需用户确认，不新增 Hook 或流程状态机来实现这项原则。
+
 - Claude Code 使用原生 Hooks，但流程层统一为共享生命周期；Superpowers 活动入口已停用。
 - Codex 使用 `adapters/codex/` 中的生成适配器。
 - 两端全局记忆统一到 `~/.memory/`。
