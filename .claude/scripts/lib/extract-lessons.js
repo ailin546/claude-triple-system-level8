@@ -27,12 +27,22 @@ function cleanLesson(raw) {
 }
 
 /**
- * Extract dedup key: LEFT side of → (problem description).
+ * Extract dedup key: the problem description, left of the problem/fix arrow.
+ *
+ * An arrow joining two ASCII word characters belongs to a term
+ * ("weekly→long-term", "json->sqlite"), not to that separator; keying on it
+ * truncated the problem to "weekly" and made unrelated lessons collide.
+ * Without any separator the whole text is the key.
  */
 function lessonKey(cleaned) {
-  const match = cleaned.match(/^(.+?)(?:→|-{1,2}>)/);
-  if (!match) return cleaned.toLowerCase();
-  return match[1].trim().toLowerCase();
+  for (const m of cleaned.matchAll(/→|-{1,2}>/g)) {
+    const before = cleaned[m.index - 1] || '';
+    const after = cleaned[m.index + m[0].length] || '';
+    if (/\w/.test(before) && /\w/.test(after)) continue;
+    const left = cleaned.slice(0, m.index).trim();
+    if (left) return left.toLowerCase();
+  }
+  return cleaned.toLowerCase();
 }
 
 /**

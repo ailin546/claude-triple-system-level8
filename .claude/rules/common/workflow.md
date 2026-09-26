@@ -167,7 +167,7 @@ Claude 只需在分析问题时自然地使用以下格式，Stop hook 会自动
 | 机制 | 作用 | 位置 |
 |------|------|------|
 | `seen-lessons.json` + 消息时间门控 | 持久化已提取的教训与决策 keys（`SEEN_TTL_MS` = 7 天），防止同一条目反复提取；提取时跳过早于 `SEEN_TTL_MS` 的消息——key 过期时它的消息必然已超龄，所以同一条消息永远不会被提取两次。长会话记录会把旧对话链（原 uuid、原时间戳）原样追加回来，只靠会过期的 key 挡不住（2026-09-26：11 天前的 5 条教训被重记一遍） | `.claude/.session-state/`；`lib/extract-lessons.js`（stop-summary / periodic-memory / pre-compact 共用的唯一提取器） |
-| `lessonKey()` | 取箭头左侧文本做语义去重，"X → A" 和 "X → B" 算同一教训 | 内存中 |
+| `lessonKey()` | 取"问题 → 做法"分隔箭头左侧文本做语义去重，"X → A" 和 "X → B" 算同一教训。两侧都紧贴 ASCII 字母数字的箭头属于术语（`weekly→long-term`、`json->sqlite`），不算分隔符；找不到分隔符时整段文本即 key（此前按第一个箭头切，把问题截成 `weekly`，不相干的教训互相当成重复，2026-09-26） | 内存中；实现唯一的家 `lib/extract-lessons.js` |
 | `cleanLesson()` | 去 markdown 格式（`**bold**` → `bold`），normalize 空白 | 内存中 |
 | 时间戳+项目名 | `[auto] HH:MM — 项目名` marker 防同一**分钟+marker**重复写入。**仅防同 marker**——跨触发点/跨 marker（`[auto]` vs `[periodic]`）的 commit 不防，见下行 | today.md 文件中 |
 | `filterNewCommits()` | commit 按 short-hash 去重，剔除 today.md 已记录的。防多次 Stop / periodic 触发用 `git log --since=session_start` 全量窗口重复 append（2026-06-05 修：commit 路径此前无去重——lessons 有 seen-lessons 但 commits 无等价机制——weekly 曾 86% 冗余 / 129KB）。**写 today.md 的 commit 的地方共三处，每处都必须过它**：`stop-summary.js` / `periodic-memory.js` / `pre-compact.js`（2026-09-17 修：pre-compact 自建 `git log` 后直接 append 不去重 → 每次 `/compact` 把整窗口重抄成 `[compact]` 块，同 commit 被记 2–3 次并随轮转进 weekly。回归测试 `__tests__/pre-compact.test.js`） | `lib/extract-lessons.js` |

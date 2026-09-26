@@ -25,6 +25,7 @@ const {
   extractFromTranscript,
   loadSeenLessonKeys,
   saveSeenLessonKeys,
+  lessonKey,
   SEEN_TTL_MS,
 } = require(path.join(__dirname, '..', '..', 'lib', 'extract-lessons.js'));
 
@@ -176,6 +177,45 @@ test('stop-summary, periodic-memory and pre-compact share the extractor and its 
     const persistsKeys = /^\s*(?:if \([^)]*\)\s*)?(?:\w+\.)?saveSeenLessonKeys\((?:[\w.]+,\s*)?keys\);/m;
     assert.ok(persistsKeys.test(src), `${f} does not persist the extraction's keys`);
   }
+});
+
+// ── lessonKey: the problem side, split at the separator arrow only ──
+
+const WEEKLY_A = 'weekly→long-term 只沉淀 lessons 和 decisions，流水账丢弃';
+const WEEKLY_B = 'weekly→long-term 沉淀只保留 lessons 和 decisions → 流水账（安装了 X）丢弃';
+
+// 16. An arrow inside a term is part of the problem, not the separator.
+test('an arrow inside a term does not split the key', () => {
+  assert.strictEqual(lessonKey(WEEKLY_B), 'weekly→long-term 沉淀只保留 lessons 和 decisions');
+  assert.strictEqual(lessonKey('db json->sqlite 迁移漏字段 → 用业务 id 做主键'), 'db json->sqlite 迁移漏字段');
+  assert.notStrictEqual(lessonKey(WEEKLY_A), lessonKey(WEEKLY_B));
+});
+
+// 17. With no separator at all, the whole text identifies the lesson.
+test('a lesson whose only arrows sit inside terms is keyed by its whole text', () => {
+  assert.strictEqual(lessonKey(WEEKLY_A), WEEKLY_A.toLowerCase());
+});
+
+// 18. Separators keep working: spaced, CJK-adjacent, mixed, multi-part, leading.
+test('plain, spaced and CJK-adjacent arrows still separate problem from fix', () => {
+  assert.strictEqual(lessonKey('问题描述→正确做法'), '问题描述');
+  assert.strictEqual(lessonKey('Problem Here -> Fix'), 'problem here');
+  assert.strictEqual(lessonKey('缓存命中率下降→add warmup'), '缓存命中率下降');
+  assert.strictEqual(lessonKey('retry storm→ 加退避'), 'retry storm');
+  assert.strictEqual(lessonKey('原因 → 后果 → 做法'), '原因');
+  assert.strictEqual(lessonKey('→ 开头的箭头 → 做法'), '→ 开头的箭头');
+});
+
+// 19. The dedup semantics stay: one problem, differently phrased fixes → one key.
+test('the same problem with a different fix still shares a key', () => {
+  assert.strictEqual(lessonKey('同一个问题 → 做法甲'), lessonKey('同一个问题 → 做法乙'));
+});
+
+// 20. Consequence at extraction: both lessons survive the in-run dedup.
+test('two lessons that differ only after an embedded arrow are both extracted', () => {
+  const p = tmpTranscript([assistantAt(Date.now() - 60 * 1000, 'u-w',
+    `**Lessons:**\n- ${WEEKLY_B}\n- weekly→long-term 同步前先去重 → 否则重复条目进 long-term`)]);
+  assert.strictEqual(extractFromTranscript(p, new Set()).lessons.length, 2);
 });
 
 // Report
