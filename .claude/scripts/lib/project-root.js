@@ -12,12 +12,12 @@
  *    back to HOME, so hook state stays at the canonical ~/.claude/.
  *
  * 2. .memory/ git-repo nesting (2026-05-03)
- *    The .memory/ directory is itself an independent git repo (see
- *    lib/memory-sync.js for design). When cwd lands inside it,
+ *    The .memory/ directory is itself an independent git repo (synced by
+ *    quant-deploy scripts/pull-all.sh / push-all.sh). When cwd lands inside it,
  *    `git rev-parse --show-toplevel` returns .memory/ as the project root.
  *    Hooks then write `.memory/.memory/today.md` (observed up to 3 levels
  *    deep), and also pollute .memory/ with runtime state files
- *    (.task-mode, .escalation-state.json) that memory-sync auto-commits.
+ *    (runtime files) that an auto-commit would otherwise publish.
  *    Fix: when cwd / git-toplevel lands inside any `.memory` dir, walk up
  *    to the first non-`.memory` ancestor — the *real* project root.
  *

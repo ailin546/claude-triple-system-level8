@@ -5,7 +5,7 @@
  * Generates a snapshot of the current ~/.claude/ system state:
  *   hooks / agents / skills / commands / state files / mode entries
  * AND a drift report exposing inconsistencies between registration sources
- * (settings.json, INDEX.md, model-map.js) and the filesystem.
+ * (settings.json, INDEX.md) and the filesystem.
  *
  * 2026-05-20 (P0): Created per Codex's "可生成 manifest" direction.
  * Critical: must report drift/unknown items, not just generate markdown,
@@ -128,18 +128,10 @@ function scanModeEntries() {
   return [...triggers].sort();
 }
 
-// ── model-map agents ────────────────────────────────────────
-function scanModelMapAgents() {
-  const c = readSafe(path.join(ROOT, 'scripts', 'lib', 'model-map.js'));
-  const out = new Set();
-  const re = /^\s*['"]([a-zA-Z0-9_-]+(?:\s[a-zA-Z0-9_-]+)*)['"]:\s*['"][a-z]+['"]/gm;
-  let m;
-  while ((m = re.exec(c)) !== null) out.add(m[1]);
-  return [...out].sort();
-}
+// (D3「模型映射表引用缺失 agent」已于 2026-10-07 随模式机器退役；编号 D3 不复用)
 
 // ── Drift detection ────────────────────────────────────────
-function detectDrift(hooks, agents, skills, modelMapAgents) {
+function detectDrift(hooks, agents, skills) {
   const drift = {};
 
   // D1: orphan hooks (file exists but not registered in settings.json)
@@ -149,14 +141,7 @@ function detectDrift(hooks, agents, skills, modelMapAgents) {
   drift.skillsMissingFromIndex = skills.missingFromIndex;
   drift.indexedSkillsMissing = skills.indexedButMissing;
 
-  // D3: model-map references missing agents.
-  //   model-map.js indexes by file-slug (e.g. "engineering-ai-engineer")
-  //   AND occasionally by Capital frontmatter name (e.g. "agents orchestrator").
-  //   So a model-map key is dangling only if BOTH (file-slug match) AND
-  //   (frontmatter name match) miss.
-  const agentNames = new Set(agents.map(a => a.name));
-  const agentSlugs = new Set(agents.map(a => a.file.replace(/\.md$/, '')));
-  drift.modelMapDangling = modelMapAgents.filter(n => !agentNames.has(n) && !agentSlugs.has(n));
+  // D3: retired 2026-10-07 with the mode machine; number not reused.
 
   // D4: lowercase vs Capital normalize-equal (namespace conflict)
   const norm = s => s.toLowerCase().replace(/\s/g, '-');
@@ -280,8 +265,7 @@ function main() {
   const commands = scanCommands();
   const stateFiles = scanStateFiles();
   const modeEntries = scanModeEntries();
-  const modelMapAgents = scanModelMapAgents();
-  const drift = detectDrift(hooks, agents, skills, modelMapAgents);
+  const drift = detectDrift(hooks, agents, skills);
 
   const ts = new Date().toISOString();
 
@@ -320,8 +304,6 @@ function main() {
     console.log(`## State files (extracted from hook source)`);
     for (const s of stateFiles) console.log(`- ${s}`);
     console.log('');
-    console.log(`## model-map.js registered agents (${modelMapAgents.length})`);
-    for (const n of modelMapAgents) console.log(`- ${n}`);
     console.log('');
   }
 
@@ -344,7 +326,6 @@ function main() {
   section('D1 Orphan hooks (file exists, not in settings.json)', drift.orphanHooks, x => x);
   section('D2a Skills present but missing from INDEX.md', drift.skillsMissingFromIndex, x => x);
   section('D2b Skills in INDEX.md but missing on disk', drift.indexedSkillsMissing, x => x);
-  section('D3 model-map.js references missing agent names', drift.modelMapDangling, x => x);
   section('D4 Namespace conflicts (lowercase ↔ Capital normalize-equal)', drift.namespaceConflicts, c =>
     `${c.key} ← ${c.agents.map(a => `${a.name}(${a.file})`).join(' / ')}`);
   section('D5 Hook stderr CLAUDE.md § references missing scope prefix (~/.claude/ or PROJECT/)', drift.hookAnchorViolations, x => x);
@@ -359,7 +340,6 @@ function main() {
   if (driftCount > 0) {
     console.log('- D1: hooks should be in settings.json OR moved to scripts/utils/ (utilities)');
     console.log('- D2: sync INDEX.md with actual skills dirs');
-    console.log('- D3: clean stale agent names from model-map.js');
     console.log('- D4: rename one to break normalize-equal collision');
     console.log('- D5: prefix with `~/.claude/CLAUDE.md §` or `PROJECT/CLAUDE.md §` per agents.md §Hook 文案锚点规则');
     console.log('- D6: add stdin passthrough (process.stdout.write(stdinData)), emit additionalContext (lib/hook-output), or document why excluded');

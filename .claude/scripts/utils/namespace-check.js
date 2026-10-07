@@ -36,11 +36,8 @@ function lsSafe(p) { try { return fs.readdirSync(p); } catch { return []; } }
 // Hook groups on same trigger that are documented as intentional workflow composition.
 // Format: '<trigger>:<matcher>' → reason
 const ACKED_HOOK_GROUPS = {
-  'SessionStart:*':              'init chain: session-start → task-router → rules-loader',
-  'PreToolUse:Bash':             'guard chain: evaluation-gate / careful-guard / fix-depth-check',
-  'PreToolUse:*':                'orthogonal: pre-tool-escalate (mode) + suggest-compact (context)',
-  'PostToolUse:*':               'orthogonal: drift-detector (state) + periodic-memory (lessons)',
-  'PostToolUse:Bash':            'orthogonal: fault-hint (fault tips) + lesson-nudge (lessons reminder, 2026-06-05)',
+  'PreToolUse:Bash':             'guard chain: careful-guard / fix-depth-check',
+  'PostToolUse:Edit|Write':      'edit chain: post-edit-light + ssot-source-guard + post-edit-format (async)',
 };
 // Cross-layer name collisions that are intentional entrypoint patterns.
 // command + skill same name = "command is invocation, skill is the capability"
@@ -150,29 +147,7 @@ function checkDeclaredVsFilesystem() {
     }
   }
 
-  // 4b. model-map.js key vs agent file basename
-  const mmPath = path.join(ROOT, 'scripts', 'lib', 'model-map.js');
-  const mm = readSafe(mmPath);
-  const agentsDir = path.join(ROOT, 'agents');
-  const agentBaseNames = new Set(lsSafe(agentsDir).filter(f => f.endsWith('.md')).map(f => f.replace(/\.md$/, '')));
-  const agentFrontmatterNames = new Set();
-  for (const f of lsSafe(agentsDir).filter(f => f.endsWith('.md'))) {
-    const content = readSafe(path.join(agentsDir, f));
-    const nm = content.match(/^name:\s*(.+)$/m);
-    if (nm) agentFrontmatterNames.add(nm[1].trim());
-  }
-  const mmRe = /^\s*['"]([a-zA-Z0-9_\s-]+?)['"]:\s*['"][a-z]+['"]/gm;
-  while ((m = mmRe.exec(mm)) !== null) {
-    const key = m[1];
-    // Skip non-agent keys (e.g. 'orchestrator', 'review', 'development' role names)
-    // Agent-keys typically contain '-' or match an agent file/name
-    if (!agentBaseNames.has(key) && !agentFrontmatterNames.has(key)) {
-      // Could be a category role name like 'orchestrator' — skip unless it looks like an agent ref
-      if (/^[a-z]+-[a-z]/.test(key) || /\s/.test(key)) {
-        issues.push({ kind: 'model-map.js key not matching any agent file/name', key });
-      }
-    }
-  }
+  // 4b retired 2026-10-07 with the mode machine (agent↔model table deleted).
 
   return issues;
 }

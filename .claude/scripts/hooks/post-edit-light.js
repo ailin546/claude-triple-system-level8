@@ -151,7 +151,6 @@ function run(rawInput) {
       }
     }
 
-    // Note: Mode auto-escalation is handled by pre-tool-escalate.js (SSOT)
   } catch {
     // Invalid input — pass through silently
   }

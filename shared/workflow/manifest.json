@@ -36,31 +36,57 @@
       ".claude/skills/systematic-debugging/SKILL.md",
       ".claude/skills/test-driven-development/SKILL.md",
       ".claude/skills/using-git-worktrees/SKILL.md",
-      ".claude/skills/writing-skills/SKILL.md"
-    ],
-    "protected_paths": [
-      "CLAUDE.md",
-      ".claude/settings.json",
+      ".claude/skills/writing-skills/SKILL.md",
       ".claude/rules/routing.md",
-      ".claude/rules/common/agents.md",
-      ".claude/rules/common/workflow.md",
-      ".claude/rules/common/quality-and-security.md",
       ".claude/skills/brainstorming/SKILL.md",
       ".claude/skills/writing-plans/SKILL.md",
       ".claude/skills/evaluation-loop/SKILL.md",
-      ".claude/agents/ecc-code-reviewer.md",
       ".claude/commands/plan.md",
-      ".claude/commands/verify.md",
-      ".claude/commands/code-review.md",
       ".claude/commands/save-session.md",
       ".claude/commands/resume-session.md",
-      ".claude/scripts/lib/project-root.js",
       ".claude/scripts/hooks/session-start.js",
       ".claude/scripts/hooks/periodic-memory.js",
       ".claude/scripts/hooks/stop-summary.js",
       ".claude/scripts/hooks/session-end.js",
+      ".claude/commands/mode-explain.md",
+      ".claude/rules/common/infrastructure.md",
+      ".claude/COLLABORATION.md",
+      ".claude/scripts/setup-remote.sh",
+      ".claude/scripts/install-level8.sh",
+      ".claude/scripts/hooks/task-router.js",
+      ".claude/scripts/hooks/set-mode.js",
+      ".claude/scripts/hooks/pre-tool-escalate.js",
+      ".claude/scripts/hooks/user-prompt-classify.js",
+      ".claude/scripts/hooks/suggest-compact.js",
+      ".claude/scripts/hooks/auto-model.js",
+      ".claude/scripts/hooks/mode-explain.js",
+      ".claude/scripts/hooks/get-model.js",
+      ".claude/scripts/hooks/drift-detector.js",
+      ".claude/scripts/hooks/lesson-nudge.js",
+      ".claude/scripts/hooks/fault-hint.js",
+      ".claude/scripts/hooks/post-edit-typecheck.js",
+      ".claude/scripts/hooks/pre-compact.js",
+      ".claude/scripts/hooks/shared-state-sync.js",
+      ".claude/scripts/hooks/evaluation-gate.js",
+      ".claude/scripts/hooks/quality-gate.js",
+      ".claude/scripts/lib/mode-check.js",
+      ".claude/scripts/lib/model-map.js",
+      ".claude/scripts/lib/memory-sync.js",
+      ".claude/scripts/lib/extract-lessons.js"
+    ],
+    "protected_paths": [
+      "CLAUDE.md",
+      ".claude/settings.json",
+      ".claude/rules/common/agents.md",
+      ".claude/rules/common/workflow.md",
+      ".claude/rules/common/quality-and-security.md",
+      ".claude/agents/ecc-code-reviewer.md",
+      ".claude/commands/verify.md",
+      ".claude/commands/code-review.md",
+      ".claude/scripts/lib/project-root.js",
       "install.sh",
-      "setup-claude.sh"
+      "setup-claude.sh",
+      ".claude/rules/common/hooks.md"
     ]
   },
   "capabilities": [
@@ -70,8 +96,10 @@
       "codex_skill": "system-triage",
       "claude_evidence": [
         {
-          "path": ".claude/rules/routing.md",
-          "contains": ["### Fast", "### Standard", "### Heavy"]
+          "path": "CLAUDE.md",
+          "contains": [
+            "plan mode"
+          ]
         }
       ]
     },
@@ -81,8 +109,10 @@
       "codex_skill": "clarify-scope",
       "claude_evidence": [
         {
-          "path": ".claude/skills/brainstorming/SKILL.md",
-          "contains": ["Requirement Confirmation", "Existing Capabilities", "Change Budget"]
+          "path": "CLAUDE.md",
+          "contains": [
+            "AskUserQuestion"
+          ]
         }
       ]
     },
@@ -92,16 +122,10 @@
       "codex_skill": "plan-execute",
       "claude_evidence": [
         {
-          "path": ".claude/skills/writing-plans/SKILL.md",
-          "contains": ["# Plan", "每步验证", "Change Budget"]
-        },
-        {
-          "path": ".claude/rules/common/workflow.md",
-          "contains": ["2. **Execute**", "停止扩张并重新确认"]
-        },
-        {
-          "path": ".claude/rules/common/agents.md",
-          "contains": ["默认单 agent 直接完成任务"]
+          "path": "CLAUDE.md",
+          "contains": [
+            "→ verify"
+          ]
         }
       ]
     },
@@ -112,11 +136,17 @@
       "claude_evidence": [
         {
           "path": "CLAUDE.md",
-          "contains": ["Verification Gate", "完成声明必须附最新、相关的验证证据"]
+          "contains": [
+            "验证证据",
+            "完成声明必须附最新、相关的验证证据"
+          ]
         },
         {
           "path": ".claude/rules/common/workflow.md",
-          "contains": ["4. **Verify**", "说明已验证、未验证和剩余风险"]
+          "contains": [
+            "4. **Verify**",
+            "说明已验证、未验证和剩余风险"
+          ]
         }
       ]
     },
@@ -126,8 +156,10 @@
       "codex_skill": "autoresearch-lite",
       "claude_evidence": [
         {
-          "path": ".claude/skills/evaluation-loop/SKILL.md",
-          "contains": ["Bounded Evaluation Loop", "最多 3 轮", "连续两轮"]
+          "path": "CLAUDE.md",
+          "contains": [
+            "/goal"
+          ]
         }
       ]
     },
@@ -138,11 +170,19 @@
       "claude_evidence": [
         {
           "path": ".claude/rules/common/workflow.md",
-          "contains": ["3. **Review**", "按风险审查一次", "第三次及以后需用户明确要求"]
+          "contains": [
+            "3. **Review**",
+            "按风险审查一次",
+            "第三次及以后需用户明确要求"
+          ]
         },
         {
           "path": ".claude/agents/ecc-code-reviewer.md",
-          "contains": ["name: code-reviewer", "Critical|High|Medium|Low", "REQUEST CHANGES"]
+          "contains": [
+            "name: code-reviewer",
+            "Critical|High|Medium|Low",
+            "REQUEST CHANGES"
+          ]
         }
       ]
     },
@@ -152,12 +192,18 @@
       "codex_skill": "workflow-doctor",
       "claude_evidence": [
         {
-          "path": ".claude/rules/common/agents.md",
-          "contains": ["机制变更完成门", "只读无副作用", "sync_workflow.py --check"]
+          "path": ".claude/on-demand/self-evolution.md",
+          "contains": [
+            "机制变更完成门",
+            "只读无副作用",
+            "sync_workflow.py --check"
+          ]
         },
         {
           "path": ".claude/scripts/utils/manifest-generate.js",
-          "contains": ["--drift-only"]
+          "contains": [
+            "--drift-only"
+          ]
         }
       ]
     },
@@ -167,12 +213,11 @@
       "codex_skill": "handoff-memory",
       "claude_evidence": [
         {
-          "path": ".claude/commands/save-session.md",
-          "contains": ["Save Session", "hand off context"]
-        },
-        {
-          "path": ".claude/scripts/hooks/stop-summary.js",
-          "contains": ["weekly.md", "long-term.md"]
+          "path": "shared/memory/PROTOCOL.md",
+          "contains": [
+            "auto/MEMORY.md",
+            "handoff.md"
+          ]
         }
       ]
     }

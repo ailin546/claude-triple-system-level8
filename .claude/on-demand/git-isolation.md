@@ -77,5 +77,5 @@ git worktree add ~/<project>-s2 -b dev/session-2
 **资源冲突清单**（同一项目两 worktree）：
 - ✅ 自动隔离：working tree、index、cchft.db（相对路径）、journals、`.logs/`、`.pids/`、target/、node_modules/
 - 🟡 需要手动配置：master/ws 端口、worker metrics 9090（hardcode follow-up）、web vite 5173、worker_id（避 master 看到两同名 worker 互踢）、testnet exchange API listenKey（同 account 后到先得）
-- 🔴 全局共享（注意互踩）：`~/.cchft-secret`（密码同享 OK）、`~/.claude/state/evaluation-gate/last-pass.json`（多 session evaluation-loop 互踩；hook 按 `git_head` pin 部分缓解）、`~/.memory/`（hook 自动写，多 session 同写一个 today.md 行交错）
+- 🔴 全局共享（注意互踩）：`~/.cchft-secret`（密码同享 OK）、（多 session evaluation-loop 互踩；hook 按 `git_head` pin 部分缓解）、`~/.memory/`（hook 自动写，多 session 同写一个 today.md 行交错）
 

@@ -3,24 +3,10 @@
 /**
  * command-scan.js — shared shell-command parsing helpers for guard hooks.
  *
- * Root cause this addresses (2026-06-06): pre-tool-escalate.js and
- * evaluation-gate.js both matched their patterns against the RAW command
- * string. That conflated three distinct things into one blob:
- *   1. the actual command(s) being run,
- *   2. flag/argument VALUES (`--reason "..."`, `-m "..."`, path args),
- *   3. chained sub-commands (`a && b ; c`).
- * The result was a self-reinforcing deadlock with evaluation-gate: any
- * `git push` auto-escalated to heavy, and the de-escalation CLI's own
- * `--reason "...git push..."` text matched the gate's `git push` pattern —
- * so the command meant to LOWER the mode re-tripped the guard that blocked it.
- *
- * These helpers let a hook reason about command STRUCTURE instead of raw
- * substrings. They are pure functions with no I/O or side effects, but are
- * unit-tested anyway (`__tests__/command-scan.test.js`) because they underpin
- * two blocking hooks (evaluation-gate exit 2, pre-tool-escalate mode change).
- *
- * See: error-log [2026-06-06], ~/.claude/scripts/hooks/{pre-tool-escalate,
- * evaluation-gate}.js, and CLAUDE.md §Long-term correctness 守卫.
+ * Rule: blocking hooks must match patterns against the command with quoted
+ * strings stripped and split into segments, never the raw text — otherwise a
+ * commit message or reason string that merely mentions a dangerous word gets
+ * blocked (2026-06-06 self-reinforcing deadlock). Consumer: careful-guard.js.
  */
 
 /**
@@ -89,7 +75,7 @@ function splitSegments(cmd) {
  *
  * Git global options before the subcommand are skipped, so `git --no-pager
  * push` and `git -c user.x=y commit` are correctly seen as push/commit
- * (closing an evaluation-gate bypass). Value-taking globals (`-c`, `-C`,
+ * (so a guard cannot be bypassed with a global option). Value-taking globals (`-c`, `-C`,
  * `--git-dir`, `--work-tree`, `--namespace`, `--exec-path`, `--super-prefix`)
  * consume their argument; `=`-form and boolean globals are skipped too.
  *
@@ -104,23 +90,8 @@ function gitSubcommand(segment) {
   return m ? m[1] : null;
 }
 
-/**
- * True if a segment invokes the set-mode.js CLI — the de-escalation tool.
- * Such a segment must never be treated as a risk signal, or resetting the
- * mode re-escalates it (the [2026-05-20] deadlock). Matches the script name
- * only when it is a real path/word boundary, so `foo-set-mode.js` is excluded.
- *
- * @param {string} segment one command segment
- * @returns {boolean}
- */
-function isSetModeInvocation(segment) {
-  if (typeof segment !== 'string') return false;
-  return /(?:^|[\s/])set-mode\.js(?:\s|$)/.test(segment);
-}
-
 module.exports = {
   stripQuotedStrings,
   splitSegments,
   gitSubcommand,
-  isSetModeInvocation,
 };

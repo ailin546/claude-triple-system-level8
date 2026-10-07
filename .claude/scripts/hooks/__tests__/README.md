@@ -8,10 +8,10 @@
 
 | 类别 | 风险 | 示例 hook |
 |---|---|---|
-| **state file** | 写文件后状态污染影响未来 session | `evaluation-gate`, `stop-summary` (architecture-rescue) |
-| **mode gate** | 错误条件下 hook 行为不一致 | `shared-state-sync`, `quality-gate` |
-| **阻断** (exit 1/2) | 阻断用户合法操作 | `careful-guard`, `evaluation-gate`, `freeze-guard` |
-| **改 context** (stderr 注入) | Claude 看到错信号 | `fix-depth-check`, `user-prompt-classify` |
+| **state file** | 写文件后状态污染影响未来 session | `ssot-source-guard` (state/ssot-source-guard.json), `careful-guard` (.careful-enabled) |
+| **条件门** | 错误条件下 hook 行为不一致 | `freeze-guard` (/freeze 范围) |
+| **阻断** (exit 1/2) | 阻断用户合法操作 | `careful-guard`, `freeze-guard` |
+| **改 context** (additionalContext 注入) | Claude 看到错信号 | `ssot-source-guard`, `fix-depth-check` |
 | **解析配置/内容** | regex/parser bug 漏过或误抓 | `fix-depth-check` (commit msg), `careful-guard` (command parse) |
 
 **单纯纯函数 utility（无 stdin/stderr 副作用）可豁免**，但应在文件顶部注释说明"无副作用"。
@@ -21,7 +21,6 @@
 | 文件 | 覆盖类别 | 测试数 |
 |---|---|---|
 | [careful-guard.test.js](./careful-guard.test.js) | 阻断 + 解析配置 + 改 context | 42 |
-| [evaluation-gate.test.js](./evaluation-gate.test.js) | 已停用 legacy hook 的回归资料；不在 settings.json 注册 | 40 |
 | [fix-depth-check.test.js](./fix-depth-check.test.js) | 解析配置 + 改 context | 31 |
 | [pre-tool-escalate.test.js](./pre-tool-escalate.test.js) | 解析配置（命令分段匹配）+ mode 升档 | 23 |
 | [command-scan.test.js](./command-scan.test.js) | 纯函数解析库（strip-quote / segment / git-head / 全局选项 / 重定向 / 命令替换）| 25 |
@@ -31,7 +30,7 @@
 | [session-identity.test.js](./session-identity.test.js) | state file 落点：会话身份取 hook 输入的 session_id，否则 CLAUDE_CODE_SESSION_ID（session-end 每会话一个文件 / session-start 只恢复本会话 / suggest-compact 按会话计数）| 5 |
 | [project-root.test.js](./project-root.test.js) | state file 落点：hook 项目根唯一解析点（启动目录 / 守卫 / checkout 根 / 两个入口同解）+ session-end 元数据 + 真 git fixture | 9 |
 
-> 2026-06-06：`command-scan.js` 是 `lib/` 下的纯函数解析库（无副作用，README §17 本可豁免），但因它支撑两个阻断 hook（evaluation-gate exit 2 + pre-tool-escalate mode），仍配单测。`evaluation-gate.test.js` 新增 subprocess 集成测试演示如何用 throwaway `HOME` hermetic 跑真实 hook 的 exit-code，不碰真实 marker。
+> 2026-06-06：`command-scan.js` 是 `lib/` 下的纯函数解析库（无副作用，README §17 本可豁免），但因它支撑阻断 hook（careful-guard exit 2），仍配单测。subprocess 集成测试用 throwaway `HOME` hermetic 跑真实 hook 的 exit-code（见 careful-guard.test.js）。
 
 ## 零依赖测试模式
 
@@ -89,7 +88,6 @@ done
 
 ```bash
 node ~/.claude/scripts/hooks/__tests__/careful-guard.test.js
-node ~/.claude/scripts/hooks/__tests__/evaluation-gate.test.js
 node ~/.claude/scripts/hooks/__tests__/fix-depth-check.test.js
 ```
 

@@ -13,7 +13,7 @@
  *   entry_threshold deploy-copy-vs-ArcSwap, raw-vs-net spread). The SSOT
  *   principle exists as a rule but nothing makes the wrong source unreachable
  *   or the right one un-bypassable. This hook is the same reliability move as
- *   fix-depth-check / lesson-nudge: a rule was ~0% self-enforced; a soft
+ *   fix-depth-check: a rule was ~0% self-enforced; a soft
  *   commit/edit-time nudge makes it reliable.
  *
  * Design (consensus with Codex 2026-06-27 — narrowed to EXACT high-signal
@@ -166,7 +166,7 @@ function saveState(state) {
 
 /**
  * Per-(session, file, pattern) dedup. Resets the seen set when the transcript
- * (≈ session) changes, like lesson-nudge's per-transcript model. Returns the
+ * (≈ session) changes. Returns the
  * subset of matches that have NOT yet been nudged this session, and records
  * them as seen.
  */

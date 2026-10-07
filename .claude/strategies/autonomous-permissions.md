@@ -15,8 +15,8 @@
 |------|------|------|
 | `careful-guard` | PreToolUse | 阻断破坏性命令（rm -rf、DROP TABLE、git push --force） |
 | `freeze-guard` | PreToolUse | 阻断锁定范围外的编辑 |
-| `pre-tool-escalate` | PreToolUse | 检测高风险操作，自动升档模式 |
-| 模式门控 hooks | Standard+/Heavy | 按模式启用验证、质量门、shared-state |
+| `freeze-guard` | PreToolUse | /freeze 编辑范围锁 |
+| `ssot-source-guard` | PostToolUse | SSOT-risk 读取模式软提醒 |
 
 ## 三层权限分类（治理参考）
 

@@ -2,7 +2,7 @@
 'use strict';
 /**
  * Unit tests for lib/command-scan.js — shared command-structure helpers that
- * underpin two blocking hooks (pre-tool-escalate, evaluation-gate).
+ * underpin the blocking hook careful-guard.
  *
  * Run: node ~/.claude/scripts/hooks/__tests__/command-scan.test.js
  * Exit 0 = all pass, exit 1 = any failure.
@@ -14,7 +14,6 @@ const {
   stripQuotedStrings,
   splitSegments,
   gitSubcommand,
-  isSetModeInvocation,
 } = require(path.join(__dirname, '..', '..', 'lib', 'command-scan.js'));
 
 let pass = 0;
@@ -49,7 +48,7 @@ t('preserves operators OUTSIDE quotes', () => {
 });
 
 t('blanks dangling unbalanced opening quote to EOL', () => {
-  assert.strictEqual(stripQuotedStrings('set-mode --reason "unblock git push'), 'set-mode --reason ');
+  assert.strictEqual(stripQuotedStrings('tool --reason "unblock git push'), 'tool --reason ');
 });
 
 t('non-string and empty return empty string', () => {
@@ -62,8 +61,8 @@ t('non-string and empty return empty string', () => {
 process.stdout.write('\nsplitSegments:\n');
 
 t('splits on && and trims', () => {
-  assert.deepStrictEqual(splitSegments('set-mode --reset standard && git push'), [
-    'set-mode --reset standard',
+  assert.deepStrictEqual(splitSegments('tool --reset standard && git push'), [
+    'tool --reset standard',
     'git push',
   ]);
 });
@@ -113,31 +112,7 @@ t('sudo / env prefix before git still detected', () => {
 
 t('non-git command → null', () => {
   assert.strictEqual(gitSubcommand('npm install'), null);
-  assert.strictEqual(gitSubcommand('node set-mode.js heavy'), null);
-});
-
-// ─── isSetModeInvocation ─────────────────────────────────────────────
-process.stdout.write('\nisSetModeInvocation:\n');
-
-t('node /abs/.../set-mode.js ... → true', () => {
-  assert.strictEqual(
-    isSetModeInvocation('node /Users/hi/.claude/scripts/hooks/set-mode.js --reset standard --force'),
-    true
-  );
-});
-
-t('bare set-mode.js → true', () => {
-  assert.strictEqual(isSetModeInvocation('set-mode.js'), true);
-  assert.strictEqual(isSetModeInvocation('node set-mode.js heavy'), true);
-});
-
-t('similarly-named file is NOT set-mode: foo-set-mode.js → false', () => {
-  assert.strictEqual(isSetModeInvocation('node foo-set-mode.js'), false);
-});
-
-t('unrelated commands → false', () => {
-  assert.strictEqual(isSetModeInvocation('git push'), false);
-  assert.strictEqual(isSetModeInvocation('node get-mode.js --all'), false);
+  assert.strictEqual(gitSubcommand('node tool.js heavy'), null);
 });
 
 // ─── Hardening (2026-06-06 Codex review findings) ────────────────────
@@ -169,8 +144,8 @@ t('background & and && still split', () => {
 
 t('#6 command substitution contents surface as their own segment', () => {
   assert.deepStrictEqual(
-    splitSegments('node set-mode.js --reset standard --reason "$(terraform apply)"'),
-    ['node set-mode.js --reset standard --reason', 'terraform apply']
+    splitSegments('node tool.js --reset standard --reason "$(terraform apply)"'),
+    ['node tool.js --reset standard --reason', 'terraform apply']
   );
   assert.deepStrictEqual(splitSegments('echo `git push`'), ['echo', 'git push']);
 });

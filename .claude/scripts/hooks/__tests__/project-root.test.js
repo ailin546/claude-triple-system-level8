@@ -10,7 +10,6 @@ const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
 
 const LIB = path.resolve(__dirname, '../../lib');
-const SESSION_END = path.resolve(__dirname, '../session-end.js');
 
 function git(args, cwd) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -108,18 +107,4 @@ test('modified files are listed from the root checkout, with paths inside it', (
   { cwd: f.wtNested, encoding: 'utf8', env: envFor(f, { CLAUDE_PROJECT_DIR: f.main }) });
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(JSON.parse(r.stdout), [path.join(f.nested, 'f.txt')]);
-}));
-
-test('session-end names the project, worktree and branch after the root, not the cwd', () => withFixture((f) => {
-  const env = envFor(f, { CLAUDE_PROJECT_DIR: f.main });
-  const input = JSON.stringify({ session_id: 'rootcase1' });
-  const r = spawnSync(process.execPath, [SESSION_END], { cwd: f.wtNested, input, encoding: 'utf8', env });
-  assert.equal(r.status, 0, r.stderr);
-  const dir = path.join(f.home, '.claude', 'sessions');
-  const files = fs.readdirSync(dir);
-  assert.equal(files.length, 1, files.join(','));
-  const text = fs.readFileSync(path.join(dir, files[0]), 'utf8');
-  assert.ok(text.includes('**Project:** proj\n'), text.slice(0, 300));
-  assert.ok(text.includes(`**Worktree:** ${f.main}\n`), text.slice(0, 300));
-  assert.ok(text.includes('**Branch:** trunk\n'), text.slice(0, 300));
 }));

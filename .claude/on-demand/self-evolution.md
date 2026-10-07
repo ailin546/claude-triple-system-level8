@@ -40,7 +40,7 @@
 **反模式（禁止）**:
 - "改了 hook 就 claim done,不改 CLAUDE.md" → hook 行为和文档约定的不一致 → 未来 debug 地狱
 - "新 skill 放 skills/,不在 CLAUDE.md §工作流程 里 link" → 新 session 不知道它存在 → skill 被边缘化
-- "改了 commands/verify.md 的 `pre-pr` 分支行为,不同步 CLAUDE.md Quick Commands 表" → 用户看旧表
+- "改了 scripts/hooks/careful-guard.js 的 allowlist,不同步 rules/common/hooks.md" → 用户看旧表
 - "给 agent 加新能力,不更新 agents 路由表" → 任务路由不到新 agent
 - "口头跟自己说'记得 XXX'" → 下个 session 立即失效
 
@@ -72,8 +72,8 @@
 - **边界案例**: 某个规则同时适用系统和项目级 → 写在 user-level(更广),项目级只 link
 
 **判定歧义示例**:
-- 改 `~/.claude/skills/evaluation-loop/SKILL.md` → 系统级(工具本身)
-- 改 "CCHFT 项目的 Heavy 任务必须走 evaluation-loop" → 项目级(项目纪律)
+- 改 `~/.claude/rules/common/hooks.md` → 系统级(工具本身)
+- 改 "CCHFT 资金路径改动必须过 Codex 对抗审查" → 项目级(项目纪律)
 - 两者分别在两个 CLAUDE.md,互不重叠
 
 **关联**: 项目级 CCHFT 有同构规则在 `/home/ubuntu/quant-deploy/CLAUDE.md §十二`,作用域严格互补(user-level 管 Claude Code 基础设施,project-level 管 CCHFT 代码/监控/修复)。
@@ -88,3 +88,41 @@
 
 判据"重要"与持久化验证同源：**换一个新 session 会被再次问起、且需要重读代码/重走弯路才能回答 → 就是重要，必须落文档**。
 
+
+## 机制变更清单（2026-10-07 自 rules/common/agents.md 迁入）
+
+### Agent 删除扫描清单（强制）
+
+> 2026-05-20 教训：删 agent 时漏了 5 处真实活引用。根因：agent 名有两套约定（frontmatter `name` + 文件-slug）。删除任意 `~/.claude/agents/*.md` 前，**两个名字都要扫**：
+
+必扫：`agents/`、`CLAUDE.md`、`commands/*.md`（`subagent_type:`）、`rules/**/*.md`、`rules-all/**/*.md`、`skills/**/SKILL.md`、`scheduled-tasks/**/SKILL.md`、`state/sessions-board.md`、`scripts/hooks/*.js`、`on-demand/*.md`、`settings.json`、`~/.claude-system/shared/`（M4 清单与 tests）。可忽略：`backups/`、`*-archive/`、`projects/**/*.jsonl`、`sessions/`、`file-history/`、`plugins/cache/`。
+
+真引用（必须改）：`subagent_type: "..."`、反引号包裹的名、列表项 `- **name**:`、ASCII 流程图里的名。描述性短语与历史教训记录保留。删除时同步搜意图相反的待办（`- [ ] 保留 X 删除 Y`），标 `[x] DONE 日期 (做法相反)`。
+
+### 新增机制注册清单（强制）
+
+加新机制前**先 read 现有最近 3 个同类样本**。
+
+- **hook**：先答「是否真需要」（守卫放 hook，提醒不放）→ 写 `scripts/hooks/X.js` → 注册 `settings.json` → `rules/common/hooks.md` 加一行 → 有 additionalContext 文案则遵守 Hook 文案锚点规则 → 有状态文件写路径与清理策略 → 涉及 state file / 阻断 / 注入 / 解析配置任一为真必须配单测（`scripts/hooks/__tests__/README.md`）。
+- **agent**：`agents/<scope>-<name>.md`；frontmatter `name` 不与现有同名（normalize 后比较）；更新 `CLAUDE.md §Agent 路由` 或 `rules/common/agents.md`；预演删除扫描。
+- **skill**：`skills/<name>/SKILL.md`（frontmatter 仅 name + description，description 是 "Use when..."）；更新 `skills/INDEX.md`；与 plugin 同名加前缀；重叠 skill 互引。
+- **command**：`commands/<name>.md`；有副作用的加 `disable-model-invocation: true`。
+
+### 机制变更完成门（强制）
+
+触发：新增 / 删除 / 重命名 hook、agent、skill、command；改 hook 实现或契约；改 manifest（INDEX.md / settings.json）；改 CLAUDE.md 或 rules/common 结构。四条检查按顺序跑，全部只读无副作用：
+
+```bash
+node ~/.claude/scripts/utils/manifest-generate.js --drift-only   # M1 系统级 drift
+node ~/.claude/scripts/utils/namespace-check.js                   # M2 跨命名空间冲突（变更前后各跑一次 diff Review 列表）
+node ~/.claude/scripts/utils/rules-load-snapshot.js               # M3 启动上下文（改 CLAUDE.md / rules 时）
+python3 ~/.claude-system/scripts/sync_workflow.py --check         # M4 Claude/Codex 统一工作流清单
+```
+
+接受标准：M1 drift 仅含已登记的 D1；M2 Hard 0 且 Review 不增（新增 Review 项必须在 commit message 写 acked 理由）；M3 token 变化与预期一致；M4 exit 0——`missing Claude evidence file` / `disabled Claude entrypoint is active` → 改 `shared/workflow/manifest.json`；`protected Claude file changed without baseline review` → 按 `~/.claude-system/docs/UNIFIED_WORKFLOW.md §更新纪律` 兼容评审，结论写进 commit，再 `--refresh-claude-baseline`，同一改动提交。pre-push 对推到 main 的提交也跑 `--check`，所以必须在本地完成门里跑。
+
+漂移回填：本可检出但漏跑 → 提高接受标准 + lesson；现有检测不覆盖 → 登记 detection gap（纳入扩展或明确豁免，不能两边都选）；触发场景未识别 → 补本节列表。
+
+### Hook 文案锚点规则（强制）
+
+User-level hook 注入文案引用 CLAUDE.md 章节时禁止裸数字章节号（hook 跑在所有项目）；必须前缀作用域：`~/.claude/CLAUDE.md §稳定章节名` 或 `PROJECT/CLAUDE.md §章节名`；章节名优先于编号。检测：`grep 'CLAUDE\.md §[0-9一二三四五六七八九十百]' ~/.claude/scripts/hooks/*.js | grep -v 'PROJECT/CLAUDE.md\|~/.claude/CLAUDE.md'` 应 0 hits。

@@ -21,7 +21,7 @@
  * ⚠ Transitive side effects: This script does NOT write any files itself,
  * but it INVOKES other utilities/tests that may write to /tmp:
  *   - careful-guard.test.js uses mkdtemp() under /tmp for clean-tree cases
- *   - evaluation-gate.test.js may write temp marker files
+ *   - hook tests write only to throwaway HOME
  * Requires /tmp (or $TMPDIR) writable. If running in a read-only sandbox,
  * hook tests will fail with EPERM and report -1/-1 (see Codex review
  * 2026-05-21: contract violation root-cause docs not transitive).
@@ -84,7 +84,7 @@ function hookTests() {
     const out = runSafe(`node "${path.join(dir, f)}" 2>&1`);
     // Accept both formats:
     //   "31 pass / 0 fail"   (fix-depth-check)
-    //   "36 passed, 0 failed" (careful-guard / evaluation-gate)
+    //   "36 passed, 0 failed" (careful-guard)
     const m = out.match(/(\d+)\s+pass(?:ed)?\s*[,/]\s*(\d+)\s+fail(?:ed)?/);
     if (m) {
       results.push({ name: f.replace('.test.js', ''), pass: +m[1], fail: +m[2], err: null });

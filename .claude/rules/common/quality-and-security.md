@@ -77,8 +77,7 @@ Test Types (ALL required):
 
 ### Test-Driven Development
 
-Standard+ 模式下的功能开发和有明确 AC 的 bugfix 使用 TDD 流程。
-Fast 模式下的小修复、配置微调、文档变更不强制 TDD。
+功能开发和有明确验收条件的 bugfix 可用 TDD；小修复、配置微调、文档变更不强制。
 
 TDD 流程（当适用时）：
 1. Write test first (RED)

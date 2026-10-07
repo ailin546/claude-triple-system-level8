@@ -1,155 +1,72 @@
 #!/usr/bin/env node
 /**
- * rules-load-snapshot.js — One-shot SessionStart context-tax baseline.
- *
- * Manual tool. NO hook registration, NO persistent state, NO settings.json
- * change. Run on demand to see how much context the current rules-loader
- * setup will inject at SessionStart.
- *
- * 2026-05-20: Created per Codex保留意见 (Stage B Reject 后的可接受形态):
- *   Stage B's 7-day continuous observation was rejected because it accrued
- *   new hooks/state/docs but only measured static file linkage. A manual
- *   snapshot lets us see *current* context tax without adding any runtime
- *   component.
- *
- * Usage:
- *   node ~/.claude/scripts/utils/rules-load-snapshot.js
- *   node ~/.claude/scripts/utils/rules-load-snapshot.js --project /path/to/project
- *
- * Output: stdout only. No files written.
+ * rules-load-snapshot.js — 指令加载三口径估算（完成门 M3；harness 收缩计划 A1）。
+ *   A1a 启动固定加载：用户 CLAUDE.md + 无 `paths:` 的 rules + 项目根 CLAUDE.md + MEMORY.md 实际加载部分（前 200 行 / 25KB 取小）
+ *   A1b 按需路径规则：每个带 `paths:` 的 rules 文件单列（只在碰到匹配文件时加载）
+ *   A1c 磁盘总量
+ * token ≈ CJK 字 × 1.3 + 其余字节 / 4（2026-10-07 前按 bytes/4 估，CJK 低估约一倍）。
+ * 用法：node rules-load-snapshot.js [项目目录]（默认 CLAUDE_PROJECT_DIR 或 cwd）
  */
-
+'use strict';
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-function parseArgs(argv) {
-  const args = { project: process.cwd() };
-  for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--project' && argv[i + 1]) args.project = argv[++i];
-  }
-  return args;
-}
+const HOME = os.homedir();
+const PROJECT = path.resolve(process.argv[2] || process.env.CLAUDE_PROJECT_DIR || process.cwd());
 
-function estimateTokens(bytes) {
-  // Heuristic: ~4 bytes/token for mixed ASCII/UTF-8 markdown.
-  // CJK denser (~2 bytes/token), code blocks looser. Good enough for delta tracking.
-  return Math.round(bytes / 4);
+function tok(s) {
+  const cjk = (s.match(/[一-鿿　-〿＀-￯]/g) || []).length;
+  return Math.round(cjk * 1.3 + (s.length - cjk) / 4);
 }
-
-// 2026-05-20: Codex MODIFY 修复
-//   ① 只统计 *.md (非 markdown 文件不算配置注入)
-//   ② symlink 用 realpath 去重 (rules/active/ 经常 symlink 到 rules/common/,
-//      不去重会重复计算同一物理文件)
-// scanDir(dir, visited) — visited 是跨调用的 Set<realpath>，调用者传入并复用。
-function scanDir(dir, visited) {
+function hasPaths(file) {
+  const head = fs.readFileSync(file, 'utf8').slice(0, 400);
+  return head.startsWith('---') && /^paths:/m.test(head);
+}
+function walkMd(dir) {
   if (!fs.existsSync(dir)) return [];
-  const entries = [];
-  for (const name of fs.readdirSync(dir)) {
-    const full = path.join(dir, name);
-    let stat;
-    try { stat = fs.lstatSync(full); } catch { continue; }
-
-    // 解析真实路径并去重 (含 symlink follow)
-    let realPath;
-    try { realPath = fs.realpathSync(full); } catch { continue; }
-    if (visited.has(realPath)) continue;
-
-    let tstat;
-    try { tstat = fs.statSync(realPath); } catch { continue; }
-
-    if (tstat.isDirectory()) {
-      visited.add(realPath);
-      entries.push(...scanDir(realPath, visited).map(e => ({ ...e, name: `${name}/${e.name}` })));
-    } else if (tstat.isFile()) {
-      // 只统计 markdown
-      if (!/\.md$/i.test(name)) continue;
-      visited.add(realPath);
-      entries.push({ name, bytes: tstat.size, lines: countLines(realPath), path: realPath });
-    }
+  const out = [];
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...walkMd(p));
+    else if (e.isFile() && e.name.endsWith('.md')) out.push(p);
   }
-  return entries;
+  return out.sort();
+}
+function autoMemoryDir() {
+  for (const f of [path.join(PROJECT, '.claude/settings.local.json'), path.join(PROJECT, '.claude/settings.json'), path.join(HOME, '.claude/settings.json')]) {
+    try {
+      const v = JSON.parse(fs.readFileSync(f, 'utf8')).autoMemoryDirectory;
+      if (v) return v.startsWith('~/') ? path.join(HOME, v.slice(2)) : v;
+    } catch { /* absent */ }
+  }
+  const slug = PROJECT.replace(/[^a-zA-Z0-9]/g, '-');
+  return path.join(HOME, '.claude/projects', slug, 'memory');
 }
 
-function countLines(p) {
-  try { return fs.readFileSync(p, 'utf8').split('\n').length; }
-  catch { return 0; }
+const fixed = []; const scoped = []; let disk = 0;
+function add(label, file) {
+  if (!fs.existsSync(file)) return;
+  const s = fs.readFileSync(file, 'utf8'); disk += Buffer.byteLength(s);
+  (hasPaths(file) ? scoped : fixed).push([label, file, tok(s)]);
 }
-
-function fmtBytes(b) {
-  if (b < 1024) return `${b}B`;
-  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)}KB`;
-  return `${(b / 1024 / 1024).toFixed(2)}MB`;
+add('user-CLAUDE.md', path.join(HOME, '.claude/CLAUDE.md'));
+for (const f of walkMd(path.join(HOME, '.claude/rules'))) add('user-rules', f);
+add('project-CLAUDE.md', path.join(PROJECT, 'CLAUDE.md'));
+for (const f of walkMd(path.join(PROJECT, '.claude/rules'))) add('project-rules', f);
+const mem = path.join(autoMemoryDir(), 'MEMORY.md');
+if (fs.existsSync(mem)) {
+  const s = fs.readFileSync(mem, 'utf8'); disk += Buffer.byteLength(s);
+  const loaded = Buffer.from(s.split('\n').slice(0, 200).join('\n')).subarray(0, 25 * 1024).toString('utf8');
+  fixed.push(['auto-memory(loaded)', mem, tok(loaded)]);
 }
-
-function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const project = path.resolve(args.project);
-  const activeDir = path.join(project, '.claude', 'rules', 'active');
-  const userCommonDir = path.join(os.homedir(), '.claude', 'rules', 'common');
-  const userClaudeMd = path.join(os.homedir(), '.claude', 'CLAUDE.md');
-  const projectClaudeMd = path.join(project, 'CLAUDE.md');
-
-  console.log(`# Rules Load Snapshot — ${new Date().toISOString()}`);
-  console.log(`Project: ${project}`);
-  console.log('');
-
-  const sources = [];
-  // 跨所有扫描源共享 visited (realpath set), 防止 user-rules-common 和
-  // project-rules-active symlink 重叠导致同一物理文件被双计
-  const visited = new Set();
-
-  if (fs.existsSync(userClaudeMd)) {
-    const s = fs.statSync(userClaudeMd);
-    const rp = fs.realpathSync(userClaudeMd);
-    if (!visited.has(rp)) {
-      visited.add(rp);
-      sources.push({ group: 'user-CLAUDE.md', name: 'CLAUDE.md', bytes: s.size, lines: countLines(userClaudeMd), path: userClaudeMd });
-    }
-  }
-  if (fs.existsSync(projectClaudeMd)) {
-    const s = fs.statSync(projectClaudeMd);
-    const rp = fs.realpathSync(projectClaudeMd);
-    if (!visited.has(rp)) {
-      visited.add(rp);
-      sources.push({ group: 'project-CLAUDE.md', name: 'CLAUDE.md', bytes: s.size, lines: countLines(projectClaudeMd), path: projectClaudeMd });
-    }
-  }
-  for (const f of scanDir(userCommonDir, visited)) sources.push({ group: 'user-rules-common', ...f });
-  for (const f of scanDir(activeDir, visited)) sources.push({ group: 'project-rules-active', ...f });
-
-  // Group totals
-  const groups = {};
-  for (const s of sources) {
-    if (!groups[s.group]) groups[s.group] = { bytes: 0, tokens: 0, files: 0 };
-    groups[s.group].bytes += s.bytes;
-    groups[s.group].tokens += estimateTokens(s.bytes);
-    groups[s.group].files += 1;
-  }
-
-  console.log('## By group');
-  let totalBytes = 0, totalTokens = 0;
-  for (const [g, v] of Object.entries(groups)) {
-    console.log(`  ${g.padEnd(24)} ${String(v.files).padStart(3)} files  ${fmtBytes(v.bytes).padStart(8)}  ~${v.tokens} tokens`);
-    totalBytes += v.bytes;
-    totalTokens += v.tokens;
-  }
-  console.log(`  ${'TOTAL'.padEnd(24)} ${String(sources.length).padStart(3)} files  ${fmtBytes(totalBytes).padStart(8)}  ~${totalTokens} tokens`);
-  console.log('');
-
-  console.log('## Per file');
-  sources.sort((a, b) => b.bytes - a.bytes);
-  for (const s of sources) {
-    console.log(`  ${fmtBytes(s.bytes).padStart(8)}  ${String(s.lines).padStart(4)}L  ~${String(estimateTokens(s.bytes)).padStart(4)}t  [${s.group}] ${s.name}`);
-  }
-  console.log('');
-  console.log('## Notes');
-  console.log('  - token estimate = bytes/4 (heuristic; CJK denser, code blocks looser)');
-  console.log('  - this snapshot reads only filesystem; does not measure runtime agent usage');
-  console.log('  - Codex 反对持续观测 hook; 本工具仅为一次性基线，不写状态、不挂 hook');
-}
-
-try { main(); } catch (err) {
-  console.error(`rules-load-snapshot error: ${err.message}`);
-  process.exit(1);
-}
+const short = (p) => p.replace(HOME, '~');
+console.log(`# Rules Load Snapshot — ${new Date().toISOString()}\nProject: ${PROJECT}\n`);
+console.log('## A1a 启动固定加载（token）');
+for (const [l, f, t] of fixed) console.log(`  ${String(t).padStart(7)}  ${l.padEnd(22)} ${short(f)}`);
+console.log(`  ${String(fixed.reduce((a, x) => a + x[2], 0)).padStart(7)}  TOTAL A1a`);
+console.log('\n## A1b 按需路径规则（token，单列，不计入启动）');
+if (!scoped.length) console.log('  (无)');
+for (const [l, f, t] of scoped) console.log(`  ${String(t).padStart(7)}  ${l.padEnd(22)} ${short(f)}`);
+console.log(`\n## A1c 磁盘总量: ${disk} B`);
+console.log('\n注：token 为启发式估算；以新会话 /context 为准校准一次（差异 < 15%）。');

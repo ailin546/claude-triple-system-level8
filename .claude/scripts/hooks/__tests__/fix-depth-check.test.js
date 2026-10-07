@@ -5,7 +5,7 @@
  * Covers Codex 5-class "必测 hook" boundary "解析配置/内容" — regex pattern
  * matching + commit message extraction. Companion to:
  *   - careful-guard.test.js (阻断 + 改 context)
- *   - evaluation-gate.test.js (state file + mode gate + 阻断)
+ *   - careful-guard.test.js (阻断 + 解析命令)
  *
  * Run: node ~/.claude/scripts/hooks/__tests__/fix-depth-check.test.js
  * Exit 0 = all pass, exit 1 = any failure.

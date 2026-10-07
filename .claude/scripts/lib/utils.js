@@ -177,7 +177,7 @@ function getTimeString() {
  * The session a hook or script acts for, made safe for file names; '' when
  * there is none. A hook's stdin JSON carries `session_id`. Claude Code also
  * exports the same id as CLAUDE_CODE_SESSION_ID to hooks and to its Bash tool,
- * which is all a script Claude runs through Bash (set-mode, get-model) has.
+ * which is all a script Claude runs through Bash has.
  * Claude Code never sets CLAUDE_SESSION_ID.
  */
 function hookSessionId(input) {

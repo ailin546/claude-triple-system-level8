@@ -74,3 +74,18 @@ Codex 的日常调用、Fast/Standard/Heavy 路径和阶段映射见
 - Codex 安装器遇到无效 TOML、无效 JSON 或未知 Hook 事件结构时，在写入前失败。
 - Hook 只按规范化后的完整目标路径识别自身条目，不按脚本文件名误删用户 Hook。
 - 共享的是知识文件和流程语义；锁、日志、transcript、会话与客户端状态继续隔离。
+
+## 2026-10-07 兼容评审：harness 收缩（Claude 侧改用原生能力）
+
+依据 `quant-deploy/reports/harness-slim-plan-2026-10-07.md`（Codex 对抗审查 14 条已吸收）。Claude 侧删除 Fast/Standard/Heavy 模式机器、提醒型 hook、自建记忆轮转、Board 模式与对应 command / skill；共享语义不变，映射改为：
+
+| capability | Codex 侧 | Claude 侧新家 |
+|---|---|---|
+| triage | system-triage | `CLAUDE.md` §工作方式：一句话能描述 diff 直接做，否则原生 plan mode |
+| clarify_scope | clarify-scope | `CLAUDE.md`：AskUserQuestion 访谈写 SPEC；`rules/common/workflow.md` step 0 |
+| plan_execute | plan | `CLAUDE.md` / `workflow.md`：plan mode + 每步 `→ verify:` |
+| iterative_improvement | evaluation loop | `CLAUDE.md`：原生 `/goal` 或 Stop hook 门，有基线与指标才循环 |
+| handoff_memory | shared memory | `shared/memory/PROTOCOL.md`：`PROJECT/.memory/auto/`（原生 auto memory，Claude/Codex 共用）+ `handoff.md`；同步只经 push-all / pull-all |
+| 完成门 | — | `.claude/on-demand/self-evolution.md`（自 agents.md 迁入） |
+
+Codex 侧 AGENTS.md / 八个 Skill 的语义（Fast/Standard/Heavy 分类、共享记忆读 `~/.memory` 与 `PROJECT/.memory`）仍成立：Codex 保留自己的分类，Claude 侧不再有对应状态机；记忆路径按新协议读 `auto/MEMORY.md`。受保护文件基线随本次显式刷新。

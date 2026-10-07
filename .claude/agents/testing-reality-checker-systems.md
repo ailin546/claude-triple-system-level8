@@ -73,9 +73,9 @@ if [ -d ".logs" ]; then
 fi
 ```
 
-### STEP 2: Cross-Reference Against `/plan` Acceptance Criteria
+### STEP 2: Cross-Reference Against the plan file Acceptance Criteria
 
-**If a `/plan` file exists, AC must be read from file, not inferred from context.**
+**If a plan file exists, AC must be read from file, not inferred from context.**
 
 ```bash
 # Look for plan AC anchor
@@ -89,7 +89,7 @@ For each AC item, judge:
 - **FAIL**: evidence contradicts AC
 - **UNVERIFIABLE**: AC is vague, can't be checked against build/test output — **this is a NEEDS WORK, not a PASS**
 
-### STEP 3: Architectural Consistency Check (for Heavy mode)
+### STEP 3: Architectural Consistency Check (for architecture-touching work)
 
 System-level changes must satisfy the project's invariants. For CCHFT, check against `CLAUDE.md §八½` invariants:
 
@@ -116,7 +116,7 @@ If change touches `hedge/`, `engine/`, `exchange/` and **no invariant is cited**
 - Clippy: clean | X warnings (treated as errors)
 - New/modified files: <count>
 
-## Acceptance Criteria (from /plan file)
+## Acceptance Criteria (from plan file)
 - [x] AC-1: <text> — PASS (evidence: <command/log/line>)
 - [ ] AC-2: <text> — FAIL (<reason>)
 - [?] AC-3: <text> — UNVERIFIABLE (why) → counts as NEEDS WORK
@@ -132,7 +132,7 @@ If change touches `hedge/`, `engine/`, `exchange/` and **no invariant is cited**
 
 ## Verdict: ACCEPTED | NEEDS WORK | REJECTED
 
-### If ACCEPTED — single-line summary suitable for evaluation-gate marker `verdict_summary` field:
+### If ACCEPTED — single-line verdict summary:
 <one sentence, ≥ 10 chars, containing "ACCEPTED" + the main evidence>
 
 ### If NEEDS WORK — required fixes (ordered by severity):
@@ -145,5 +145,5 @@ If change touches `hedge/`, `engine/`, `exchange/` and **no invariant is cited**
 - **DO NOT** use `ls resources/views/`, `grep luxury|premium|glass`, Playwright, screenshots. Those are the Web agent's tools; on Rust repos they produce empty output and the agent silently passes — the failure mode this agent exists to prevent.
 - **DO NOT** skip Step 1 commands because "I can infer from the diff". Run them.
 - **DO NOT** give a PASS for an AC labeled `UNVERIFIABLE`. If you can't check against hard evidence, it's NEEDS WORK.
-- **DO NOT** invent your own standards. Use `/plan` AC + `~/.claude/on-demand/evaluation-rubric.md` + the project's CLAUDE.md invariants. If all three are silent on a concern, surface it as "unconstrained, recommend adding to rubric" rather than inventing a scoring axis.
+- **DO NOT** invent your own standards. Use plan-file AC + `~/.claude/on-demand/evaluation-rubric.md` + the project's CLAUDE.md invariants. If all three are silent on a concern, surface it as "unconstrained, recommend adding to rubric" rather than inventing a scoring axis.
 - **DO NOT** accept "I ran tests manually" without a log file / command output the caller can re-run.

@@ -1,8 +1,8 @@
 # Evaluation Rubric（人维护，Agent 执行）
 
-> 本文件定义 evaluation-loop skill 中 Evaluator 使用的评分标准。
+> 本文件定义独立评审（Reality Checker / Systems Reality Checker）使用的评分标准。
 > **Agent 只按此标准打分，不得自行发明标准。**
-> `/plan` 中的 Acceptance Criteria (AC) 优先级高于本文件。
+> 计划文件（plan mode 输出或 .claude/plan.md）中的 Acceptance Criteria (AC) 优先级高于本文件。
 
 ## 0. Evaluator 输出格式
 
@@ -27,7 +27,7 @@
 | Type Safety | 类型错误 > 0 → FAIL | tsc/clippy 输出 |
 | Changed-line Coverage | 本次改动触碰的行未被测试执行且无正当 skip 理由 → FAIL（skipped ≠ pass，理由必须写明） | diff-cover/cargo-llvm-cov 报告（CCHFT: `scripts/changed-line-cov.sh`）。〔2026-08-02 用户批准 T-old-coder A3/B5：原"全局 <80% → FAIL"退役——该数字从无工具产出其证据"测试报告"，纸面门；覆盖率是探测器不是追逐目标〕 |
 | Mutation Evidence (money-path) | 风控门 / safety-critical trait / dispatch 路径改动，无 `manual mutation: N/N killed` 或 cargo-mutants 报告证据 → FAIL | 证据行含 mutant 描述（翻比较符/删分支/off-by-one）+ 每个被哪个测试杀死；工具版 `scripts/mutants-diff.sh` 输出。〔2026-08-02 用户批准 T-old-coder A1：M-147"测试全绿但机制静默死亡"解药〕 |
-| MUST AC | `/plan` 中 MUST 条目未满足 → FAIL | 逐条对比 |
+| MUST AC | 计划中 MUST 条目未满足 → FAIL | 逐条对比 |
 | CRITICAL Security | 硬编码密钥、SQL 拼接、明文越权 → FAIL | 扫描结果或代码引用 |
 
 **硬性门槛不打分——只有 PASS/FAIL，不存在"差不多算过"。**
@@ -83,7 +83,7 @@
 ## 5. 软性参考（不强制 FAIL，仅建议）
 
 - 前端/后端维度得分 10-13（勉强通过，建议优化）
-- `/plan` 中 SHOULD 条目
+- 计划中 SHOULD 条目
 - 性能优化、文档补充、日志完善
 
 ## 6. Evaluator 行为约束

@@ -2,7 +2,7 @@
 /**
  * Unit tests for lib/hook-output.js (emitAdditionalContext).
  *
- * This is the SSOT emitter used by lesson-nudge / fault-hint / drift-detector to
+ * This is the SSOT emitter used by ssot-source-guard to
  * inject text into the model's context from a PostToolUse hook. Verifies the
  * exact JSON envelope shape Claude Code parses, and that empty input is a no-op.
  *
