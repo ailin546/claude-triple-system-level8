@@ -95,7 +95,7 @@
 
 > 2026-05-20 教训：删 agent 时漏了 5 处真实活引用。根因：agent 名有两套约定（frontmatter `name` + 文件-slug）。删除任意 `~/.claude/agents/*.md` 前，**两个名字都要扫**：
 
-必扫：`agents/`、`CLAUDE.md`、`commands/*.md`（`subagent_type:`）、`rules/**/*.md`、`rules-all/**/*.md`、`skills/**/SKILL.md`、`scheduled-tasks/**/SKILL.md`、`state/sessions-board.md`、`scripts/hooks/*.js`、`on-demand/*.md`、`settings.json`、`~/.claude-system/shared/`（M4 清单与 tests）。可忽略：`backups/`、`*-archive/`、`projects/**/*.jsonl`、`sessions/`、`file-history/`、`plugins/cache/`。
+必扫：`agents/`、`CLAUDE.md`、`commands/*.md`（`subagent_type:`）、`rules/**/*.md`、`skills/**/SKILL.md`、`scheduled-tasks/**/SKILL.md`、`state/sessions-board.md`、`scripts/hooks/*.js`、`on-demand/*.md`、`settings.json`、`~/.claude-system/shared/`（M4 清单与 tests）。可忽略：`backups/`、`*-archive/`、`projects/**/*.jsonl`、`sessions/`、`file-history/`、`plugins/cache/`。
 
 真引用（必须改）：`subagent_type: "..."`、反引号包裹的名、列表项 `- **name**:`、ASCII 流程图里的名。描述性短语与历史教训记录保留。删除时同步搜意图相反的待办（`- [ ] 保留 X 删除 Y`），标 `[x] DONE 日期 (做法相反)`。
 

@@ -89,3 +89,7 @@ Codex 的日常调用、Fast/Standard/Heavy 路径和阶段映射见
 | 完成门 | — | `.claude/on-demand/self-evolution.md`（自 agents.md 迁入） |
 
 Codex 侧 AGENTS.md / 八个 Skill 的语义（Fast/Standard/Heavy 分类、共享记忆读 `~/.memory` 与 `PROJECT/.memory`）仍成立：Codex 保留自己的分类，Claude 侧不再有对应状态机；记忆路径按新协议读 `auto/MEMORY.md`。受保护文件基线随本次显式刷新。
+
+### 2026-10-08 追加：删 rules-loader / rules-all，清三个无引用目录
+
+`rules-loader.js` 在项目会话里找 `PROJECT/.claude/rules-all` 不存在即跳过，从未起作用；它是 `rules-all/` 的唯一消费者，两者按 Rule 0 一起删（hook 7 → 6，SessionStart 不再注册任何 hook）。同时删 `scripts/hooks-archive/`（git 历史即归档）、`scripts/deepseek-executor/`、`.claude/strategies/`（均无引用）。Codex 映射不受影响（无 capability 指向它们）；`settings.json` 与根 `CLAUDE.md` 为受保护文件，显式刷新基线。

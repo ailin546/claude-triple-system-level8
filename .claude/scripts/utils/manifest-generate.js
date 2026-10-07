@@ -181,14 +181,11 @@ function detectDrift(hooks, agents, skills) {
   //   - SessionStart hooks (写 stdout 输出给 Claude, 不是 chain 传递)
   //   - PreToolUse 阻断式 guard (exit 1/2 阻断, passthrough 反而抵消阻断意图)
   //   - additionalContext 注入式 (emitAdditionalContext: stdout 必须是纯 JSON,
-  //     不能 passthrough, 否则合并后非法 JSON → 注入被丢弃; 见 infrastructure.md
-  //     §Hook 输出渠道 SSOT)
+  //     不能 passthrough, 否则合并后非法 JSON → 注入被丢弃; 见 rules/common/hooks.md
+  //     §输出渠道)
   drift.hookContractIncomplete = [];
   const passthroughExclude = new Set([
-    'session-start', 'task-router', 'rules-loader',  // SessionStart 输出类
-    'careful-guard', 'freeze-guard',                   // PreToolUse 阻断式 (exit 1/2)
-    'evaluation-gate', 'fix-depth-check',              // PreToolUse 阻断式 (exit 2)
-    'auto-model',                                       // 已知 utility, 非注册 hook
+    'careful-guard', 'freeze-guard', 'fix-depth-check', // PreToolUse 阻断式 (exit 1/2)
   ]);
   for (const hookName of hooks.active) {
     if (passthroughExclude.has(hookName)) continue;

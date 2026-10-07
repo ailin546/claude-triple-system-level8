@@ -14,7 +14,7 @@
 
 ## 优先级
 
-1. 用户显式指令 2. hooks（`rules/common/hooks.md`，7 个守卫型）3. `rules/common/` 工作流 4. 专长 agent（下表）。
+1. 用户显式指令 2. hooks（`rules/common/hooks.md`，6 个守卫型）3. `rules/common/` 工作流 4. 专长 agent（下表）。
 
 ## Agent 路由（专长 agent，Capital 名，按需）
 

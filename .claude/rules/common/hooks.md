@@ -1,10 +1,9 @@
 # Hooks
 
-> 2026-10-07 harness 收缩后只剩 7 个 hook：全是守卫型或零上下文成本的自动化。提醒型 hook、Fast/Standard/Heavy 模式机器、自建记忆管道、Board 模式已删（计划：`quant-deploy/reports/harness-slim-plan-2026-10-07.md`）。新增 hook 只允许「必须每次发生、不需要 Claude 思考」的事，优先阻断型；14 天内同类事故 ≥ 2 次才考虑重建。
+> 2026-10-07 harness 收缩后只剩 6 个 hook（rules-loader 于 10-08 删：它在项目会话里找 `PROJECT/.claude/rules-all` 不存在即跳过，从未起作用，连同 `rules-all/` 一起删）：全是守卫型或零上下文成本的自动化。提醒型 hook、Fast/Standard/Heavy 模式机器、自建记忆管道、Board 模式已删（计划：`quant-deploy/reports/harness-slim-plan-2026-10-07.md`）。新增 hook 只允许「必须每次发生、不需要 Claude 思考」的事，优先阻断型；14 天内同类事故 ≥ 2 次才考虑重建。
 
 | Hook | 事件 | 作用 | 测试 |
 |---|---|---|---|
-| rules-loader | SessionStart | 按项目语言把 `rules-all/<lang>/` 软链进 `rules/<lang>/`；`rules/common/` 始终加载 | — |
 | careful-guard | PreToolUse(Bash) | 破坏性命令守卫：DENY（fork bomb / 格式化文件系统 / 裸设备写 / 删根目录）无条件拦；CONTEXTUAL 按上下文判（clean tree 的 reset、仅 build 工件的递归删除放行）；单条 git/cargo/npm 走 allowlist。状态 `~/.claude/.careful-enabled`，`/careful` 开关。按命令字面扫描，heredoc 文本里出现关键词也会拦 | `careful-guard.test.js`(50) + `command-scan.test.js` |
 | fix-depth-check | PreToolUse(Bash) | `git commit` 含 fix 关键字但缺根因解释（root cause / because / 原因 / 根因）→ 软警告 | `fix-depth-check.test.js` |
 | freeze-guard | PreToolUse(Edit\|Write) | `/freeze` 编辑范围锁 | — |

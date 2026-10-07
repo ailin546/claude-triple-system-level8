@@ -6,12 +6,12 @@
     ".claude/commands/code-review.md": "078184ba0d53f995248b163a908b79b0b465334d99845aefcbbf599423235d80",
     ".claude/commands/verify.md": "a7463cdd4d0f272911c7cb9bf971a9b790f4b268f19b30be16224afc177cc28c",
     ".claude/rules/common/agents.md": "88551f89ed0f8d92439a10a122bacf4c0b5483197823428da2b61c1f4f638655",
-    ".claude/rules/common/hooks.md": "83261e8b229ed918927787efc8abe2f4b0c307a87dfb16d25aede2c1fe1e036f",
+    ".claude/rules/common/hooks.md": "1da6719ffb8256c69d51bd14e141e49f89402c82f037bdf431e021ae547545cd",
     ".claude/rules/common/quality-and-security.md": "c060ae872b63e74e2cd97b2471637925ed33958781ae156261bdf13fbe0cd9c8",
     ".claude/rules/common/workflow.md": "e82cbb1dd6e58b6dcd661c8c05a0eb6efdfa9f5d2b4e69bc7f0b05d1cbcf3e70",
     ".claude/scripts/lib/project-root.js": "3a423b0f8ee26d52d46616b5db207e70aa2b8fbbdec1a38162eb342e50c4ef0f",
-    ".claude/settings.json": "8521dc58e5e247b5db01788d571d94276e2020c5cc00980036990d9fc1e3f8f7",
-    "CLAUDE.md": "b51890445b34dc79d0f9bf5065c80608cb6c296b7a67387dfafd70a40fb2d601",
+    ".claude/settings.json": "59424445f488785e5eb7709045dcb72bb86eee801d8207ea4bd9484a927c4e93",
+    "CLAUDE.md": "00b1b7ee5f332da7a292987cc34869e6afb0b4d54f4305eedba38d7f9178b857",
     "install.sh": "82269cf49b5c88a6c590aa24f6c235c33bccca701992972f60fb4d95686330ed",
     "setup-claude.sh": "678932d0be4004e5a89744b83c25b7a19fa2e62395e5b1a097f38156869465f1"
   }

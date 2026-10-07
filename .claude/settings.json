@@ -58,18 +58,6 @@
   },
   "model": "opus[1m]",
   "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ~/.claude/scripts/hooks/rules-loader.js",
-            "timeout": 5000
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
