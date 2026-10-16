@@ -11,7 +11,7 @@
     ".claude/rules/common/workflow.md": "e82cbb1dd6e58b6dcd661c8c05a0eb6efdfa9f5d2b4e69bc7f0b05d1cbcf3e70",
     ".claude/scripts/lib/project-root.js": "3a423b0f8ee26d52d46616b5db207e70aa2b8fbbdec1a38162eb342e50c4ef0f",
     ".claude/settings.json": "59424445f488785e5eb7709045dcb72bb86eee801d8207ea4bd9484a927c4e93",
-    "CLAUDE.md": "00b1b7ee5f332da7a292987cc34869e6afb0b4d54f4305eedba38d7f9178b857",
+    "CLAUDE.md": "4440f8771d1f4ce5eb970a6e86acf7d0cc19d0e7f6468a45e30117dea1a4192d",
     "install.sh": "82269cf49b5c88a6c590aa24f6c235c33bccca701992972f60fb4d95686330ed",
     "setup-claude.sh": "678932d0be4004e5a89744b83c25b7a19fa2e62395e5b1a097f38156869465f1"
   }

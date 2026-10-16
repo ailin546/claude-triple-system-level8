@@ -28,7 +28,7 @@
 - 准备 commit → 看其他 session 是否动同区域；自己 commit 后更新 entry
 - spawn 后台 agent 修改类任务 → 更新 `next` 让对方知道何时不该 stash/reset
 - 长任务切换大方向 → 更新 `doing` + `next`
-- session 结束 → entry 移到 `## History` 段（保留 30 天）
+- session 结束 → 先清掉自己 worktree 的编译产物（`cargo clean`，有在跑的栈或演练除外），再把 entry 剪到 `sessions-board-history-2026.md`。写「可剪」之前 target 必须已经为空。
 
 ---
 
@@ -59,7 +59,7 @@
 ## 失效与清理
 
 - 任一 session 看到 entry mtime > 4h → 视为 stale，主动询问或迁到 History
-- session 结束移到 `## History`，保留最近 50 个，老的删
+- session 结束剪到 `sessions-board-history-2026.md`，保留最近 50 个，老的删；剪之前 `cargo clean`（见「写入触发」）
 - 不强制 hook 自动写（自觉纪律 > hook 强制；hook 在每个文件操作后 spam 写比不写还烦）
 
 ---
@@ -78,3 +78,4 @@
 - ❌ entry 太宽泛：`doing: 改 master.rs` → 对方不知道改哪段哪函数
 - ❌ 不写 don't touch：对方推测 don't touch，推测错就冲突
 - ❌ session 结束不清理 → board 越长越没人读
+- ❌ 卡合完不 `cargo clean` → 每份 debug target 30–70G，2026-10-09～10-16 四轮共清出 500G+，10-16 盘只剩 6G

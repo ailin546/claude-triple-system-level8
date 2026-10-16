@@ -67,6 +67,13 @@
 - 同步只经 `quant-deploy/scripts/pull-all.sh` / `push-all.sh`（只发布 .md、拒绝冲突标记、冲突即停），没有 hook 自动推拉。
 - 会话恢复用原生 `/resume`、`/rename`。
 
+## 读 PDF
+
+- 先转 Markdown 再读：`pymupdf4llm <文件或目录> --out <scratchpad 目录> --opt page_separators=true`，产物 `<out>/<文件名>/<文件名>.md`。图片页自动 OCR（RapidOCR，中英文，模型随包，每个图片页多几秒），OCR 文本包在 `<!-- Start of picture text -->` 里。
+- 转完看同目录 `run-log.txt` 的 `OCR on page` 行：这些页是图片识别出来的，要引用其中数字时 `Read` 原页（带 `pages`）对一眼。横排（旋转 90°）的扫描页 OCR 会乱码，直接 `Read` 那一页。
+- 已知损失：页脚页码被去掉、跨页表格表头错位、图表曲线不转。问题针对图表 / 版式时直接 `Read` 原页。含个人信息的产物用完即删。
+- 命令不存在时：`uv tool install pymupdf4llm --with rapidocr`；`Read` 读 PDF 页依赖 poppler（`brew install poppler` / `apt install poppler-utils`）。
+
 ## 多 Worktree / Sub-agent Git 隔离（强制）
 
 > 2026-05-05 事故：后台 agent 在共享 worktree 内 `git stash` / `pop` 吞掉主 session 的 staging，16 个文件从 commit 丢失。全文 `on-demand/git-isolation.md`。
